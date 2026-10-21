@@ -1,0 +1,312 @@
+You are a principal full-stack engineer and staffing-domain product architect at an enterprise consultancy. You are building the minimum lovable product (MVP) of HireNestOS, the AI-native staffing operating system for HireNest Workforce. Build it from scratch, production-grade, secure by default, with a professional, consistent enterprise UI.
+
+The product must feel like real software that a staffing company runs on (think Greenhouse, Bullhorn or Ceipal), not a demo. Correct data, correct permissions and a clear workflow matter more than visual flourish.
+
+Before you write code, restate the scope in five bullets and list the screens you will build. Then build everything in one pass. Do not stop at a skeleton.
+
+1. NON-NEGOTIABLE RULES (read twice)
+Supabase is the only backend and the only source of truth. The database, RLS policies, functions and storage bucket ALREADY EXIST. Do not create, alter or migrate tables. Do not write SQL. Do not invent tables, columns, enums or RPC names. Use exactly the contract in Section 5. If something seems missing, show a clear "Not available in MVP" state. Do not fake it.
+No mock, sample, hardcoded or random data anywhere. Every list, count, score and chart comes from Supabase. Empty database means empty states with a helpful call to action.
+No paid AI. Do NOT use Gemini. Do not import @google/genai or any Google AI SDK. Do not call any LLM API. The owner's policy is Ollama-only, no paid fallback. Matching in the MVP is done in the database by a deterministic engine (candidate_matches). AI resume parsing and AI screening interviews are Phase 2. Show them as clearly labelled "Coming soon" panels behind the platform_settings.ai_screening_enabled flag, which is false by default.
+Security is enforced by the database. The UI is never the security boundary. Still, the UI must:
+only use the anon/publishable key (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY); never a service-role key, and never hardcode keys;
+never trust user_metadata for role; read the role from public.profiles;
+never log PII (email, phone, resume text) to the console, analytics or error messages;
+route by role and hide actions a role cannot perform, but always handle 42501 / "FORBIDDEN" errors gracefully.
+Pipeline writes go through RPCs only. Never insert or update candidates creation, submissions, interviews, requirement_vendor_shares, match overrides or requirement status directly. Use the RPCs in Section 5.4. Direct table writes are allowed only where Section 5.3 says so.
+A potential match is NOT an application. Only apply_to_requirement (direct candidate) or submit_candidate (vendor/HQ) creates a pipeline record.
+Source attribution must always be correct and visible: vendor (shows vendor agency name), direct (never show a vendor), internal (HireNest sourced). The candidate's original source, current vendor association and submitter for a specific requirement are three different things. Display them separately.
+Recruiter override wins. Show final_score, and when override_score is set, show "Overridden by recruiter" with the reason.
+Bounded queries only. Every list uses server-side pagination (.range(from, to) with count: 'exact'), default page size 25, and filters applied in the query, not in the browser.
+Human decisions are final. Scores are advisory. Every consequential action (reject, withdraw, share with client, offer, override, approve) needs a confirmation dialog, and a reason where the RPC requires one.
+2. TECH STACK (use exactly this)
+React 18 + TypeScript (strict) + Vite
+Tailwind CSS + a small in-house component kit (Button, Input, Select, Textarea, Badge, Card, Table, Tabs, Dialog, Drawer, Toast, Skeleton, EmptyState, Pagination, StatCard, RatingInput 1–5)
+React Router v6 (role-scoped route trees)
+@supabase/supabase-js v2 (one client in src/lib/supabase.ts)
+TanStack Query for all server state (query keys per entity; invalidate after mutations)
+react-hook-form + zod for every form (validation messages inline)
+date-fns for dates (display in the user's local time zone; store UTC)
+lucide-react icons
+No other backend, no Firebase, no Express server, no Gemini.
+Folder layout:
+
+src/
+  lib/supabase.ts, lib/errors.ts, lib/hash.ts, lib/format.ts
+  types/db.ts               // hand-written types matching Section 5 exactly
+  api/                      // one file per domain: requirements.ts, candidates.ts, submissions.ts, ...
+  auth/AuthProvider.tsx, auth/RequireRole.tsx
+  components/ui/...         // the component kit
+  components/domain/...     // SourceBadge, StageBadge, MatchEvidence, ScoreBar, VendorScoreCard, ...
+  layouts/AppShell.tsx      // sidebar + top bar + notifications bell
+  pages/admin/... pages/recruiter/... pages/client/... pages/vendor/... pages/candidate/...
+  pages/auth/...            // sign in, sign up, pending approval, reset password
+3. PRODUCT CONTEXT (from the PRD)
+HireNestOS connects Admin (HQ), Recruiter (HQ), Client, Vendor and Direct Candidate to one governed recruitment lifecycle:
+
+Source / registration → resume upload → profile → potential match → direct application OR vendor submission → recruiter review → client review → interviews (with ratings) → offer → accepted / declined → onboarded
+
+Two-way discovery is required:
+
+Requirement → Candidates: from a requirement, see ranked eligible candidates with evidence.
+Candidate → Requirements: from a candidate, see ranked relevant requirements with evidence.
+New feature in this MVP: Vendor & Client Rating System (Section 8). Vendor performance is measured on submission timing (SLA), candidate quality and process compliance, kept as three separate scores. Clients give structured feedback after every interview round.
+
+4. ROLES, ROUTING AND AUTH
+4.1 Roles (from profiles.role)
+Role	Who	Home route
+admin	HireNest HQ admin	/admin
+recruiter	HireNest internal recruiter / ops	/recruiter
+client_manager	Client hiring manager	/client
+client_member	Client interviewer / panel (read + feedback)	/client
+vendor_admin	Vendor agency owner	/vendor
+vendor_recruiter	Vendor agency recruiter	/vendor
+candidate	Direct candidate	/candidate
+pending	Signed up as vendor/client, waiting for approval	/pending
+admin and recruiter share most HQ screens. Admin-only items (user and role management, organizations, margins, feedback-sharing approval, dispute resolution, settings and score weights, audit log) are hidden from recruiters.
+
+4.2 Auth flows
+Sign up (email + password, Supabase Auth): fields full name, email, password, and "I am a…" (Candidate / Vendor agency / Hiring company). For vendor or company, also ask for company name. Send it as options.data = { full_name, signup_intent: 'candidate' | 'vendor' | 'client', company_name }. The database decides the role. Candidates become candidate; everyone else becomes pending.
+Sign in, forgot password (resetPasswordForEmail), update password page, sign out.
+After sign-in, load profiles for auth.uid(), then load the org (if any). Route by role.
+status = 'pending_approval' or role pending → Pending approval page ("HireNest will verify your company and activate your access"). No other access.
+status = 'suspended' or org not approved → Access suspended page.
+Session persistence and auto-refresh on. Handle expired sessions with a redirect to sign-in that preserves the return URL.
+5. DATABASE CONTRACT (exists already; use exactly)
+5.1 Enums
+app_role: admin, recruiter, client_manager, client_member, vendor_admin, vendor_recruiter, candidate, pending
+user_status: active, pending_approval, suspended
+org_type: internal, client, vendor · org_status: pending_review, approved, suspended, rejected
+requirement_status: draft, pending_approval, open, on_hold, closed, filled
+candidate_source: vendor, direct, internal
+submission_stage: applied, recruiter_review, client_review, interviewing, offered, offer_accepted, offer_declined, rejected, withdrawn, onboarded
+interview_round: initial_screening, technical, managerial, final, ai_screening
+interview_status: scheduled, completed, cancelled, rescheduled, no_show
+interview_decision: advance, hold, reject, additional_assessment
+ai_modality: text, audio, video · dispute_status: open, upheld, rejected
+5.2 Tables (all in public; RLS filters rows automatically per user)
+organizations: id, name, type, status, industry, domain, gst_number, contact_name, contact_email, contact_phone, sla_tier (standard|premium|enterprise), created_at, updated_at
+profiles: id (= auth user id), org_id, role, status, full_name, email, phone, requested_role, requested_company, created_at
+requirements: id, client_org_id, title, description, skills text[], min_experience, max_experience, location, work_mode (onsite|hybrid|remote), employment_type (full_time|contract|contract_to_hire|part_time), openings, vendor_visible_budget, currency, status, is_public, submission_sla_hours, created_by, opened_at, closed_at, created_at, updated_at
+requirement_financials: requirement_id, actual_client_budget, notes (client managers + HQ only; vendors never see it)
+requirement_margins: requirement_id, platform_margin, margin_type (fixed|percentage) (admin only)
+requirement_vendor_shares: id, requirement_id, vendor_org_id, shared_by, shared_at, due_at, acknowledged_at, acknowledged_by, revoked_at
+candidates: id, user_id, full_name, current_title, location, total_experience_years, skills text[], summary, resume_path, resume_hash, parsed_data jsonb, original_source, source_vendor_org_id, owner_vendor_org_id, created_by, created_at, updated_at. No pipeline status here.
+candidate_contacts: candidate_id, email, phone, linkedin_url (clients can NOT read; show "Contact details are managed by HireNest" to clients)
+duplicate_flags: id, kind (candidate|submission), match_type, existing_candidate_id, requirement_id, attempted_by, attempted_org_id, attempted_name, status (open|resolved), resolution_note, resolved_by, resolved_at, created_at
+candidate_matches: id, requirement_id, candidate_id, computed_score, skill_score, experience_score, override_score, final_score, matched_skills text[], unproven_skills text[], experience_note, evidence jsonb, engine_version, calculated_at, override_reason, overridden_by, overridden_at
+submissions: id, requirement_id, candidate_id, source, vendor_org_id, submitted_by, stage, stage_changed_at, shared_with_client_at, is_valid, invalid_reason, notes, created_at, updated_at
+submission_stage_history: id, submission_id, from_stage, to_stage, actor_id, actor_role, reason, created_at
+interviews: id, submission_id, round_type, round_number, scheduled_at, duration_minutes, mode (video|phone|in_person|ai_text), meeting_link, status, created_by, completed_at
+interview_feedback: id, interview_id, rated_by, rater_org_id, skill_rating 1–5, communication_rating 1–5, overall_rating 1–5, decision, feedback (min 10 chars), evidence, visible_to_vendor, visibility_approved_by, excluded_from_score, created_at
+candidate_quality_feedback: id, submission_id, rated_by, rater_org_id, jd_skill_alignment, relevant_experience, resume_accuracy, communication, interview_readiness, overall_suitability (each 1–5), comments, visible_to_vendor, visibility_approved_by, excluded_from_score, created_at
+rating_disputes: id, feedback_kind (interview|quality), feedback_id, vendor_org_id, raised_by, reason (min 20 chars), status, resolved_by, resolution_note, created_at, resolved_at
+ai_screening_sessions: Phase 2 (read-only "coming soon" in the MVP)
+platform_settings (single row, id = 1): timing_weight, quality_weight, compliance_weight (must sum to 100), weights_approved, weights_approved_by, min_sample_size, default_submission_sla_hours, share_vendor_summary_with_clients, ai_provider ('ollama'), ai_screening_enabled
+notifications: id, user_id, kind, title, body, link, read_at, created_at
+audit_logs (admin read-only): id, table_name, record_id, action, actor_id, actor_role, old_data, new_data, created_at
+Storage bucket resumes (private). Path MUST be <candidate_id>/<timestamp>-<safe-file-name>. PDF/DOC/DOCX, max 10 MB. Open files with createSignedUrl(path, 300), never public URLs.
+5.3 Direct table writes that ARE allowed
+Table	Who	Allowed columns
+organizations	admin	insert/update all business fields
+profiles	self	update full_name, phone only
+requirements	client_manager (own org) / HQ	insert: client_org_id, title, description, skills, min_experience, max_experience, location, work_mode, employment_type, openings, vendor_visible_budget, currency, submission_sla_hours · update: same minus client_org_id
+requirement_financials	client_manager (own org) / HQ	insert/update actual_client_budget, notes
+requirement_margins	admin	insert/update platform_margin, margin_type
+candidates	owner vendor / HQ / the candidate	update: full_name, current_title, location, total_experience_years, skills, summary, resume_path, resume_hash, parsed_data
+candidate_contacts	same as above	update email, phone, linkedin_url
+interview_feedback	client users of that requirement / HQ, after interview completed	insert: interview_id, skill_rating, communication_rating, overall_rating, decision, feedback, evidence
+candidate_quality_feedback	client users / HQ, after the submission is shared	insert: submission_id, the six ratings, comments
+platform_settings	admin	update weights, weights_approved, min_sample_size, default_submission_sla_hours, share_vendor_summary_with_clients, ai_screening_enabled
+notifications	self	update read_at
+Feedback is immutable once saved. There is no edit button; corrections go through disputes.
+
+5.4 RPCs (supabase.rpc(name, args)); argument names are exact
+RPC	Args	Returns	Who
+admin_assign_user	p_user_id, p_role, p_org_id?, p_status?	void	admin
+set_requirement_status	p_requirement_id, p_status, p_reason?	void	HQ any; client_manager: draft→pending_approval, pending_approval→draft, open↔on_hold, draft/open/on_hold→closed
+set_requirement_public	p_requirement_id, p_is_public	void	HQ
+share_requirement_with_vendors	p_requirement_id, p_vendor_org_ids uuid[], p_sla_hours?	int (new shares)	HQ; requirement must be open
+revoke_requirement_share	p_requirement_id, p_vendor_org_id	void	HQ
+acknowledge_requirement	p_requirement_id	void	vendor
+check_candidate_duplicate	p_email?, p_phone?, p_resume_hash?	jsonb {is_duplicate, match_type, can_access_existing, existing_candidate_id}	vendor / HQ / candidate
+create_candidate	p_full_name, p_email?, p_phone?, p_linkedin_url?, p_current_title?, p_location?, p_total_experience_years?, p_skills?, p_summary?, p_resume_hash?	jsonb {status:'created', candidate_id} or {status:'duplicate', match_type, flag_id, existing_candidate_id}	vendor / HQ / candidate (own, once). Source is set by the DB from the caller's role
+submit_candidate	p_requirement_id, p_candidate_id, p_notes?	jsonb {status:'created', submission_id} or {status:'duplicate', reason}	vendor (shared requirement + own candidate) / HQ
+apply_to_requirement	p_requirement_id	jsonb {status, submission_id?, reason?}	candidate; requirement open + public
+transition_submission	p_submission_id, p_to, p_reason? (required for rejected / withdrawn / offer_declined)	void	see 5.5
+mark_submission_invalid	p_submission_id, p_reason	void	HQ
+schedule_interview	p_submission_id, p_round_type, p_scheduled_at, p_duration_minutes?, p_mode?, p_meeting_link?	uuid	HQ / client (after shared). Moves client_review → interviewing
+update_interview_status	p_interview_id, p_status	void	HQ / client
+my_pending_feedback	none	rows {interview_id, submission_id, requirement_title, candidate_name, round_type, round_number, completed_at}	client / HQ
+set_feedback_vendor_visibility	p_kind ('interview'|'quality'), p_feedback_id, p_visible	void	admin
+raise_rating_dispute	p_kind, p_feedback_id, p_reason	uuid	vendor_admin
+resolve_rating_dispute	p_dispute_id, p_upheld, p_note	void	admin
+override_match	p_requirement_id, p_candidate_id, p_score (0–100 or null to clear), p_reason	void	HQ
+recompute_matches	p_requirement_id	void	HQ
+resolve_duplicate_flag	p_flag_id, p_note, p_new_owner_vendor_org_id? (admin only)	void	HQ
+admin_link_candidate_account	p_candidate_id, p_user_id	void	admin
+get_vendor_performance	p_vendor_org_id	jsonb (see Section 8.4)	HQ / that vendor / clients if enabled (overall only)
+admin_vendor_performance	p_limit?, p_offset?	rows {vendor_org_id, vendor_name, metrics}	HQ
+admin_dashboard_summary	none	jsonb counts	HQ
+5.5 Submission stage rules (enforced by DB; mirror them in the UI)
+applied → recruiter_review | rejected | withdrawn
+recruiter_review → client_review | rejected | withdrawn     (client_review = "Share with client")
+client_review → interviewing | rejected | withdrawn
+interviewing → offered | rejected | withdrawn
+offered → offer_accepted | offer_declined | withdrawn
+offer_accepted → onboarded | withdrawn
+HQ: any allowed transition.
+Client: client_review→interviewing/rejected, interviewing→offered/rejected.
+Vendor (own submissions) and candidate (own application): withdraw only.
+Only show buttons the current user can actually use for the current stage.
+5.6 Error handling (src/lib/errors.ts)
+Map Supabase/Postgres errors to friendly messages:
+
+code 42501 or message starting FORBIDDEN → "You don't have permission to do this."
+RLS violation ("row-level security") → "This action isn't allowed for your role."
+23505 unique → "This already exists."
+23514 check → show the field-level validation message.
+"Invalid transition" / "A reason is required" → show as is.
+RPC {status:'duplicate'} → a non-error Duplicate detected dialog that explains "HireNest has been notified to review ownership. Nothing was merged." Never show raw SQL or stack traces. Log only error codes, never payloads.
+6. SCREENS BY WORKSPACE
+Global shell: collapsible left sidebar (role-specific menu), top bar with global search (scoped to what the role can see), a notifications bell (unread count; mark read; links route in-app), profile menu, and an org name chip. Breadcrumbs on detail pages.
+
+6.1 Admin / Recruiter (HQ)
+Dashboard: StatCards from admin_dashboard_summary (clients, vendors, pending users, candidates by source, requirements by status, submissions by stage, open duplicate flags, open disputes, interviews pending feedback). Each card links to a filtered list.
+Approvals (admin): pending profiles (requested_role, requested_company) → Approve dialog: pick or create the organization, pick the role → admin_assign_user. Reject → set status suspended.
+Organizations (admin): tabs Clients / Vendors / Internal; create and edit; status (approve/suspend); SLA tier. Detail page lists users, requirements (clients) or candidates and submissions (vendors), plus a vendor performance card.
+Users (admin): list with role and org filters; change role and org via admin_assign_user; suspend.
+Requirements: list with filters (client, status, public, shared vendor, skill text search via .ilike on title), server pagination. Detail page tabs:
+Overview (JD, skills chips, experience, budget for vendors, client budget, margin for admin only)
+Status actions (set_requirement_status, set_requirement_public)
+Vendor sharing (multi-select approved vendors, SLA hours default submission_sla_hours → share_requirement_with_vendors; table of shares with shared_at, due_at, acknowledged_at, first submission time, an SLA badge On time / Late / Pending / Missed, and a revoke action)
+Matches (Requirement → Candidates: ranked candidate_matches joined to candidates; columns: candidate, source badge, owner vendor, final score bar, matched / unproven skills, experience note, calculated_at + engine_version; override dialog; "Submit to this requirement" → submit_candidate; "Recompute" → recompute_matches)
+Pipeline (Kanban by stage plus a table view; cards show source badge, vendor name, days in stage)
+Activity (stage history + audit entries for this requirement).
+Candidates (Candidate 360): list with filters (original_source, owner vendor, skills contains, experience range, created date). Detail page:
+header: name, title, location, experience, Original source, Current vendor association, created by
+contacts (HQ / owner vendor / self only)
+resume (signed URL viewer and download)
+skills
+Matches tab (Candidate → Requirements, ranked)
+Applications & submissions tab (each with requirement, submitter, source, vendor, stage, history)
+Interviews & ratings tab
+Audit tab (admin).
+Submissions: global pipeline table with filters (stage, source, vendor, client, requirement, date, is_valid). Detail drawer: stage timeline (submission_stage_history), allowed transitions with a reason field, "Share with client" (→ client_review), mark invalid, schedule interview, interviews list, feedback received, quality feedback.
+Interviews: calendar/list of scheduled and completed rounds; complete / cancel / no-show; pending-feedback queue (my_pending_feedback for HQ).
+Duplicates & ownership: open duplicate_flags with the existing candidate link; resolve with a note; admin can reassign the current vendor association. Never auto-merge.
+Vendor performance: admin_vendor_performance table. Columns: vendor, timing score, avg response hours, avg turnaround hours, SLA compliance 90d, quality score + avg 1–5, compliance score, overall, status badges ("Not enough data", "Weights not approved"). Row → detail with the six quality dimensions as bars.
+Feedback moderation (admin): all interview and quality feedback; toggle "Share with vendor" (set_feedback_vendor_visibility). Clearly warn that client feedback is not shared with vendors automatically.
+Disputes (admin): open disputes with the original feedback side by side → Uphold (excludes from score) or Reject, with a note.
+Settings (admin): score weights (three number inputs that must sum to 100, live validated), Approve weights toggle with the warning "Overall vendor scores stay hidden until weights are approved", min sample size, default SLA hours, share vendor summary with clients, AI screening enabled (disabled switch with a "Requires Ollama service, Phase 2" tooltip).
+Audit log (admin): paginated, filter by table / action / actor / date; JSON diff viewer.
+6.2 Client workspace (client_manager, client_member)
+Dashboard: my open requirements, candidates awaiting my review (client_review), upcoming interviews, pending feedback (my_pending_feedback) as a red badge.
+Requirements: list of own org's requirements. Create/edit (client_manager only) with the JD form: title, description (rich textarea), skills chip input, min/max experience, location, work mode, employment type, openings, vendor-visible budget, currency, SLA hours, plus a separate "Internal budget (never shared with vendors)" field → requirement_financials. Actions: Submit for approval, Put on hold, Reopen, Close. Status is read-only otherwise.
+Candidates for review: submissions shared with the client. Shows candidate profile (no contact details), resume only if HQ has provided it (MVP: show "Resume available on request from HireNest"), source badge: "Vendor: " or "Direct applicant", match evidence, stage history. Actions per Section 5.5. "Rate candidate quality" form (Section 8.2).
+Interviews: schedule a round (round type, date and time, duration, mode, link), mark completed / no-show / cancelled, and the Interview feedback form (Section 8.1) for completed rounds. Feedback is mandatory: a completed interview without the current user's feedback shows a persistent "Feedback pending" banner.
+Vendor summary (only if share_vendor_summary_with_clients): overall vendor status from get_vendor_performance.
+Clients never see other clients, vendor candidate pools, contact PII, margins or vendor notes.
+6.3 Vendor workspace (vendor_admin, vendor_recruiter)
+Dashboard: new shared requirements (unacknowledged), SLA countdowns (due_at − now, colour-coded), my submissions by stage, upcoming interviews, my performance card.
+Requirements shared with us: list from requirements (RLS returns only shared ones). Detail shows JD, vendor-visible budget (never the client budget), SLA due time, and an Acknowledge button (acknowledge_requirement, shown until acknowledged). Tabs: My matching candidates (vendor's own candidates ranked from candidate_matches) and My submissions.
+Candidate pool (own candidates only): list, add, edit. Add candidate flow: select resume → compute SHA-256 in the browser (crypto.subtle.digest) → check_candidate_duplicate(email, phone, hash) → if duplicate, show the duplicate dialog and stop → create_candidate(...) → upload the file to resumes/<candidate_id>/<ts>-<name> → update candidates set resume_path → toast and go to the profile. Skills are entered manually as chips in the MVP ("AI parsing: Phase 2").
+Submit candidate: from a requirement or a candidate → choose the candidate/requirement → show match evidence first → notes → confirm → submit_candidate. Handle the duplicate result.
+My submissions: table plus a detail with stage timeline, interviews, feedback approved for sharing, and a withdraw action (reason required).
+Ratings & performance: get_vendor_performance(my org) with three separate cards (Timing / Quality / Compliance), each with its own "Not enough data (n of min)" state. The overall card shows "Pending approval" if weights are not approved. Shared feedback list; Dispute button (vendor_admin only, min 20-char reason).
+Vendors never see other vendors, other vendors' candidates, client budget, margin, unshared feedback or client identity beyond what the requirement shows.
+6.4 Direct candidate workspace
+Onboarding: if there is no candidate profile, run the "Create my profile" wizard: name, title, location, experience, skills, summary, email/phone, resume upload (same hash + duplicate check). On duplicate, show "We found an existing profile. HireNest will link it to your account."
+Jobs for me (Candidate → Requirements): open public requirements ranked by my candidate_matches.final_score, labelled "Potential match", with matched / unproven skills ("not found on your profile; add it if you have it"). The Apply button calls apply_to_requirement after a confirm dialog. After applying, the label changes to "Applied".
+Browse all open jobs: public open requirements, paginated, with search.
+My applications: stage timeline (candidate-friendly labels), interviews, withdraw (reason required).
+My profile: edit allowed fields, replace resume.
+7. END-TO-END FLOWS TO IMPLEMENT AND VERIFY
+A. Requirement → Candidates: client creates draft → submits for approval → HQ opens (matches compute automatically) → HQ shares with vendors and/or makes it public → HQ reviews the ranked matches with evidence → explicit submit/shortlist → submission + history + audit.
+B. Candidate → Requirements: candidate created/updated → matches recompute automatically → Potential Matches shown → explicit apply (candidate) or submit (vendor/HQ). Matching alone never creates a transaction.
+C. Vendor candidate: vendor sees a shared requirement → acknowledges → adds a candidate (hash + duplicate check) → reviews match evidence → submits → HQ sees vendor name + source → HQ shares with client → client reviews → interviews and statuses update the same submission.
+D. Direct candidate: register → profile + resume → sees eligible jobs → match evidence → apply → Admin sees "Direct applicant / Applied" with no vendor → recruiter review → client review → decision.
+E. AI screening interview: Phase 2. Show a disabled "AI screening (coming soon, Ollama)" card on the submission detail. Do not simulate it.
+F. Admin oversight: dashboard → drill into any entity → filter by source / vendor / client / status → inspect audit → act → notification reaches the right workspace.
+G. Ratings: interview completed → client sees "Feedback pending" → submits the interview feedback form → submits the candidate quality form → admin reviews and optionally shares with the vendor → vendor sees shared feedback → may dispute → admin resolves → vendor scores update.
+8. RATING SYSTEM (new feature, build fully)
+8.1 Client interview feedback form (after each round)
+Interview stage: read-only from the interview (round_type: Initial Screening / Technical Round / Managerial Round / Final Round)
+Job-related skill assessment: 1–5 (1 = Poor · 5 = Excellent), as a 5-segment RatingInput with labels
+Communication and clarity: 1–5
+Overall interview rating: 1–5
+Interview decision: Advance to next round / Hold for review / Reject / Additional assessment required (advance|hold|reject|additional_assessment)
+Feedback and evidence: feedback (required, min 10 chars, placeholder with a good example), evidence (optional: specific answers or observations)
+Submit → insert into interview_feedback. Show "Feedback is final and visible to HireNest. It is shared with the vendor only if HireNest approves." If the decision is Reject, offer (do not force) moving the submission to rejected via transition_submission with a reason.
+8.2 Candidate quality rating (client, per submission, once per rater)
+Six 1–5 ratings: JD skill alignment, Relevant experience, Resume accuracy & completeness, Communication & professionalism, Interview readiness, Overall candidate suitability + comments → candidate_quality_feedback. Linked to the specific candidate + requirement submission.
+
+8.3 Vendor submission-timing metrics (computed by DB)
+Response speed (avg hours share → acknowledge), submission turnaround (avg hours share → first valid submission), SLA compliance (first valid submission ≤ due_at), consistency (SLA compliance over the last 90 days).
+
+8.4 get_vendor_performance result shape
+{
+  "vendor_org_id": "uuid", "min_sample_size": 5,
+  "timing": { "status": "ok|not_enough_data", "score": 0-100|null, "evaluable_shares": n, "sla_met": n,
+              "sla_compliance_90d_pct": n|null, "avg_response_hours": n|null, "avg_turnaround_hours": n|null },
+  "quality": { "status": "...", "score": 0-100|null, "rated_submissions": n, "avg_rating_1_to_5": n|null,
+               "dimensions": { "jd_skill_alignment": n, "relevant_experience": n, "resume_accuracy": n,
+                               "communication": n, "interview_readiness": n, "overall_suitability": n },
+               "avg_interview_overall_1_to_5": n|null },
+  "compliance": { "status": "...", "score": 0-100|null, "submissions": n, "compliant": n },
+  "overall": { "status": "ok|not_enough_data|weights_not_approved", "score": n|null,
+               "weights": { "timing": 30, "quality": 50, "compliance": 20, "approved": false } }
+}
+Render every null / not_enough_data as "Not enough data" with the sample count. Never show 0 instead of null. Never compute scores in the browser.
+
+8.5 Where ratings appear
+Workspace	Shows
+Admin	Vendor SLA performance, quality trends, all client feedback, rating history, disputes
+Vendor	Own timing, own quality trends, only feedback approved for sharing
+Client	Candidate-specific feedback and interview ratings for its own requirements
+Recruiter	Ratings, pending feedback, interview outcomes, follow-up actions
+9. UI / UX STANDARDS
+Design language: clean enterprise SaaS. Neutral slate greys, one brand colour (indigo-600), and semantic colours for status (green = on time / advance, amber = pending / hold, red = late / reject). Inter font, 14px base, 8px spacing grid, rounded-lg cards, subtle borders instead of heavy shadows. Light and dark mode.
+Consistent page anatomy: page title + one-line description + primary action (top right) → filter bar → content → pagination.
+Every async view has four states: loading (skeletons, not spinners on full pages), empty (icon + what it means + next action), error (friendly message + Retry), and success.
+Badges: SourceBadge (Vendor · / Direct applicant / HireNest sourced), StageBadge (one colour per stage), SlaBadge, ScoreBar (0–100 with the number), NotEnoughData.
+Match evidence panel: score bar, skill score, experience score + note, matched skills (green chips), unproven skills (grey dashed chips, tooltip "Not found on profile; not proof the skill is missing"), engine version + calculated time, and the override banner if any.
+Forms: inline zod errors, disabled submit while pending, toast on success, no data loss on error.
+Tables: sticky header, sortable where the query supports it, row click → detail, empty filter result state with "Clear filters".
+Accessibility: keyboard navigable, visible focus ring, aria labels on icon buttons, colour never the only signal, WCAG AA contrast.
+Responsive: sidebar collapses to a drawer under 1024px. Tables become stacked cards under 640px.
+Copy: plain, professional. Use "Requirement" (not "Job") in HQ/client/vendor views and "Job" in the candidate view.
+10. SECURITY CHECKLIST (the UI must not undermine the DB)
+Only the anon key in the browser. Read env from import.meta.env. Show a setup screen if it's missing.
+Never pass vendor_org_id, source, submitted_by, rated_by or role from the client; the DB sets them.
+Resume files: private bucket, signed URLs (5 min), sanitize file names, enforce type and size before upload.
+Do not cache PII in localStorage. TanStack Query cache is in memory only. Clear it on sign-out.
+Mask contact details in lists (e.g. ra***@gmail.com, +91 ******3210); reveal on the detail page only for allowed roles.
+No dangerouslySetInnerHTML. Render JD text as plain text with line breaks.
+Rate-limit UI actions (disable buttons while pending) to avoid duplicate RPC calls.
+11. OUT OF SCOPE FOR THIS MVP (show "Coming soon", don't build)
+AI resume parsing, AI JD parsing, AI screening interview (Ollama, Phase 2) · email/WhatsApp delivery (DB writes event_outbox for a future worker) · offers/placements finance, invoices · calendar integrations · bulk import · public job board for anonymous users · client resume access (pending a decision).
+
+12. ACCEPTANCE CRITERIA (demonstrate each)
+Client A creates a requirement; Client B cannot see it.
+A vendor sees only requirements shared with it, and never the client budget or margin.
+A vendor-uploaded candidate appears in Admin with the correct vendor name and source.
+A direct candidate appears in Admin as "Direct applicant" with no vendor.
+A potential match does not create an application; explicit apply does.
+Both matching directions work, filtered by role.
+A duplicate candidate or submission shows the duplicate dialog, creates an admin flag and never merges.
+Scores and evidence come from candidate_matches, never computed or mocked in the UI.
+Recruiter override changes the displayed score and shows the reason.
+Client feedback is not visible to the vendor until admin approval.
+Vendor scores show "Not enough data" below the minimum sample size and "Pending approval" until weights are approved.
+Disputes can be raised (vendor_admin) and resolved (admin); upheld feedback leaves the score.
+Every stage change appears in the timeline with actor, time and reason.
+Pending and suspended users can't reach any workspace.
+Every list is paginated and has loading, empty and error states.
+npm run build and npm run lint pass with zero TypeScript errors.
+13. DELIVERABLES FROM YOU
+The complete working app.
+README.md: setup (env vars), how roles work, how to create the first admin, the screen map, and known limitations.
+src/types/db.ts matching Section 5 exactly.
+A manual test script (TESTING.md) walking through Section 12 with the eight test users (admin, recruiter, client A manager, client A member, client B manager, vendor X admin, vendor Y recruiter, candidate).
+A list of anything you could not build and why. Do not paper over gaps.

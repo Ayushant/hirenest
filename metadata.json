@@ -1,0 +1,6 @@
+{
+  "name": "HireNestOS",
+  "description": "Governed enterprise staffing operating system for HireNest Workforce connecting HQ, Hiring Clients, Staffing Vendors, and Direct Candidates.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
