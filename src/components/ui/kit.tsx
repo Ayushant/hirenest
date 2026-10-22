@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Inbox,
@@ -8,7 +7,62 @@ import {
   X,
 } from 'lucide-react';
 
-// Button
+// Category palette (in order):
+// #1F4CC4 rich blue · #4F95DB sky · #6A89A7 storm blue · #384959 storm slate · #2A9D8F teal · #D99A2B amber
+export const CATEGORY_PALETTE = [
+  '#1F4CC4',
+  '#4F95DB',
+  '#6A89A7',
+  '#384959',
+  '#2A9D8F',
+  '#D99A2B',
+] as const;
+
+// Avatar deterministic 100-tint bg + 700-shade text from the category palette
+const AVATAR_STYLES = [
+  { bg: '#DAE6FF', text: '#1B3EA0' }, // Rich Blue 100 / 700
+  { bg: '#E3F0FD', text: '#1F5F99' }, // Sky 100 / 700
+  { bg: '#E6ECF2', text: '#384959' }, // Storm Blue 100 / 700
+  { bg: '#E6ECF2', text: '#27333F' }, // Storm Slate 100 / 800
+  { bg: '#E4F5F2', text: '#1A6B61' }, // Teal 100 / 700
+  { bg: '#FDF1DC', text: '#8F5A0A' }, // Amber 100 / 700
+];
+
+export const Avatar: React.FC<{
+  id?: string | null;
+  name?: string | null;
+  size?: 'sm' | 'md';
+  className?: string;
+}> = ({ id, name, size = 'md', className = '' }) => {
+  const seed = id || name || 'hirenest';
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const palette = AVATAR_STYLES[hash % AVATAR_STYLES.length];
+  const initials = (name || 'U')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('');
+
+  const sizeClass =
+    size === 'sm'
+      ? 'h-6 w-6 text-[11px] leading-[16px]'
+      : 'h-7 w-7 text-[12px] leading-[16px]';
+
+  return (
+    <span
+      style={{ backgroundColor: palette.bg, color: palette.text }}
+      className={`inline-flex items-center justify-center rounded-[6px] font-semibold select-none shrink-0 ${sizeClass} ${className}`}
+    >
+      {initials || 'U'}
+    </span>
+  );
+};
+
+// Button: 32px (sm 28px), 13/500, 6px radius; primary Rich Blue 600, secondary white + Storm 200 border, ghost, danger
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
@@ -29,21 +83,23 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const base =
-      'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap shrink-0 cursor-pointer';
+      'inline-flex items-center justify-center gap-1.5 font-medium rounded-[6px] transition-colors duration-120 ease-out focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--focus-ring)] disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap shrink-0 cursor-pointer';
     const variants: Record<string, string> = {
-      primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
+      primary:
+        'bg-[var(--primary-bg)] text-[var(--primary-text)] hover:bg-[var(--primary-hover)]',
       secondary:
-        'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200',
+        'border border-[var(--border)] bg-[var(--surface)] text-[var(--text-button-sec)] hover:bg-[var(--bg-hover)] hover:border-[var(--border-strong)]',
       outline:
-        'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800',
-      danger: 'bg-red-600 text-white hover:bg-red-700',
+        'border border-[var(--border)] bg-[var(--surface)] text-[var(--text-button-sec)] hover:bg-[var(--bg-hover)] hover:border-[var(--border-strong)]',
+      danger:
+        'border border-[var(--border)] bg-[var(--surface)] text-[var(--status-danger)] hover:bg-[var(--status-danger-bg)] hover:border-[var(--status-danger)]',
       ghost:
-        'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white',
+        'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]',
     };
     const sizes: Record<string, string> = {
-      sm: 'px-3 py-1.5 text-xs',
-      md: 'px-4 py-2 text-xs',
-      lg: 'px-5 py-2.5 text-sm',
+      sm: 'h-7 px-2.5 text-[12px] leading-[16px]',
+      md: 'h-8 px-3 text-[13px] leading-[20px]',
+      lg: 'h-8 px-3.5 text-[13px] leading-[20px]',
     };
 
     return (
@@ -61,7 +117,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = 'Button';
 
-// Input
+// Input: 34px height, 6px radius, label 12/500 Storm 600, focus = 3px Rich Blue 100 ring
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
@@ -76,7 +132,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+            className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)] mb-1"
           >
             {label}
           </label>
@@ -84,24 +140,26 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
-          className={`w-full rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 ${
+          className={`w-full h-[34px] rounded-[6px] border px-3 text-[14px] leading-[20px] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-colors duration-120 focus:outline-none focus:border-[var(--focus-border)] focus:ring-[3px] focus:ring-[var(--focus-ring)] ${
             error
-              ? 'border-red-500 dark:border-red-500'
-              : 'border-slate-300 dark:border-slate-700'
+              ? 'border-[var(--status-danger)]'
+              : 'border-[var(--border)] hover:border-[var(--border-strong)]'
           } ${className}`}
           {...props}
         />
         {hint && !error && (
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
+          <p className="mt-1 text-[12px] leading-[16px] text-[var(--text-tertiary)]">{hint}</p>
         )}
-        {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {error && (
+          <p className="mt-1 text-[12px] leading-[16px] text-[var(--status-danger)]">{error}</p>
+        )}
       </div>
     );
   }
 );
 Input.displayName = 'Input';
 
-// Select
+// Select: 34px height, 6px radius, focus = 3px Rich Blue 100 ring
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
@@ -116,7 +174,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={selectId}
-            className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+            className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)] mb-1"
           >
             {label}
           </label>
@@ -124,10 +182,10 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         <select
           ref={ref}
           id={selectId}
-          className={`w-full rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-600 ${
+          className={`w-full h-[34px] rounded-[6px] border px-2.5 text-[14px] leading-[20px] bg-[var(--surface)] text-[var(--text-primary)] transition-colors duration-120 focus:outline-none focus:border-[var(--focus-border)] focus:ring-[3px] focus:ring-[var(--focus-ring)] ${
             error
-              ? 'border-red-500 dark:border-red-500'
-              : 'border-slate-300 dark:border-slate-700'
+              ? 'border-[var(--status-danger)]'
+              : 'border-[var(--border)] hover:border-[var(--border-strong)]'
           } ${className}`}
           {...props}
         >
@@ -137,14 +195,16 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {error && (
+          <p className="mt-1 text-[12px] leading-[16px] text-[var(--status-danger)]">{error}</p>
+        )}
       </div>
     );
   }
 );
 Select.displayName = 'Select';
 
-// Textarea
+// Textarea: 6px radius, focus = 3px Rich Blue 100 ring
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
@@ -159,7 +219,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+            className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)] mb-1"
           >
             {label}
           </label>
@@ -167,63 +227,199 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
           ref={ref}
           id={textareaId}
-          className={`w-full rounded-lg border px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 ${
+          className={`w-full rounded-[6px] border px-3 py-2 text-[14px] leading-[20px] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-colors duration-120 focus:outline-none focus:border-[var(--focus-border)] focus:ring-[3px] focus:ring-[var(--focus-ring)] ${
             error
-              ? 'border-red-500 dark:border-red-500'
-              : 'border-slate-300 dark:border-slate-700'
+              ? 'border-[var(--status-danger)]'
+              : 'border-[var(--border)] hover:border-[var(--border-strong)]'
           } ${className}`}
           {...props}
         />
         {hint && !error && (
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
+          <p className="mt-1 text-[12px] leading-[16px] text-[var(--text-tertiary)]">{hint}</p>
         )}
-        {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {error && (
+          <p className="mt-1 text-[12px] leading-[16px] text-[var(--status-danger)]">{error}</p>
+        )}
       </div>
     );
   }
 );
 Textarea.displayName = 'Textarea';
 
-// Badge (Semantic text status indicator with subtle hairline border)
+// Badge (soft-tint chip = tint background + 700-shade text + 6px dot, 6px radius)
+export type BadgeTone =
+  | 'neutral'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'info'
+  | 'storm_blue'
+  | 'rich_blue'
+  | 'sky'
+  | 'teal'
+  | 'slate'
+  | 'indigo'
+  | 'emerald'
+  | 'amber'
+  | 'red';
+
 export const Badge: React.FC<{
-  tone?: 'slate' | 'indigo' | 'emerald' | 'amber' | 'red';
+  tone?: BadgeTone;
   children: React.ReactNode;
   className?: string;
-}> = ({ tone = 'slate', children, className = '' }) => {
-  const tones = {
-    slate:
-      'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700',
-    indigo:
-      'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-800',
-    emerald:
-      'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800',
-    amber:
-      'text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800',
-    red: 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/60 border-red-200 dark:border-red-800',
+}> = ({ tone = 'neutral', children, className = '' }) => {
+  const chipStyles: Record<
+    string,
+    { bg: string; text: string; dot: string }
+  > = {
+    neutral: {
+      bg: 'bg-[var(--status-neutral-bg)]',
+      text: 'text-[var(--status-neutral)]',
+      dot: 'bg-[var(--status-neutral-dot)]',
+    },
+    slate: {
+      bg: 'bg-[var(--status-neutral-bg)]',
+      text: 'text-[var(--status-neutral)]',
+      dot: 'bg-[var(--status-neutral-dot)]',
+    },
+    success: {
+      bg: 'bg-[var(--status-success-bg)]',
+      text: 'text-[var(--status-success)]',
+      dot: 'bg-[var(--status-success-dot)]',
+    },
+    emerald: {
+      bg: 'bg-[var(--status-success-bg)]',
+      text: 'text-[var(--status-success)]',
+      dot: 'bg-[var(--status-success-dot)]',
+    },
+    warning: {
+      bg: 'bg-[var(--status-warning-bg)]',
+      text: 'text-[var(--status-warning)]',
+      dot: 'bg-[var(--status-warning-dot)]',
+    },
+    amber: {
+      bg: 'bg-[var(--status-warning-bg)]',
+      text: 'text-[var(--status-warning)]',
+      dot: 'bg-[var(--status-warning-dot)]',
+    },
+    danger: {
+      bg: 'bg-[var(--status-danger-bg)]',
+      text: 'text-[var(--status-danger)]',
+      dot: 'bg-[var(--status-danger-dot)]',
+    },
+    red: {
+      bg: 'bg-[var(--status-danger-bg)]',
+      text: 'text-[var(--status-danger)]',
+      dot: 'bg-[var(--status-danger-dot)]',
+    },
+    info: {
+      bg: 'bg-[var(--status-info-bg)]',
+      text: 'text-[var(--status-info)]',
+      dot: 'bg-[var(--status-info-dot)]',
+    },
+    sky: {
+      bg: 'bg-[var(--chip-sky-bg)]',
+      text: 'text-[var(--chip-sky-text)]',
+      dot: 'bg-[var(--chip-sky-dot)]',
+    },
+    storm_blue: {
+      bg: 'bg-[var(--chip-storm-blue-bg)]',
+      text: 'text-[var(--chip-storm-blue-text)]',
+      dot: 'bg-[var(--chip-storm-blue-dot)]',
+    },
+    rich_blue: {
+      bg: 'bg-[var(--chip-rich-blue-bg)]',
+      text: 'text-[var(--chip-rich-blue-text)]',
+      dot: 'bg-[var(--chip-rich-blue-dot)]',
+    },
+    indigo: {
+      bg: 'bg-[var(--chip-rich-blue-bg)]',
+      text: 'text-[var(--chip-rich-blue-text)]',
+      dot: 'bg-[var(--chip-rich-blue-dot)]',
+    },
+    teal: {
+      bg: 'bg-[var(--chip-teal-bg)]',
+      text: 'text-[var(--chip-teal-text)]',
+      dot: 'bg-[var(--chip-teal-dot)]',
+    },
   };
+
+  const activeStyle = chipStyles[tone] || chipStyles.neutral;
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium whitespace-nowrap shrink-0 ${tones[tone]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-[12px] leading-[16px] font-medium whitespace-nowrap shrink-0 ${activeStyle.bg} ${activeStyle.text} ${className}`}
     >
-      {children}
+      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${activeStyle.dot}`} />
+      <span>{children}</span>
     </span>
   );
 };
 
-// Card (Single-elevation flat surface with 1px border)
+// Card: 10px radius, 1px border, flat white surface
 export const Card: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ children, className = '' }) => (
   <div
-    className={`rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 ${className}`}
+    className={`rounded-[10px] border border-[var(--border)] bg-[var(--surface)] ${className}`}
   >
     {children}
   </div>
 );
 
-// StatCard
+// MetricStrip: One white panel, 3–4 metrics separated by dividers; each has a 12px label + 8px dot in its category colour and a 28px mono value
+export const MetricStrip: React.FC<{
+  items: Array<{
+    label: string;
+    value: number | string;
+    sublabel?: string;
+    tone?: 'default' | 'neutral' | 'success' | 'warning' | 'danger' | 'amber' | 'red' | 'emerald';
+    onClick?: () => void;
+  }>;
+}> = ({ items }) => (
+  <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)] overflow-hidden">
+    {items.map((item, idx) => {
+      const dotColor = CATEGORY_PALETTE[idx % CATEGORY_PALETTE.length];
+      return (
+        <div
+          key={idx}
+          onClick={item.onClick}
+          role={item.onClick ? 'button' : undefined}
+          tabIndex={item.onClick ? 0 : undefined}
+          onKeyDown={
+            item.onClick
+              ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') item.onClick?.();
+                }
+              : undefined
+          }
+          className={`p-4 sm:px-5 ${
+            item.onClick ? 'cursor-pointer hover:bg-[var(--bg-hover)] transition-colors' : ''
+          }`}
+        >
+          <div className="flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+            <span
+              style={{ backgroundColor: dotColor }}
+              className="h-2 w-2 rounded-full shrink-0"
+            />
+            <span className="truncate">{item.label}</span>
+          </div>
+          <div className="mt-1.5 text-[28px] leading-[36px] font-semibold tracking-[-0.01em] font-mono tabular-nums text-[var(--text-primary)]">
+            {item.value}
+          </div>
+          {item.sublabel && (
+            <div className="mt-0.5 text-[12px] leading-[16px] text-[var(--text-tertiary)]">
+              {item.sublabel}
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+);
+
+// StatCard: Plain metric cell with 8px category dot and 28px mono value
 export const StatCard: React.FC<{
   label: string;
   value: number | string;
@@ -231,13 +427,12 @@ export const StatCard: React.FC<{
   tone?: 'default' | 'emerald' | 'amber' | 'red';
   onClick?: () => void;
 }> = ({ label, value, sublabel, tone = 'default', onClick }) => {
-  const valueColors = {
-    default: 'text-slate-900 dark:text-slate-100',
-    emerald: 'text-emerald-600 dark:text-emerald-400',
-    amber: 'text-amber-600 dark:text-amber-400',
-    red: 'text-red-600 dark:text-red-400',
+  const dotMap: Record<string, string> = {
+    default: '#1F4CC4',
+    emerald: '#2A9D8F',
+    amber: '#D99A2B',
+    red: '#B8322B',
   };
-
   return (
     <div
       onClick={onClick}
@@ -250,30 +445,34 @@ export const StatCard: React.FC<{
             }
           : undefined
       }
-      className={`rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 transition-colors ${
-        onClick
-          ? 'cursor-pointer hover:border-indigo-500/60 dark:hover:border-indigo-500/60'
-          : ''
+      className={`py-3.5 px-4 border-l first:border-l-0 border-[var(--border)] bg-[var(--surface)] transition-colors ${
+        onClick ? 'cursor-pointer hover:bg-[var(--bg-hover)]' : ''
       }`}
     >
-      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-      <p className={`mt-1.5 text-2xl font-semibold font-mono tabular-nums ${valueColors[tone]}`}>
+      <div className="flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+        <span
+          style={{ backgroundColor: dotMap[tone] || dotMap.default }}
+          className="h-2 w-2 rounded-full shrink-0"
+        />
+        <span className="truncate">{label}</span>
+      </div>
+      <p className="mt-1.5 text-[28px] leading-[36px] font-semibold tracking-[-0.01em] font-mono tabular-nums text-[var(--text-primary)]">
         {value}
       </p>
       {sublabel && (
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{sublabel}</p>
+        <p className="mt-0.5 text-[12px] leading-[16px] text-[var(--text-tertiary)]">{sublabel}</p>
       )}
     </div>
   );
 };
 
-// Tabs
+// Tabs: Text tabs with a 2px Rich Blue 600 underline on the active tab and a mono count chip
 export const Tabs: React.FC<{
   tabs: Array<{ id: string; label: string; count?: number }>;
   activeTab: string;
   onChange: (id: string) => void;
 }> = ({ tabs, activeTab, onChange }) => (
-  <div className="border-b border-slate-200 dark:border-slate-800 flex items-center gap-1 overflow-x-auto">
+  <div className="border-b border-[var(--border)] flex items-center gap-6 overflow-x-auto">
     {tabs.map((tab) => {
       const active = tab.id === activeTab;
       return (
@@ -281,16 +480,22 @@ export const Tabs: React.FC<{
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
-          className={`px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+          className={`py-2.5 text-[13px] leading-[20px] font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 inline-flex items-center gap-2 cursor-pointer ${
             active
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-[var(--accent)] text-[var(--accent)]'
+              : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           <span>{tab.label}</span>
           {tab.count !== undefined && (
-            <span className="ml-1.5 font-mono tabular-nums text-slate-400 dark:text-slate-500">
-              ({tab.count})
+            <span
+              className={`rounded-[6px] px-1.5 py-0.5 font-mono tabular-nums text-[12px] leading-[16px] ${
+                active
+                  ? 'bg-[var(--chip-rich-blue-bg)] text-[var(--chip-rich-blue-text)]'
+                  : 'bg-[var(--track)] text-[var(--text-secondary)]'
+              }`}
+            >
+              {tab.count}
             </span>
           )}
         </button>
@@ -302,7 +507,7 @@ export const Tabs: React.FC<{
 // Skeleton
 export const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
   <div
-    className={`animate-pulse rounded bg-slate-200/80 dark:bg-slate-800/80 ${className}`}
+    className={`animate-pulse rounded-[6px] bg-[var(--track)] ${className}`}
   />
 );
 
@@ -310,17 +515,17 @@ export const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = ({
   rows = 6,
   cols = 5,
 }) => (
-  <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
-    <div className="border-b border-slate-200 dark:border-slate-800 px-4 py-3 grid grid-cols-5 gap-4">
+  <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+    <div className="border-b border-[var(--border)] bg-[var(--bg-subtle)] px-4 h-9 grid grid-cols-5 gap-4 items-center">
       {Array.from({ length: cols }).map((_, i) => (
-        <Skeleton key={i} className="h-4 w-24" />
+        <Skeleton key={i} className="h-3 w-20" />
       ))}
     </div>
-    <div className="divide-y divide-slate-200 dark:divide-slate-800">
+    <div className="divide-y divide-[var(--border)]">
       {Array.from({ length: rows }).map((_, r) => (
-        <div key={r} className="px-4 py-3.5 grid grid-cols-5 gap-4 items-center">
+        <div key={r} className="px-4 h-11 grid grid-cols-5 gap-4 items-center">
           {Array.from({ length: cols }).map((__, c) => (
-            <Skeleton key={c} className="h-4 w-full" />
+            <Skeleton key={c} className="h-3.5 w-full" />
           ))}
         </div>
       ))}
@@ -328,7 +533,7 @@ export const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = ({
   </div>
 );
 
-// EmptyState
+// EmptyState: Left-aligned inside the panel; a 40px rounded-10 Sky 100 tile with a 20px Rich Blue 600 stroke icon; one title line, one guidance line, one button
 export const EmptyState: React.FC<{
   title: string;
   description: string;
@@ -344,18 +549,18 @@ export const EmptyState: React.FC<{
   secondaryActionLabel,
   onSecondaryAction,
 }) => (
-  <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-10 text-center">
-    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-      <Inbox className="h-5 w-5" />
+  <div className="p-6 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-left">
+    <div className="h-10 w-10 rounded-[10px] bg-[var(--highlight-soft)] flex items-center justify-center mb-3">
+      <Inbox strokeWidth={1.75} className="h-5 w-5 text-[var(--accent)]" />
     </div>
-    <h3 className="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+    <h3 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">{title}</h3>
+    <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)] max-w-xl">
       {description}
     </p>
     {(actionLabel || secondaryActionLabel) && (
-      <div className="mt-4 flex items-center justify-center gap-2">
+      <div className="mt-3.5 flex items-center gap-2">
         {actionLabel && onAction && (
-          <Button size="sm" onClick={onAction}>
+          <Button size="sm" variant="primary" onClick={onAction}>
             {actionLabel}
           </Button>
         )}
@@ -374,20 +579,20 @@ export const ErrorState: React.FC<{
   message: string;
   onRetry?: () => void;
 }> = ({ message, onRetry }) => (
-  <div className="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/20 p-6 text-center">
-    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mx-auto" />
-    <p className="mt-2 text-xs font-medium text-red-800 dark:text-red-300">{message}</p>
+  <div className="py-4 px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-between gap-4">
+    <div className="flex items-center gap-2 text-[13px] leading-[20px] text-[var(--text-primary)]">
+      <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)] shrink-0" />
+      <span>{message}</span>
+    </div>
     {onRetry && (
-      <div className="mt-3">
-        <Button size="sm" variant="outline" onClick={onRetry}>
-          Retry
-        </Button>
-      </div>
+      <Button size="sm" variant="outline" onClick={onRetry}>
+        Retry
+      </Button>
     )}
   </div>
 );
 
-// Pagination (Server-side bounded range pagination)
+// Pagination: "1–25 of 312" + prev/next ghost buttons, bottom-right
 export const Pagination: React.FC<{
   page: number;
   pageSize?: number;
@@ -399,27 +604,24 @@ export const Pagination: React.FC<{
   const to = Math.min(totalCount, page * pageSize);
 
   return (
-    <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
+    <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] px-4 py-2.5 text-[12px] leading-[16px] text-[var(--text-secondary)]">
       <div className="font-mono tabular-nums">
-        Showing {from}–{to} of {totalCount}
+        {from}–{to} of {totalCount}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <Button
           size="sm"
-          variant="outline"
+          variant="ghost"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
           aria-label="Previous page"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
-          Previous
+          Prev
         </Button>
-        <span className="font-mono tabular-nums px-2">
-          Page {page} of {totalPages}
-        </span>
         <Button
           size="sm"
-          variant="outline"
+          variant="ghost"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
           aria-label="Next page"
@@ -432,7 +634,7 @@ export const Pagination: React.FC<{
   );
 };
 
-// Dialog (Modal)
+// Dialog (Modal): 480px default (640px for forms), 10px radius, floating shadow
 export const Dialog: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -440,22 +642,30 @@ export const Dialog: React.FC<{
   description?: string;
   children: React.ReactNode;
   maxWidth?: string;
-}> = ({ open, onClose, title, description, children, maxWidth = 'max-w-lg' }) => {
+}> = ({ open, onClose, title, description, children, maxWidth = 'max-w-[480px]' }) => {
   if (!open) return null;
+  const normalizedWidth =
+    maxWidth === 'max-w-lg' || maxWidth === 'max-w-md'
+      ? 'max-w-[480px]'
+      : maxWidth === 'max-w-2xl' || maxWidth === 'max-w-xl'
+      ? 'max-w-[640px]'
+      : maxWidth;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div
         role="dialog"
         aria-modal="true"
-        className={`w-full ${maxWidth} rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg overflow-hidden max-h-[90vh] flex flex-col`}
+        style={{ boxShadow: 'var(--shadow-floating)' }}
+        className={`w-full ${normalizedWidth} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden max-h-[90vh] flex flex-col`}
       >
-        <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-4">
+        <div className="flex items-start justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <h2 className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
               {title}
             </h2>
             {description && (
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-[13px] leading-[20px] text-[var(--text-secondary)]">
                 {description}
               </p>
             )}
@@ -464,7 +674,7 @@ export const Dialog: React.FC<{
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+            className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-1 rounded-[6px] hover:bg-[var(--bg-hover)] cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -475,7 +685,7 @@ export const Dialog: React.FC<{
   );
 };
 
-// Drawer (Slide-over right panel)
+// Drawer (Slide-over right panel): 480px from right with a Sky 50 header strip
 export const Drawer: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -483,43 +693,51 @@ export const Drawer: React.FC<{
   subtitle?: string;
   children: React.ReactNode;
   widthClass?: string;
-}> = ({ open, onClose, title, subtitle, children, widthClass = 'max-w-2xl' }) => {
+}> = ({ open, onClose, title, subtitle, children, widthClass = 'max-w-[480px]' }) => {
   if (!open) return null;
+  const normalizedWidth =
+    widthClass === 'max-w-2xl' || widthClass === 'max-w-xl' || widthClass === 'max-w-md'
+      ? 'max-w-[480px]'
+      : widthClass;
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/30">
       <div
         role="dialog"
         aria-modal="true"
-        className={`w-full ${widthClass} h-full border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shadow-xl`}
+        style={{ boxShadow: 'var(--shadow-floating)' }}
+        className={`w-full ${normalizedWidth} h-full border-l border-[var(--border)] bg-[var(--surface)] flex flex-col`}
       >
-        <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-4">
+        <div className="flex items-start justify-between border-b border-[var(--border)] bg-[var(--drawer-header-bg)] px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <h2 className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
               {title}
             </h2>
             {subtitle && (
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+              <p className="mt-0.5 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                {subtitle}
+              </p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close panel"
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+            className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-1 rounded-[6px] hover:bg-[var(--bg-hover)] cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto flex-1">{children}</div>
+        <div className="p-5 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );
 };
 
-// RatingInput 1–5 (5-segment RatingInput with labels per Section 8.1)
+// RatingInput 1–5: Five 24px rounded-6 squares; filled Rich Blue 500 (score 5 = Rich Blue 700), empty Storm 100
 const RATING_LABELS: Record<number, string> = {
   1: 'Poor',
-  2: 'Below Avg',
+  2: 'Below average',
   3: 'Satisfactory',
   4: 'Good',
   5: 'Excellent',
@@ -533,36 +751,48 @@ export const RatingInput: React.FC<{
 }> = ({ label, value, onChange, error }) => (
   <div>
     <div className="flex items-center justify-between mb-1.5">
-      <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{label}</span>
-      <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-        {value ? `${value}/5 · ${RATING_LABELS[value]}` : 'Select 1–5'}
+      <span className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+        {label}
+      </span>
+      <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)]">
+        {value ? `${value}/5 · ${RATING_LABELS[value]}` : '1–5'}
       </span>
     </div>
-    <div className="grid grid-cols-5 gap-1.5">
+    <div className="flex items-center gap-1.5">
       {[1, 2, 3, 4, 5].map((score) => {
-        const active = value === score;
+        const filled = value >= score;
+        const isFive = value === 5 && score === 5;
         return (
           <button
             key={score}
             type="button"
             onClick={() => onChange(score)}
-            className={`py-2 px-2 rounded-lg border text-center transition-colors cursor-pointer ${
-              active
-                ? 'border-indigo-600 bg-indigo-600 text-white font-semibold'
-                : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+            aria-label={`Rate ${score} out of 5 (${RATING_LABELS[score]})`}
+            className={`h-6 w-6 rounded-[6px] text-[12px] leading-[16px] font-mono tabular-nums flex items-center justify-center transition-colors cursor-pointer ${
+              filled
+                ? isFive
+                  ? 'bg-[#1B3EA0] text-white font-medium'
+                  : 'bg-[#2F63DE] text-white font-medium'
+                : 'bg-[var(--track)] text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <div className="text-xs font-mono tabular-nums">{score}</div>
-            <div className="text-[10px] truncate opacity-85">{RATING_LABELS[score]}</div>
+            {score}
           </button>
         );
       })}
+      {value > 0 && (
+        <span className="ml-2 text-[12px] leading-[16px] text-[var(--text-secondary)]">
+          {RATING_LABELS[value]}
+        </span>
+      )}
     </div>
-    {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
+    {error && (
+      <p className="mt-1 text-[12px] leading-[16px] text-[var(--status-danger)]">{error}</p>
+    )}
   </div>
 );
 
-// Skill Chips Input (manual chip entry for MVP)
+// Skill Chips Input (6px radius bordered chips)
 export const SkillsChipInput: React.FC<{
   label?: string;
   skills: string[];
@@ -590,7 +820,7 @@ export const SkillsChipInput: React.FC<{
 
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+      <label className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)] mb-1">
         {label}
       </label>
       <div className="flex gap-2">
@@ -600,10 +830,10 @@ export const SkillsChipInput: React.FC<{
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type a skill and press Enter (e.g. TypeScript, PostgreSQL)"
-          className="flex-1 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+          className="flex-1 h-[34px] rounded-[6px] border border-[var(--border)] px-3 text-[14px] leading-[20px] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--focus-border)] focus:ring-[3px] focus:ring-[var(--focus-ring)]"
         />
-        <Button type="button" size="sm" variant="outline" onClick={() => addSkill(draft)}>
-          Add Skill
+        <Button type="button" size="md" variant="outline" onClick={() => addSkill(draft)}>
+          Add
         </Button>
       </div>
       {skills.length > 0 && (
@@ -611,14 +841,14 @@ export const SkillsChipInput: React.FC<{
           {skills.map((skill) => (
             <span
               key={skill}
-              className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs text-slate-800 dark:text-slate-200"
+              className="inline-flex items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[12px] leading-[16px] font-medium text-[var(--text-primary)]"
             >
               {skill}
               <button
                 type="button"
                 onClick={() => onChange(skills.filter((s) => s !== skill))}
                 aria-label={`Remove ${skill}`}
-                className="text-slate-400 hover:text-red-500"
+                className="text-[var(--text-tertiary)] hover:text-[var(--status-danger)] cursor-pointer"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -627,25 +857,31 @@ export const SkillsChipInput: React.FC<{
         </div>
       )}
       {hint && !error && (
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
+        <p className="mt-1 text-[12px] leading-[16px] text-[var(--text-tertiary)]">{hint}</p>
       )}
-      {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && (
+        <p className="mt-1 text-[12px] leading-[16px] text-[var(--status-danger)]">{error}</p>
+      )}
     </div>
   );
 };
 
-// PageHeader (Consistent page anatomy per Section 9)
+// PageHeader: Title on left (20px/28px/600), max 1-line secondary text, primary action on right, 24px below
 export const PageHeader: React.FC<{
   title: string;
-  description: string;
+  description?: string;
   actions?: React.ReactNode;
 }> = ({ title, description, actions }) => (
-  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-200 dark:border-slate-800">
-    <div>
-      <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+    <div className="min-w-0">
+      <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
         {title}
       </h1>
-      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p>
+      {description && (
+        <p className="mt-0.5 text-[13px] leading-[20px] text-[var(--text-secondary)] truncate">
+          {description}
+        </p>
+      )}
     </div>
     {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
   </div>

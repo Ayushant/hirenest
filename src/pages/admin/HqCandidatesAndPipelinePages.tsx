@@ -1,21 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Plus,
-  FileText,
-  ExternalLink,
-  Send,
-  Sliders,
-  CheckCircle2,
-  Edit3,
-  Upload,
-  Link2,
-  Eye,
-} from 'lucide-react';
+import { Plus, Upload, ExternalLink } from 'lucide-react';
 import {
   PageHeader,
-  Card,
   Button,
   Input,
   Select,
@@ -88,7 +76,7 @@ import type {
   SubmissionStage,
 } from '../../types/db';
 
-// 1. HQ Candidates List Page (Candidate 360 List)
+// 1. HQ Candidates List Page
 export const HqCandidatesListPage: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -135,79 +123,112 @@ export const HqCandidatesListPage: React.FC = () => {
     queryFn: () => fetchOrganizations({ type: 'vendor', page: 1, pageSize: 100 }),
   });
 
+  const hasFilters = Boolean(
+    originalSource || ownerVendorId || skill || minExp || maxExp || search
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Candidates (Candidate 360)"
-        description="Governed talent pool with distinct original source attribution, current vendor ownership, and masked PII in list views."
+        title="Candidates"
+        description="Talent pool with original source attribution, current vendor association, and masked PII in list views."
         actions={
           <Button onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Add Candidate
+            <Plus className="h-3.5 w-3.5" />
+            Add candidate
           </Button>
         }
       />
 
       {/* Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Input
-          placeholder="Search full name..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Select
-          value={originalSource}
-          onChange={(e) => {
-            setOriginalSource(e.target.value as CandidateSource | '');
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Original Sources' },
-            { value: 'vendor', label: 'Vendor Sourced' },
-            { value: 'direct', label: 'Direct Applicant' },
-            { value: 'internal', label: 'HireNest Sourced' },
-          ]}
-        />
-        <Select
-          value={ownerVendorId}
-          onChange={(e) => {
-            setOwnerVendorId(e.target.value);
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Owner Vendors' },
-            ...(vendorsData?.data || []).map((v) => ({ value: v.id, label: v.name })),
-          ]}
-        />
-        <Input
-          placeholder="Skill contains (exact)..."
-          value={skill}
-          onChange={(e) => {
-            setSkill(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Input
-          placeholder="Min Exp (Yrs)"
-          type="number"
-          value={minExp}
-          onChange={(e) => {
-            setMinExp(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Input
-          placeholder="Max Exp (Yrs)"
-          type="number"
-          value={maxExp}
-          onChange={(e) => {
-            setMaxExp(e.target.value);
-            setPage(1);
-          }}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-52">
+          <Input
+            placeholder="Search full name..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="w-44">
+          <Select
+            value={originalSource}
+            onChange={(e) => {
+              setOriginalSource(e.target.value as CandidateSource | '');
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All sources' },
+              { value: 'vendor', label: 'Vendor' },
+              { value: 'direct', label: 'Direct' },
+              { value: 'internal', label: 'HireNest' },
+            ]}
+          />
+        </div>
+        <div className="w-48">
+          <Select
+            value={ownerVendorId}
+            onChange={(e) => {
+              setOwnerVendorId(e.target.value);
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All vendor owners' },
+              ...(vendorsData?.data || []).map((v) => ({ value: v.id, label: v.name })),
+            ]}
+          />
+        </div>
+        <div className="w-40">
+          <Input
+            placeholder="Skill (exact)..."
+            value={skill}
+            onChange={(e) => {
+              setSkill(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="w-28">
+          <Input
+            placeholder="Min exp"
+            type="number"
+            value={minExp}
+            onChange={(e) => {
+              setMinExp(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="w-28">
+          <Input
+            placeholder="Max exp"
+            type="number"
+            value={maxExp}
+            onChange={(e) => {
+              setMaxExp(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        {hasFilters && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setSearch('');
+              setOriginalSource('');
+              setOwnerVendorId('');
+              setSkill('');
+              setMinExp('');
+              setMaxExp('');
+              setPage(1);
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -217,25 +238,25 @@ export const HqCandidatesListPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No candidates found"
-          description="Add a candidate to the HireNest pool or clear your active filters."
-          actionLabel="Add Candidate"
+          description="Add a candidate to the pool or clear your active filters."
+          actionLabel="Add candidate"
           onAction={() => setAddOpen(true)}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Candidate</th>
-                  <th className="py-3 px-4">Original Source</th>
-                  <th className="py-3 px-4">Current Vendor Association</th>
-                  <th className="py-3 px-4">Masked Contact (List View)</th>
-                  <th className="py-3 px-4">Skills</th>
-                  <th className="py-3 px-4">Added</th>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Original source</th>
+                  <th>Vendor association</th>
+                  <th>Masked contact</th>
+                  <th>Skills</th>
+                  <th>Added</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <tbody>
                 {data.data.map((c) => {
                   const rawContacts = Array.isArray(c.candidate_contacts)
                     ? c.candidate_contacts[0]
@@ -244,45 +265,51 @@ export const HqCandidatesListPage: React.FC = () => {
                     <tr
                       key={c.id}
                       onClick={() => navigate(`${prefix}/candidates/${c.id}`)}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
+                      className="cursor-pointer"
                     >
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900 dark:text-slate-100">
+                      <td>
+                        <div className="font-medium text-[var(--text-primary)]">
                           {c.full_name}
                         </div>
-                        <div className="text-[11px] text-slate-500">
-                          {c.current_title || '—'} · {c.total_experience_years ?? '—'} yrs ·{' '}
-                          {c.location || '—'}
+                        <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
+                          {c.current_title || '—'} ·{' '}
+                          <span className="font-mono tabular-nums">
+                            {c.total_experience_years ?? '—'}y
+                          </span>{' '}
+                          · {c.location || '—'}
                         </div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td>
                         <SourceBadge
                           source={c.original_source}
                           vendorName={c.source_vendor?.name}
                         />
                       </td>
-                      <td className="py-3 px-4 font-medium">
-                        {c.owner_vendor?.name || 'None (Direct / Internal)'}
+                      <td className="text-[var(--text-secondary)]">
+                        {c.owner_vendor?.name || 'None'}
                       </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-500">
+                      <td className="font-mono text-[12px] text-[var(--text-secondary)]">
                         <div>{maskEmail(rawContacts?.email)}</div>
                         <div>{maskPhone(rawContacts?.phone)}</div>
                       </td>
-                      <td className="py-3 px-4 max-w-xs">
+                      <td className="max-w-xs">
                         <div className="flex flex-wrap gap-1">
                           {(c.skills || []).slice(0, 4).map((sk) => (
-                            <Badge key={sk} tone="slate">
+                            <span
+                              key={sk}
+                              className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[12px] leading-[16px] text-[var(--text-primary)]"
+                            >
                               {sk}
-                            </Badge>
+                            </span>
                           ))}
                           {(c.skills?.length || 0) > 4 && (
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-[12px] leading-[16px] font-mono text-[var(--text-tertiary)]">
                               +{c.skills.length - 4}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
+                      <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                         {formatLocalDate(c.created_at)}
                       </td>
                     </tr>
@@ -292,7 +319,7 @@ export const HqCandidatesListPage: React.FC = () => {
             </table>
           </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       <CandidateFormModal
@@ -307,7 +334,7 @@ export const HqCandidatesListPage: React.FC = () => {
   );
 };
 
-// 2. HQ Candidate 360 Detail Page
+// 2. HQ Candidate 360 Detail Page: Two columns at 1200px (main ~760px + 320px right rail)
 export const HqCandidateDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
@@ -322,7 +349,6 @@ export const HqCandidateDetailPage: React.FC = () => {
   const [matchesPage, setMatchesPage] = useState(1);
   const [drawerSubmissionId, setDrawerSubmissionId] = useState<string | null>(null);
 
-  // Override, Evidence & Submit modals for Candidate -> Requirements
   const [evidenceTarget, setEvidenceTarget] = useState<CandidateMatch | null>(null);
   const [overrideTarget, setOverrideTarget] = useState<CandidateMatch | null>(null);
   const [overrideScoreInput, setOverrideScoreInput] = useState('');
@@ -334,7 +360,6 @@ export const HqCandidateDetailPage: React.FC = () => {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [dupReason, setDupReason] = useState<string | null>(null);
 
-  // HQ Candidate 360 Edit & Link User Account states
   const [editOpen, setEditOpen] = useState(false);
   const [fullName, setFullName] = useState('');
   const [currentTitle, setCurrentTitle] = useState('');
@@ -482,7 +507,7 @@ export const HqCandidateDetailPage: React.FC = () => {
         phone: phone.trim() || null,
         linkedin_url: linkedin.trim() || null,
       });
-      toast({ title: 'Candidate 360 profile updated', tone: 'success' });
+      toast({ title: 'Candidate profile updated', tone: 'success' });
       setEditOpen(false);
       queryClient.invalidateQueries({ queryKey: ['candidate_detail', id] });
       queryClient.invalidateQueries({ queryKey: ['candidate_contacts', id] });
@@ -509,7 +534,7 @@ export const HqCandidateDetailPage: React.FC = () => {
     try {
       const hash = await computeFileSha256(file);
       await uploadCandidateResume(cand.id, file, hash);
-      toast({ title: 'Resume uploaded & SHA-256 hash recorded', tone: 'success' });
+      toast({ title: 'Resume uploaded', tone: 'success' });
       queryClient.invalidateQueries({ queryKey: ['candidate_detail', id] });
     } catch (uploadErr) {
       toast({
@@ -531,7 +556,6 @@ export const HqCandidateDetailPage: React.FC = () => {
       });
       toast({
         title: 'Candidate account linked',
-        description: 'Linked candidate profile to authenticated user UUID.',
         tone: 'success',
       });
       setLinkUserOpen(false);
@@ -560,20 +584,17 @@ export const HqCandidateDetailPage: React.FC = () => {
         title={cand.full_name}
         description={`${cand.current_title || 'Candidate'} · ${cand.location || '—'} · ${
           cand.total_experience_years ?? 0
-        } years experience`}
+        } yrs experience`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {cand.resume_path ? (
+            {cand.resume_path && (
               <Button size="sm" variant="outline" onClick={handleOpenResume}>
-                <FileText className="h-3.5 w-3.5" />
-                View Resume (5m Signed URL)
+                View resume
               </Button>
-            ) : (
-              <Badge tone="slate">No resume uploaded</Badge>
             )}
-            <label className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
-              <Upload className="h-3.5 w-3.5 text-indigo-600" />
-              <span>{cand.resume_path ? 'Replace Resume' : 'Upload Resume'}</span>
+            <label className="inline-flex items-center gap-1.5 h-7 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[12px] leading-[16px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)]">
+              <Upload strokeWidth={1.5} className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+              <span>{cand.resume_path ? 'Replace resume' : 'Upload resume'}</span>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
@@ -590,354 +611,360 @@ export const HqCandidateDetailPage: React.FC = () => {
                   setLinkUserOpen(true);
                 }}
               >
-                <Link2 className="h-3.5 w-3.5" />
-                {cand.user_id ? 'Relink User Account' : 'Link User Account'}
+                {cand.user_id ? 'Relink user' : 'Link user'}
               </Button>
             )}
             <Button size="sm" onClick={startEditCandidate}>
-              <Edit3 className="h-3.5 w-3.5" />
-              Edit Candidate 360
+              Edit profile
             </Button>
           </div>
         }
       />
 
-      {/* Candidate 360 Header & Three-Way Attribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 p-5 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+      {/* Two columns at 1200px: main (~760px) + right rail (320px) */}
+      <div className="flex flex-col lg:flex-row items-start gap-8">
+        {/* Main Column */}
+        <div className="flex-1 min-w-0 w-full space-y-6">
+          {/* Summary & Skills */}
+          <div className="space-y-4 pb-6 border-b border-[var(--border)]">
+            {cand.summary && (
+              <div className="space-y-1">
+                <span className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)] block">
+                  Summary
+                </span>
+                <p className="text-[14px] leading-[20px] text-[var(--text-primary)] whitespace-pre-line">
+                  {cand.summary}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <span className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)] block">
+                Skills ({cand.skills?.length || 0})
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {(cand.skills || []).map((sk) => (
+                  <span
+                    key={sk}
+                    className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[12px] leading-[16px] font-medium text-[var(--text-primary)]"
+                  >
+                    {sk}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <Tabs
+            tabs={[
+              {
+                id: 'matches',
+                label: 'Matches (Candidate → Requirements)',
+                count: matchesData?.count || 0,
+              },
+              {
+                id: 'submissions',
+                label: 'Submissions',
+                count: submissions.length,
+              },
+              ...(isAdmin ? [{ id: 'audit', label: 'Audit log' }] : []),
+            ]}
+            activeTab={activeTab}
+            onChange={setActiveTab}
+          />
+
+          {activeTab === 'matches' && (
+            <div className="space-y-4">
+              {!matchesData?.data.length ? (
+                <EmptyState
+                  title="No matching open requirements"
+                  description="Potential matches are calculated automatically when open requirements match this candidate's skills."
+                />
+              ) : (
+                <div>
+                  <div className="border-t border-[var(--border)] divide-y divide-[var(--border)]">
+                    {matchesData.data.map((m, idx) => {
+                      const rank = (matchesPage - 1) * 25 + idx + 1;
+                      const existingSub = submissions.find(
+                        (s) => s.requirement_id === m.requirement_id
+                      );
+                      const isOverridden =
+                        m.override_score !== null && m.override_score !== undefined;
+
+                      return (
+                        <div
+                          key={m.id}
+                          className="py-3 px-2 hover:bg-[var(--bg-hover)] transition-colors space-y-2"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="font-mono tabular-nums text-[12px] leading-[16px] text-[var(--text-tertiary)] w-6">
+                                #{rank}
+                              </span>
+                              <Link
+                                to={`${prefix}/requirements/${m.requirement_id}`}
+                                className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)] hover:text-[var(--accent)] truncate"
+                              >
+                                {m.requirements?.title || m.requirement_id}
+                              </Link>
+                              <span className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                                {m.requirements?.organizations?.name || '—'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0">
+                              {!existingSub ? (
+                                <Badge tone="amber">Potential match</Badge>
+                              ) : (
+                                <Badge tone="emerald">
+                                  {STAGE_LABELS[existingSub.stage]}
+                                </Badge>
+                              )}
+                              <ScoreBar score={m.final_score} isOverridden={isOverridden} />
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEvidenceTarget(m)}
+                                >
+                                  Evidence
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setOverrideTarget(m);
+                                    setOverrideScoreInput(
+                                      m.override_score !== null ? String(m.override_score) : ''
+                                    );
+                                    setOverrideReasonInput(m.override_reason || '');
+                                  }}
+                                >
+                                  Override
+                                </Button>
+                                {existingSub ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setDrawerSubmissionId(existingSub.id)}
+                                  >
+                                    Pipeline
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setSubmitMatchTarget(m);
+                                      setSubmitNotes('');
+                                    }}
+                                  >
+                                    Submit
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pl-9 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {(m.matched_skills || []).map((sk) => (
+                                <span
+                                  key={sk}
+                                  className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[12px] leading-[16px] text-[var(--text-primary)]"
+                                >
+                                  {sk}
+                                </span>
+                              ))}
+                              {(m.unproven_skills || []).map((sk) => (
+                                <span
+                                  key={sk}
+                                  title="Not found on profile; not proof the skill is missing"
+                                  className="inline-flex items-center rounded-[6px] border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[12px] leading-[16px] text-[var(--text-tertiary)]"
+                                >
+                                  {sk}
+                                </span>
+                              ))}
+                            </div>
+
+                            {isOverridden && (
+                              <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono tabular-nums">
+                                Overridden by recruiter · {m.override_score}
+                                {m.override_reason ? ` · '${m.override_reason}'` : ''}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <Pagination
+                    page={matchesPage}
+                    totalCount={matchesData.count}
+                    onPageChange={setMatchesPage}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'submissions' && (
             <div>
-              <span className="text-slate-500 block mb-1">1. Original Source</span>
+              {submissions.length === 0 ? (
+                <EmptyState
+                  title="No submissions recorded"
+                  description="Submissions appear here when this candidate applies or is submitted to a requirement."
+                />
+              ) : (
+                <div className="overflow-x-auto border-t border-[var(--border)]">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Requirement</th>
+                        <th>Submission source</th>
+                        <th>Submitting vendor</th>
+                        <th>Stage</th>
+                        <th>Submitted</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {submissions.map((s) => (
+                        <tr
+                          key={s.id}
+                          onClick={() => setDrawerSubmissionId(s.id)}
+                          className="cursor-pointer"
+                        >
+                          <td className="font-medium">
+                            {s.requirements?.title || s.requirement_id}
+                          </td>
+                          <td>
+                            <SourceBadge source={s.source} vendorName={s.organizations?.name} />
+                          </td>
+                          <td className="text-[var(--text-secondary)]">
+                            {s.organizations?.name || 'Direct / HireNest'}
+                          </td>
+                          <td>
+                            <StageBadge stage={s.stage} />
+                          </td>
+                          <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                            {formatLocalDateTime(s.created_at)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'audit' && isAdmin && (
+            <div className="border-y border-[var(--border)] divide-y divide-[var(--border)]">
+              {!auditData?.data.length ? (
+                <p className="py-4 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                  No audit records for this candidate.
+                </p>
+              ) : (
+                auditData.data.map((log) => (
+                  <div
+                    key={log.id}
+                    className="h-10 px-3 flex items-center justify-between text-[13px] leading-[20px]"
+                  >
+                    <span>
+                      <strong className="uppercase font-mono">{log.action}</strong> by{' '}
+                      {log.actor_role || 'system'}
+                    </span>
+                    <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                      {formatLocalDateTime(log.created_at)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right Rail (320px): Key facts as label/value pairs */}
+        <aside className="w-full lg:w-[320px] shrink-0 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-4 space-y-4">
+          <span className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)] block">
+            Key facts
+          </span>
+
+          <div className="divide-y divide-[var(--border)] text-[13px] leading-[20px]">
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Original source</span>
               <SourceBadge
                 source={cand.original_source}
                 vendorName={cand.source_vendor?.name}
               />
             </div>
-            <div>
-              <span className="text-slate-500 block mb-1">2. Current Vendor Association</span>
-              <span className="font-semibold text-slate-900 dark:text-slate-100">
-                {cand.owner_vendor?.name || 'None (Direct / Internal)'}
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Vendor owner</span>
+              <span className="text-[var(--text-primary)] truncate">
+                {cand.owner_vendor?.name || 'None'}
               </span>
             </div>
-            <div>
-              <span className="text-slate-500 block mb-1">Linked Auth User</span>
-              <span className="font-mono text-[11px] text-slate-600 dark:text-slate-400">
-                {cand.user_id ? cand.user_id.slice(0, 12) + '…' : 'Unlinked'}
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Experience</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
+                {cand.total_experience_years ?? 0} yrs
               </span>
             </div>
-            <div>
-              <span className="text-slate-500 block mb-1">Resume SHA-256</span>
-              <span className="font-mono text-[11px] text-slate-600 dark:text-slate-400">
-                {cand.resume_hash ? cand.resume_hash.slice(0, 12) + '…' : '—'}
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Location</span>
+              <span className="text-[var(--text-primary)]">{cand.location || '—'}</span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Email</span>
+              <span className="font-mono text-[12px] text-[var(--text-primary)] truncate">
+                {contacts?.email || '—'}
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Phone</span>
+              <span className="font-mono text-[12px] text-[var(--text-primary)]">
+                {contacts?.phone || '—'}
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">LinkedIn</span>
+              {contacts?.linkedin_url ? (
+                <a
+                  href={contacts.linkedin_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[var(--accent)] underline inline-flex items-center gap-1"
+                >
+                  Open <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : (
+                <span className="text-[var(--text-tertiary)]">—</span>
+              )}
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Auth user</span>
+              <span className="font-mono text-[12px] text-[var(--text-tertiary)]">
+                {cand.user_id ? cand.user_id.slice(0, 10) + '…' : 'Unlinked'}
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Resume SHA-256</span>
+              <span className="font-mono text-[12px] text-[var(--text-tertiary)]">
+                {cand.resume_hash ? cand.resume_hash.slice(0, 10) + '…' : '—'}
               </span>
             </div>
           </div>
-
-          {cand.summary && (
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 block mb-1">
-                Summary
-              </span>
-              <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line">
-                {cand.summary}
-              </p>
-            </div>
-          )}
-
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-            <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 block mb-2">
-              Verified Profile Skills ({cand.skills?.length || 0})
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {(cand.skills || []).map((sk) => (
-                <Badge key={sk} tone="indigo">
-                  {sk}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Unmasked Contacts on Detail Page (HQ / Owner Vendor / Self only) */}
-        <Card className="p-5 space-y-3">
-          <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-            Candidate Contact Details (Governed)
-          </h3>
-          {contacts ? (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-              <div className="py-2 flex justify-between">
-                <span className="text-slate-500">Email:</span>
-                <span className="font-mono">{contacts.email || '—'}</span>
-              </div>
-              <div className="py-2 flex justify-between">
-                <span className="text-slate-500">Phone:</span>
-                <span className="font-mono">{contacts.phone || '—'}</span>
-              </div>
-              <div className="py-2 flex justify-between">
-                <span className="text-slate-500">LinkedIn:</span>
-                {contacts.linkedin_url ? (
-                  <a
-                    href={contacts.linkedin_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-indigo-600 underline inline-flex items-center gap-1"
-                  >
-                    Profile <ExternalLink className="h-3 w-3" />
-                  </a>
-                ) : (
-                  <span>—</span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-slate-500">
-              Contact details are restricted or not recorded.
-            </p>
-          )}
-        </Card>
+        </aside>
       </div>
-
-      <Tabs
-        tabs={[
-          {
-            id: 'matches',
-            label: 'Matches (Candidate → Requirements)',
-            count: matchesData?.count || 0,
-          },
-          {
-            id: 'submissions',
-            label: 'Applications & Submissions',
-            count: submissions.length,
-          },
-          ...(isAdmin ? [{ id: 'audit', label: 'Audit Trail' }] : []),
-        ]}
-        activeTab={activeTab}
-        onChange={setActiveTab}
-      />
-
-      {activeTab === 'matches' && (
-        <div className="space-y-4">
-          <p className="text-xs text-slate-500">
-            Bidirectional matching (<code className="font-mono">Candidate → Requirements</code>). A{' '}
-            <strong>Potential Match</strong> is advisory only and does not create an application or
-            vendor submission until explicitly submitted.
-          </p>
-          {!matchesData?.data.length ? (
-            <EmptyState
-              title="No matching open requirements"
-              description="Potential matches are calculated automatically when open requirements match this candidate's skills."
-            />
-          ) : (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                      <th className="py-3 px-4">Requirement</th>
-                      <th className="py-3 px-4">Client</th>
-                      <th className="py-3 px-4">Pipeline / Attribution Status</th>
-                      <th className="py-3 px-4">Final Score</th>
-                      <th className="py-3 px-4">Matched / Unproven Skills</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {matchesData.data.map((m) => {
-                      const existingSub = submissions.find(
-                        (s) => s.requirement_id === m.requirement_id
-                      );
-                      return (
-                        <tr key={m.id}>
-                          <td className="py-3 px-4">
-                            <Link
-                              to={`${prefix}/requirements/${m.requirement_id}`}
-                              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                            >
-                              {m.requirements?.title || m.requirement_id}
-                            </Link>
-                          </td>
-                          <td className="py-3 px-4">
-                            {m.requirements?.organizations?.name || '—'}
-                          </td>
-                          <td className="py-3 px-4">
-                            {!existingSub ? (
-                              <Badge tone="amber">Potential Match (Not Applied)</Badge>
-                            ) : existingSub.source === 'direct' ? (
-                              <Badge tone="emerald">
-                                Direct Applied · {STAGE_LABELS[existingSub.stage]}
-                              </Badge>
-                            ) : existingSub.source === 'vendor' ? (
-                              <Badge tone="indigo">
-                                Vendor Submitted · {STAGE_LABELS[existingSub.stage]}
-                              </Badge>
-                            ) : (
-                              <Badge tone="slate">
-                                HQ Submitted · {STAGE_LABELS[existingSub.stage]}
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <ScoreBar
-                              score={m.final_score}
-                              isOverridden={m.override_score !== null}
-                            />
-                            {m.override_score !== null && (
-                              <div className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-0.5">
-                                Overridden: {m.override_reason}
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-                              {m.matched_skills?.length || 0} matched
-                            </span>{' '}
-                            ·{' '}
-                            <span
-                              className="text-slate-500"
-                              title="Missing evidence is not proof of missing skill"
-                            >
-                              {m.unproven_skills?.length || 0} unproven
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right space-x-1.5">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEvidenceTarget(m)}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Evidence
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setOverrideTarget(m);
-                                setOverrideScoreInput(
-                                  m.override_score !== null ? String(m.override_score) : ''
-                                );
-                                setOverrideReasonInput(m.override_reason || '');
-                              }}
-                            >
-                              <Sliders className="h-3.5 w-3.5" />
-                              Override
-                            </Button>
-                            {existingSub ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDrawerSubmissionId(existingSub.id)}
-                              >
-                                View Pipeline
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSubmitMatchTarget(m);
-                                  setSubmitNotes('');
-                                }}
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                                Submit
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination
-                page={matchesPage}
-                totalCount={matchesData.count}
-                onPageChange={setMatchesPage}
-              />
-            </Card>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'submissions' && (
-        <Card className="overflow-hidden">
-          {submissions.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500">
-              No applications or vendor submissions recorded for this candidate.
-            </div>
-          ) : (
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Requirement</th>
-                  <th className="py-3 px-4">Submission Source</th>
-                  <th className="py-3 px-4">Submitting Vendor</th>
-                  <th className="py-3 px-4">Stage</th>
-                  <th className="py-3 px-4">Submitted At</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                {submissions.map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => setDrawerSubmissionId(s.id)}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                  >
-                    <td className="py-3 px-4 font-semibold">
-                      {s.requirements?.title || s.requirement_id}
-                    </td>
-                    <td className="py-3 px-4">
-                      <SourceBadge source={s.source} vendorName={s.organizations?.name} />
-                    </td>
-                    <td className="py-3 px-4">
-                      {s.organizations?.name || 'Direct / HireNest'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <StageBadge stage={s.stage} />
-                    </td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                      {formatLocalDateTime(s.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Card>
-      )}
-
-      {activeTab === 'audit' && isAdmin && (
-        <Card className="p-5 space-y-2 text-xs">
-          {!auditData?.data.length ? (
-            <p className="text-slate-500">No audit records for this candidate.</p>
-          ) : (
-            auditData.data.map((log) => (
-              <div
-                key={log.id}
-                className="py-2 border-b border-slate-100 dark:border-slate-800 flex justify-between"
-              >
-                <span>
-                  <strong className="uppercase font-mono">{log.action}</strong> by{' '}
-                  {log.actor_role || 'system'}
-                </span>
-                <span className="font-mono tabular-nums text-slate-400">
-                  {formatLocalDateTime(log.created_at)}
-                </span>
-              </div>
-            ))
-          )}
-        </Card>
-      )}
 
       {/* Override Modal */}
       <Dialog
         open={Boolean(overrideTarget)}
         onClose={() => setOverrideTarget(null)}
-        title="Override Match Score"
+        title="Override match score"
       >
         <div className="space-y-4">
           <Input
-            label="Override Score (0–100 or blank to clear)"
+            label="Override score (0–100 or blank to clear)"
             type="number"
             min={0}
             max={100}
@@ -945,7 +972,7 @@ export const HqCandidateDetailPage: React.FC = () => {
             onChange={(e) => setOverrideScoreInput(e.target.value)}
           />
           <Textarea
-            label="Reason (Required)"
+            label="Reason (required)"
             rows={3}
             value={overrideReasonInput}
             onChange={(e) => setOverrideReasonInput(e.target.value)}
@@ -959,7 +986,7 @@ export const HqCandidateDetailPage: React.FC = () => {
               loading={overrideLoading}
               disabled={!overrideReasonInput.trim()}
             >
-              Save Override
+              Save override
             </Button>
           </div>
         </div>
@@ -969,14 +996,14 @@ export const HqCandidateDetailPage: React.FC = () => {
       <Dialog
         open={Boolean(submitMatchTarget)}
         onClose={() => setSubmitMatchTarget(null)}
-        title="Submit Candidate to Requirement"
-        maxWidth="max-w-xl"
+        title="Submit candidate to requirement"
+        maxWidth="max-w-[640px]"
       >
         {submitMatchTarget && (
           <div className="space-y-4">
             <MatchEvidencePanel match={submitMatchTarget} />
             <Textarea
-              label="Notes (Optional)"
+              label="Notes (optional)"
               rows={3}
               value={submitNotes}
               onChange={(e) => setSubmitNotes(e.target.value)}
@@ -986,7 +1013,7 @@ export const HqCandidateDetailPage: React.FC = () => {
                 Cancel
               </Button>
               <Button onClick={handleSubmitCandidate} loading={submitLoading}>
-                Confirm Submission
+                Confirm submission
               </Button>
             </div>
           </div>
@@ -1005,13 +1032,13 @@ export const HqCandidateDetailPage: React.FC = () => {
         reason={dupReason}
       />
 
-      {/* Explainable Match Evidence Inspection Modal */}
+      {/* Match Evidence Inspection Modal */}
       <Dialog
         open={Boolean(evidenceTarget)}
         onClose={() => setEvidenceTarget(null)}
-        title="Explainable Match Evidence Breakdown"
-        description="Deterministic score, matched vs unproven skills, experience alignment, and recruiter override."
-        maxWidth="max-w-xl"
+        title="Match evidence"
+        description="Deterministic score, matched vs unproven skills, and recruiter override."
+        maxWidth="max-w-[640px]"
       >
         {evidenceTarget && (
           <div className="space-y-4">
@@ -1029,19 +1056,19 @@ export const HqCandidateDetailPage: React.FC = () => {
       <Dialog
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Edit Candidate 360 Profile & Contacts"
-        maxWidth="max-w-xl"
+        title="Edit candidate profile"
+        maxWidth="max-w-[640px]"
       >
-        <form onSubmit={handleSaveCandidateEdit} className="space-y-3.5">
+        <form onSubmit={handleSaveCandidateEdit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
-              label="Full Name"
+              label="Full name"
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
             <Input
-              label="Current Title"
+              label="Current title"
               value={currentTitle}
               onChange={(e) => setCurrentTitle(e.target.value)}
             />
@@ -1053,7 +1080,7 @@ export const HqCandidateDetailPage: React.FC = () => {
               onChange={(e) => setLocation(e.target.value)}
             />
             <Input
-              label="Total Experience (Years)"
+              label="Total experience (years)"
               type="number"
               step="0.5"
               value={expYears}
@@ -1085,27 +1112,27 @@ export const HqCandidateDetailPage: React.FC = () => {
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
           />
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
             <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" loading={savingEdit}>
-              Save Candidate 360
+              Save changes
             </Button>
           </div>
         </form>
       </Dialog>
 
-      {/* Admin Link Candidate User Account Modal (admin_link_candidate_account) */}
+      {/* Admin Link Candidate User Account Modal */}
       <Dialog
         open={linkUserOpen}
         onClose={() => setLinkUserOpen(false)}
-        title="Link Candidate Profile to User Account"
-        description="Calls admin_link_candidate_account(p_candidate_id, p_user_id) to associate this candidate record with an authenticated user."
+        title="Link candidate profile to user account"
+        description="Associates this candidate record with an authenticated user UUID."
       >
         <form onSubmit={handleLinkUserAccount} className="space-y-4">
           <Input
-            label="Authenticated User UUID (profiles.id)"
+            label="User UUID (profiles.id)"
             required
             placeholder="00000000-0000-0000-0000-000000000000"
             value={linkUserIdInput}
@@ -1116,7 +1143,7 @@ export const HqCandidateDetailPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" loading={linkingUser} disabled={!linkUserIdInput.trim()}>
-              Confirm Link
+              Confirm link
             </Button>
           </div>
         </form>
@@ -1156,58 +1183,65 @@ export const HqSubmissionsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Global Submissions Pipeline"
-        description="Inspect all candidate applications and vendor submissions across requirements."
+        title="Submissions"
+        description="All candidate applications and vendor submissions across requirements."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <Select
-          value={stage}
-          onChange={(e) => {
-            setStage(e.target.value as SubmissionStage | '');
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Pipeline Stages' },
-            { value: 'applied', label: 'Applied' },
-            { value: 'recruiter_review', label: 'Recruiter Review' },
-            { value: 'client_review', label: 'Client Review' },
-            { value: 'interviewing', label: 'Interviewing' },
-            { value: 'offered', label: 'Offered' },
-            { value: 'offer_accepted', label: 'Offer Accepted' },
-            { value: 'offer_declined', label: 'Offer Declined' },
-            { value: 'onboarded', label: 'Onboarded' },
-            { value: 'rejected', label: 'Rejected' },
-            { value: 'withdrawn', label: 'Withdrawn' },
-          ]}
-        />
-        <Select
-          value={source}
-          onChange={(e) => {
-            setSource(e.target.value as CandidateSource | '');
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Sources' },
-            { value: 'vendor', label: 'Vendor Sourced' },
-            { value: 'direct', label: 'Direct Applicant' },
-            { value: 'internal', label: 'HireNest Sourced' },
-          ]}
-        />
-        <Select
-          value={validFilter}
-          onChange={(e) => {
-            setValidFilter(e.target.value);
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Compliance States' },
-            { value: 'true', label: 'Valid Submissions' },
-            { value: 'false', label: 'Marked Invalid' },
-          ]}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-48">
+          <Select
+            value={stage}
+            onChange={(e) => {
+              setStage(e.target.value as SubmissionStage | '');
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All stages' },
+              { value: 'applied', label: 'Applied' },
+              { value: 'recruiter_review', label: 'Recruiter review' },
+              { value: 'client_review', label: 'Client review' },
+              { value: 'interviewing', label: 'Interviewing' },
+              { value: 'offered', label: 'Offered' },
+              { value: 'offer_accepted', label: 'Offer accepted' },
+              { value: 'offer_declined', label: 'Offer declined' },
+              { value: 'onboarded', label: 'Onboarded' },
+              { value: 'rejected', label: 'Rejected' },
+              { value: 'withdrawn', label: 'Withdrawn' },
+            ]}
+          />
+        </div>
+        <div className="w-44">
+          <Select
+            value={source}
+            onChange={(e) => {
+              setSource(e.target.value as CandidateSource | '');
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All sources' },
+              { value: 'vendor', label: 'Vendor' },
+              { value: 'direct', label: 'Direct' },
+              { value: 'internal', label: 'HireNest' },
+            ]}
+          />
+        </div>
+        <div className="w-44">
+          <Select
+            value={validFilter}
+            onChange={(e) => {
+              setValidFilter(e.target.value);
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All compliance' },
+              { value: 'true', label: 'Valid' },
+              { value: 'false', label: 'Invalid' },
+            ]}
+          />
+        </div>
         {(stage || source || validFilter) && (
           <Button
+            size="sm"
             variant="ghost"
             onClick={() => {
               setStage('');
@@ -1231,54 +1265,54 @@ export const HqSubmissionsPage: React.FC = () => {
           description="Submissions are created when a direct candidate applies or a vendor/recruiter submits a candidate."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Candidate</th>
-                  <th className="py-3 px-4">Requirement & Client</th>
-                  <th className="py-3 px-4">Source Attribution</th>
-                  <th className="py-3 px-4">Stage</th>
-                  <th className="py-3 px-4">Compliance</th>
-                  <th className="py-3 px-4">Submitted</th>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Requirement & client</th>
+                  <th>Source</th>
+                  <th>Stage</th>
+                  <th>Compliance</th>
+                  <th>Submitted</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              <tbody>
                 {data.data.map((sub) => (
                   <tr
                     key={sub.id}
                     onClick={() => setDrawerSubId(sub.id)}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
+                    className="cursor-pointer"
                   >
-                    <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">
+                    <td className="font-medium">
                       {sub.candidates?.full_name || sub.candidate_id}
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="font-medium">
+                    <td>
+                      <div className="text-[var(--text-primary)]">
                         {sub.requirements?.title || sub.requirement_id}
                       </div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                         {sub.requirements?.organizations?.name || '—'}
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td>
                       <SourceBadge
                         source={sub.source}
                         vendorName={sub.organizations?.name}
                       />
                     </td>
-                    <td className="py-3 px-4">
+                    <td>
                       <StageBadge stage={sub.stage} />
                     </td>
-                    <td className="py-3 px-4">
+                    <td>
                       {sub.is_valid ? (
                         <Badge tone="emerald">Valid</Badge>
                       ) : (
                         <Badge tone="red">Invalid</Badge>
                       )}
                     </td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
+                    <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                       {formatLocalDateTime(sub.created_at)}
                     </td>
                   </tr>
@@ -1287,7 +1321,7 @@ export const HqSubmissionsPage: React.FC = () => {
             </table>
           </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       <SubmissionDetailDrawer
@@ -1346,29 +1380,32 @@ export const HqInterviewsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Interviews & Pending Feedback Queue"
-        description="Manage scheduled interview rounds and submit mandatory post-interview assessments."
+        title="Interviews"
+        description="Scheduled interview rounds and mandatory post-interview structured feedback."
       />
 
-      {/* Pending Feedback Queue (my_pending_feedback) */}
+      {/* Needs attention: Pending Feedback Queue */}
       {pendingFeedback.length > 0 && (
-        <Card className="p-5 border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/20 space-y-3">
-          <h3 className="text-xs font-semibold text-red-800 dark:text-red-200">
-            My Pending Feedback Queue ({pendingFeedback.length})
+        <section className="space-y-2">
+          <h3 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+            Awaiting your feedback ({pendingFeedback.length})
           </h3>
-          <div className="divide-y divide-red-200/60 dark:divide-red-900/40 text-xs">
+          <div className="border-y border-[var(--border)] divide-y divide-[var(--border)]">
             {pendingFeedback.map((pf) => (
               <div
                 key={pf.interview_id}
-                className="py-2.5 flex flex-wrap items-center justify-between gap-2"
+                className="py-2.5 px-3 flex flex-wrap items-center justify-between gap-2 text-[13px] leading-[20px]"
               >
-                <div>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-warning)] shrink-0" />
+                  <span className="font-medium text-[var(--text-primary)]">
                     {pf.candidate_name}
-                  </span>{' '}
-                  · {pf.requirement_title} ·{' '}
-                  <span className="font-mono">
-                    Round #{pf.round_number} ({ROUND_LABELS[pf.round_type]})
+                  </span>
+                  <span className="text-[var(--text-secondary)]">
+                    · {pf.requirement_title} ·{' '}
+                    <span className="font-mono">
+                      #{pf.round_number} {ROUND_LABELS[pf.round_type]}
+                    </span>
                   </span>
                 </div>
                 <Button
@@ -1382,30 +1419,36 @@ export const HqInterviewsPage: React.FC = () => {
                     })
                   }
                 >
-                  Complete Feedback Form
+                  Submit feedback
                 </Button>
               </div>
             ))}
           </div>
-        </Card>
+        </section>
       )}
 
-      <div className="flex items-center gap-3">
-        <Select
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as InterviewStatus | '');
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Interview Statuses' },
-            { value: 'scheduled', label: 'Scheduled' },
-            { value: 'completed', label: 'Completed' },
-            { value: 'no_show', label: 'No Show' },
-            { value: 'cancelled', label: 'Cancelled' },
-          ]}
-          className="max-w-xs"
-        />
+      <div className="flex items-center gap-2">
+        <div className="w-48">
+          <Select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as InterviewStatus | '');
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All statuses' },
+              { value: 'scheduled', label: 'Scheduled' },
+              { value: 'completed', label: 'Completed' },
+              { value: 'no_show', label: 'No show' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ]}
+          />
+        </div>
+        {status && (
+          <Button size="sm" variant="ghost" onClick={() => setStatus('')}>
+            Clear filters
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -1418,53 +1461,56 @@ export const HqInterviewsPage: React.FC = () => {
           description="Schedule interviews from a candidate's pipeline submission drawer."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Candidate & Requirement</th>
-                  <th className="py-3 px-4">Round</th>
-                  <th className="py-3 px-4">Scheduled At</th>
-                  <th className="py-3 px-4">Mode</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr>
+                  <th>Candidate & requirement</th>
+                  <th>Round</th>
+                  <th>Scheduled</th>
+                  <th>Mode</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              <tbody>
                 {data.data.map((iv) => (
                   <tr key={iv.id}>
-                    <td className="py-3 px-4">
-                      <div className="font-semibold">
+                    <td>
+                      <div className="font-medium">
                         {iv.submissions?.candidates?.full_name || 'Candidate'}
                       </div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                         {iv.submissions?.requirements?.title || 'Requirement'}
                       </div>
                     </td>
-                    <td className="py-3 px-4">
-                      Round #{iv.round_number} · {ROUND_LABELS[iv.round_type]}
+                    <td>
+                      <span className="font-mono text-[var(--text-tertiary)] mr-1">
+                        #{iv.round_number}
+                      </span>
+                      {ROUND_LABELS[iv.round_type]}
                     </td>
-                    <td className="py-3 px-4 font-mono tabular-nums">
+                    <td className="font-mono tabular-nums text-[12px] text-[var(--text-secondary)]">
                       {formatLocalDateTime(iv.scheduled_at)}
                     </td>
-                    <td className="py-3 px-4 uppercase font-mono text-[11px]">
+                    <td className="font-mono text-[12px] text-[var(--text-secondary)]">
                       {iv.mode}
                     </td>
-                    <td className="py-3 px-4">
+                    <td>
                       <Badge
                         tone={
                           iv.status === 'completed'
                             ? 'emerald'
                             : iv.status === 'scheduled'
-                              ? 'indigo'
+                              ? 'slate'
                               : 'red'
                         }
                       >
                         {iv.status}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 text-right space-x-1.5">
+                    <td className="text-right space-x-1">
                       {iv.status === 'scheduled' && (
                         <>
                           <Button
@@ -1476,14 +1522,14 @@ export const HqInterviewsPage: React.FC = () => {
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => handleStatusChange(iv.id, 'no_show')}
                           >
-                            No-Show
+                            No-show
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => handleStatusChange(iv.id, 'cancelled')}
                           >
                             Cancel
@@ -1502,7 +1548,7 @@ export const HqInterviewsPage: React.FC = () => {
                             })
                           }
                         >
-                          Rate Interview
+                          Submit feedback
                         </Button>
                       )}
                     </td>
@@ -1512,7 +1558,7 @@ export const HqInterviewsPage: React.FC = () => {
             </table>
           </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       {feedbackModalTarget && (
@@ -1533,7 +1579,7 @@ export const HqInterviewsPage: React.FC = () => {
   );
 };
 
-// 5. HQ Duplicates & Ownership Page (resolve_duplicate_flag; never auto-merge)
+// 5. HQ Duplicates & Ownership Page
 export const HqDuplicatesPage: React.FC = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -1570,8 +1616,7 @@ export const HqDuplicatesPage: React.FC = () => {
           : {}),
       });
       toast({
-        title: 'Duplicate ownership flag resolved',
-        description: 'Records remain distinct; ownership resolution logged.',
+        title: 'Duplicate flag resolved',
         tone: 'success',
       });
       setSelectedFlag(null);
@@ -1593,24 +1638,25 @@ export const HqDuplicatesPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Duplicates & Ownership Governance"
+        title="Duplicates & ownership"
         description="Review attempted duplicate candidate or submission flags. HireNestOS never auto-merges profiles."
       />
 
-      <div className="flex items-center gap-3">
-        <Select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as 'open' | 'resolved' | '');
-            setPage(1);
-          }}
-          options={[
-            { value: 'open', label: 'Open Flags' },
-            { value: 'resolved', label: 'Resolved Flags' },
-            { value: '', label: 'All Flags' },
-          ]}
-          className="max-w-xs"
-        />
+      <div className="flex items-center gap-2">
+        <div className="w-44">
+          <Select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as 'open' | 'resolved' | '');
+              setPage(1);
+            }}
+            options={[
+              { value: 'open', label: 'Open flags' },
+              { value: 'resolved', label: 'Resolved flags' },
+              { value: '', label: 'All flags' },
+            ]}
+          />
+        </div>
       </div>
 
       {isLoading ? (
@@ -1623,49 +1669,51 @@ export const HqDuplicatesPage: React.FC = () => {
           description="All ownership flags have been reviewed."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Kind & Match Type</th>
-                  <th className="py-3 px-4">Existing Candidate</th>
-                  <th className="py-3 px-4">Attempted Name & Org</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Created At</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr>
+                  <th>Kind & match type</th>
+                  <th>Existing candidate</th>
+                  <th>Attempted name & org</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              <tbody>
                 {data.data.map((fl) => (
                   <tr key={fl.id}>
-                    <td className="py-3 px-4">
-                      <span className="font-semibold capitalize">{fl.kind}</span> ·{' '}
-                      <span className="font-mono text-slate-500">{fl.match_type}</span>
+                    <td>
+                      <span className="font-medium capitalize">{fl.kind}</span> ·{' '}
+                      <span className="font-mono text-[12px] text-[var(--text-secondary)]">
+                        {fl.match_type}
+                      </span>
                     </td>
-                    <td className="py-3 px-4">
+                    <td>
                       <Link
                         to={`${prefix}/candidates/${fl.existing_candidate_id}`}
-                        className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                        className="font-medium text-[var(--text-primary)] hover:text-[var(--accent)]"
                       >
                         {fl.candidates?.full_name || fl.existing_candidate_id}
                       </Link>
                     </td>
-                    <td className="py-3 px-4">
+                    <td>
                       <div>{fl.attempted_name || '—'}</div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                         {fl.organizations?.name || 'Direct / HQ'}
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td>
                       <Badge tone={fl.status === 'open' ? 'amber' : 'emerald'}>
                         {fl.status}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
+                    <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                       {formatLocalDateTime(fl.created_at)}
                     </td>
-                    <td className="py-3 px-4 text-right">
+                    <td className="text-right">
                       {fl.status === 'open' ? (
                         <Button
                           size="sm"
@@ -1675,11 +1723,12 @@ export const HqDuplicatesPage: React.FC = () => {
                             setNewOwnerVendorId('');
                           }}
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
                           Resolve
                         </Button>
                       ) : (
-                        <span className="text-slate-500">{fl.resolution_note}</span>
+                        <span className="text-[12px] text-[var(--text-secondary)]">
+                          {fl.resolution_note}
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -1688,18 +1737,18 @@ export const HqDuplicatesPage: React.FC = () => {
             </table>
           </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       <Dialog
         open={Boolean(selectedFlag)}
         onClose={() => setSelectedFlag(null)}
-        title="Resolve Duplicate & Ownership Flag"
-        description="Resolves the flag with an audit note. Admin may optionally reassign current vendor association."
+        title="Resolve duplicate & ownership flag"
+        description="Resolves the flag with an audit note. Admin may optionally reassign vendor association."
       >
         <div className="space-y-4">
           <Textarea
-            label="Resolution Note (Required)"
+            label="Resolution note (required)"
             rows={3}
             value={resolutionNote}
             onChange={(e) => setResolutionNote(e.target.value)}
@@ -1707,7 +1756,7 @@ export const HqDuplicatesPage: React.FC = () => {
           />
           {isAdmin && (
             <Select
-              label="Reassign Current Vendor Association (Admin Only · Optional)"
+              label="Reassign vendor association (admin · optional)"
               value={newOwnerVendorId}
               onChange={(e) => setNewOwnerVendorId(e.target.value)}
               options={[
@@ -1728,7 +1777,7 @@ export const HqDuplicatesPage: React.FC = () => {
               loading={resolving}
               disabled={!resolutionNote.trim()}
             >
-              Confirm Resolution
+              Confirm resolution
             </Button>
           </div>
         </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Sparkles } from 'lucide-react';
 import {
   Dialog,
   Button,
@@ -87,10 +86,9 @@ export const RequirementFormModal: React.FC<{
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // AI Suggestion states (Advisory only: user reviews & clicks to apply)
   const [aiSkillSuggestions, setAiSkillSuggestions] = useState<string[]>([]);
   const [aiImprovedJd, setAiImprovedJd] = useState<string | null>(null);
-  const [aiLabel, setAiLabel] = useState<string>('AI suggestion: review before use');
+  const [aiLabel, setAiLabel] = useState<string>('Suggestion: review before use');
   const [aiLoading, setAiLoading] = useState<'skills' | 'jd' | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -260,7 +258,6 @@ export const RequirementFormModal: React.FC<{
         });
       }
 
-      // Save requirement_financials (client_manager own org / HQ)
       if (values.actual_client_budget !== undefined || values.financial_notes !== undefined) {
         const clientBudgetNum =
           values.actual_client_budget && values.actual_client_budget.trim() !== ''
@@ -273,7 +270,6 @@ export const RequirementFormModal: React.FC<{
         });
       }
 
-      // Save requirement_margins (admin only)
       if (isAdmin && values.platform_margin !== undefined && values.margin_type) {
         const marginNum =
           values.platform_margin && values.platform_margin.trim() !== ''
@@ -308,14 +304,14 @@ export const RequirementFormModal: React.FC<{
     <Dialog
       open={open}
       onClose={onClose}
-      title={isEditing ? 'Edit Requirement' : 'Create Requirement'}
-      description="Define job specification, skills, SLA hours, and governed budget visibility."
-      maxWidth="max-w-3xl"
+      title={isEditing ? 'Edit requirement' : 'New requirement'}
+      description="Job specification, skills, SLA hours, and budget visibility."
+      maxWidth="max-w-[640px]"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {isHq && !isEditing && (
           <Select
-            label="Client Organization"
+            label="Client organization"
             {...register('client_org_id')}
             error={errors.client_org_id?.message}
             options={[
@@ -326,7 +322,7 @@ export const RequirementFormModal: React.FC<{
         )}
 
         <Input
-          label="Requirement Title"
+          label="Requirement title"
           placeholder="e.g. Senior Backend Engineer (Distributed Systems)"
           {...register('title')}
           error={errors.title?.message}
@@ -334,28 +330,26 @@ export const RequirementFormModal: React.FC<{
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Requirement Description (Plain Text)
+            <label className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+              Description
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 loading={aiLoading === 'jd'}
                 onClick={handleImproveJd}
               >
-                <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
                 Improve JD wording
               </Button>
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 loading={aiLoading === 'skills'}
                 onClick={handleSuggestSkills}
               >
-                <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
                 Suggest skills
               </Button>
             </div>
@@ -363,56 +357,40 @@ export const RequirementFormModal: React.FC<{
 
           <Textarea
             rows={5}
-            placeholder="Describe responsibilities, technical environment, and must-have qualifications..."
+            placeholder="Responsibilities, technical environment, and required qualifications..."
             {...register('description')}
             error={errors.description?.message}
           />
 
           {aiError && (
-            <p className="text-xs text-amber-700 dark:text-amber-300">{aiError}</p>
+            <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">{aiError}</p>
           )}
 
-          {/* AI Improved JD Suggestion Box */}
+          {/* Inline Suggestion Block for JD */}
           {aiImprovedJd && (
-            <div className="rounded-lg border border-indigo-200 dark:border-indigo-900/60 bg-slate-50 dark:bg-slate-950 p-3 space-y-2">
+            <div className="rounded-[6px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] p-3 space-y-2">
               <AiSuggestionBanner
                 label={aiLabel}
+                onUse={() => {
+                  setValue('description', aiImprovedJd, { shouldValidate: true });
+                  setAiImprovedJd(null);
+                }}
                 onDismiss={() => setAiImprovedJd(null)}
               />
               <textarea
-                rows={5}
+                rows={4}
                 value={aiImprovedJd}
                 onChange={(e) => setAiImprovedJd(e.target.value)}
-                className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-xs text-slate-800 dark:text-slate-200"
+                className="w-full rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-2.5 text-[13px] leading-[20px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--focus-border)] focus:ring-[3px] focus:ring-[var(--focus-ring)]"
               />
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAiImprovedJd(null)}
-                >
-                  Discard
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => {
-                    setValue('description', aiImprovedJd, { shouldValidate: true });
-                    setAiImprovedJd(null);
-                  }}
-                >
-                  Use Suggested Description
-                </Button>
-              </div>
             </div>
           )}
         </div>
 
-        {/* Skills Chip Input + AI Skill Suggestions */}
+        {/* Skills Chip Input + Inline Skill Suggestions */}
         <div className="space-y-2">
           <SkillsChipInput
-            label="Required Skills"
+            label="Required skills"
             skills={skills}
             onChange={(next) => {
               setSkills(next);
@@ -422,9 +400,19 @@ export const RequirementFormModal: React.FC<{
           />
 
           {aiSkillSuggestions.length > 0 && (
-            <div className="rounded-lg border border-indigo-200 dark:border-indigo-900/60 bg-slate-50 dark:bg-slate-950 p-3 space-y-2">
+            <div className="rounded-[6px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] p-3 space-y-2">
               <AiSuggestionBanner
                 label={aiLabel}
+                onUse={() => {
+                  const merged = [...skills];
+                  for (const s of aiSkillSuggestions) {
+                    if (!merged.some((ex) => ex.toLowerCase() === s.toLowerCase())) {
+                      merged.push(s);
+                    }
+                  }
+                  setSkills(merged);
+                  setAiSkillSuggestions([]);
+                }}
                 onDismiss={() => setAiSkillSuggestions([])}
               />
               <div className="flex flex-wrap gap-1.5">
@@ -440,10 +428,10 @@ export const RequirementFormModal: React.FC<{
                       onClick={() => {
                         if (!alreadyAdded) setSkills([...skills, s]);
                       }}
-                      className={`rounded border px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                      className={`rounded-[6px] border px-2 py-0.5 text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
                         alreadyAdded
-                          ? 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default'
-                          : 'border-indigo-300 dark:border-indigo-700 bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50'
+                          ? 'border-[var(--border)] bg-[var(--bg-hover)] text-[var(--text-tertiary)] cursor-default'
+                          : 'border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
                       }`}
                     >
                       + {s}
@@ -455,16 +443,16 @@ export const RequirementFormModal: React.FC<{
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Input
-            label="Min Experience (Yrs)"
+            label="Min exp (yrs)"
             type="number"
             step="0.5"
             {...register('min_experience')}
             error={errors.min_experience?.message}
           />
           <Input
-            label="Max Experience (Yrs)"
+            label="Max exp (yrs)"
             type="number"
             step="0.5"
             {...register('max_experience')}
@@ -477,7 +465,7 @@ export const RequirementFormModal: React.FC<{
             error={errors.openings?.message}
           />
           <Input
-            label="SLA Hours"
+            label="SLA (hours)"
             type="number"
             {...register('submission_sla_hours')}
             error={errors.submission_sla_hours?.message}
@@ -492,7 +480,7 @@ export const RequirementFormModal: React.FC<{
             error={errors.location?.message}
           />
           <Select
-            label="Work Mode"
+            label="Work mode"
             {...register('work_mode')}
             error={errors.work_mode?.message}
             options={[
@@ -502,22 +490,22 @@ export const RequirementFormModal: React.FC<{
             ]}
           />
           <Select
-            label="Employment Type"
+            label="Employment type"
             {...register('employment_type')}
             error={errors.employment_type?.message}
             options={[
-              { value: 'full_time', label: 'Full Time' },
+              { value: 'full_time', label: 'Full time' },
               { value: 'contract', label: 'Contract' },
-              { value: 'contract_to_hire', label: 'Contract to Hire' },
-              { value: 'part_time', label: 'Part Time' },
+              { value: 'contract_to_hire', label: 'Contract to hire' },
+              { value: 'part_time', label: 'Part time' },
             ]}
           />
         </div>
 
         {/* Budgets & Financials */}
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3 bg-slate-50/50 dark:bg-slate-950/40">
-          <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-            Budget & Financial Governance
+        <div className="pt-3 border-t border-[var(--border)] space-y-3">
+          <h4 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+            Budget & financial governance
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
@@ -527,40 +515,39 @@ export const RequirementFormModal: React.FC<{
               error={errors.currency?.message}
             />
             <Input
-              label="Vendor-Visible Budget"
+              label="Vendor-visible budget"
               type="number"
-              placeholder="Shared with approved vendors"
+              placeholder="Shared with vendors"
               {...register('vendor_visible_budget')}
             />
             <Input
-              label="Internal Client Budget (Private)"
+              label="Internal client budget"
               type="number"
-              placeholder="Never shared with vendors"
-              hint="Stored in requirement_financials (Client + HQ only)"
+              placeholder="Private (Client + HQ)"
               {...register('actual_client_budget')}
             />
           </div>
           <Input
-            label="Internal Financial Notes (Client + HQ only)"
+            label="Internal financial notes"
             placeholder="Billing terms, rate card notes..."
             {...register('financial_notes')}
           />
 
           {isAdmin && (
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
-                label="Platform Margin (Admin Only)"
+                label="Platform margin (admin)"
                 type="number"
                 step="0.01"
                 placeholder="e.g. 12"
                 {...register('platform_margin')}
               />
               <Select
-                label="Margin Type (Admin Only)"
+                label="Margin type (admin)"
                 {...register('margin_type')}
                 options={[
                   { value: 'percentage', label: 'Percentage (%)' },
-                  { value: 'fixed', label: 'Fixed Amount' },
+                  { value: 'fixed', label: 'Fixed amount' },
                 ]}
               />
             </div>
@@ -568,16 +555,16 @@ export const RequirementFormModal: React.FC<{
         </div>
 
         <Phase2ComingSoonCard
-          title="Automated JD Document Parsing"
-          description="Direct PDF/DOCX JD ingestion is planned for Phase 2 via local Ollama."
+          title="JD document ingestion"
+          description="Direct PDF/DOCX JD upload is scheduled for Phase 2."
         />
 
-        <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" loading={submitting}>
-            {isEditing ? 'Save Changes' : 'Create Requirement'}
+            {isEditing ? 'Save changes' : 'Create requirement'}
           </Button>
         </div>
       </form>

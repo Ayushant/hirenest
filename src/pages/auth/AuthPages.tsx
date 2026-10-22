@@ -3,61 +3,103 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ShieldAlert, Clock, Database, Lock, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth, getHomeRouteForRole } from '../../auth/AuthProvider';
-import { Button, Input, Select, Card } from '../../components/ui/kit';
+import { Button, Input, Select } from '../../components/ui/kit';
 import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../../components/ui/Toast';
 
-// 1. Setup Screen when VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing
-// Guardrail 2: No AI features on the setup screen or before login.
-export const SetupGuideScreen: React.FC = () => (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
-    <Card className="max-w-2xl w-full p-8 space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg">
-          H
-        </div>
-        <div>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-            HireNestOS — Environment Configuration Required
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Connect your Supabase project to activate the staffing operating system.
-          </p>
-        </div>
+// Shared Two-Column Split Layout for Auth Pages:
+// Left 42% in deep storm-slate #1E2A36 with a subtle sky radial wash at the top, wordmark, and a concise 3-line product statement in #D6E1EC;
+// Right 58% on Storm 50 with a 400px white form card (10px radius, 1px border).
+const AuthSplitLayout: React.FC<{
+  children: React.ReactNode;
+  maxWidthClass?: string;
+}> = ({ children, maxWidthClass = 'max-w-[400px]' }) => (
+  <div className="min-h-screen flex flex-col lg:flex-row bg-[var(--app-bg)] text-[var(--text-primary)]">
+    {/* Left 42% Storm-Slate Panel */}
+    <div
+      style={{
+        backgroundImage:
+          'radial-gradient(ellipse at top, rgba(136, 189, 242, 0.16), transparent 65%)',
+      }}
+      className="lg:w-[42%] bg-[#1E2A36] text-[#D6E1EC] p-8 sm:p-12 flex flex-col justify-between shrink-0"
+    >
+      <div className="flex items-center gap-2.5">
+        <span className="h-6 w-6 rounded-[6px] bg-[#1F4CC4] flex items-center justify-center shrink-0">
+          <span className="h-2 w-2 rounded-full bg-[#88BDF2]" />
+        </span>
+        <span className="text-[14px] leading-[18px] font-semibold text-white">
+          HireNest
+        </span>
       </div>
 
-      <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 p-4 flex items-start gap-3 text-xs text-amber-900 dark:text-amber-200">
-        <Database className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <p className="font-semibold">Missing Supabase Publishable Credentials</p>
-          <p>
-            HireNestOS uses Supabase as its single source of truth for authentication, RLS
-            governance, deterministic matching, and the 25 pipeline RPCs. No mock or fabricated
-            data is rendered when disconnected.
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-3 text-xs">
-        <h2 className="font-semibold text-slate-900 dark:text-slate-100">
-          Required Environment Variables
-        </h2>
-        <pre className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-900 text-slate-100 p-4 font-mono text-xs overflow-x-auto">
-{`VITE_SUPABASE_URL="https://<your-project-ref>.supabase.co"
-VITE_SUPABASE_ANON_KEY="<your-publishable-anon-key>"
-
-# Optional server-only Gemini key (never prefix with VITE_):
-GEMINI_API_KEY="<your-gemini-api-key>"`}
-        </pre>
-        <p className="text-slate-500 dark:text-slate-400">
-          Security rule: Only use the anon/publishable key in <code className="font-mono">VITE_SUPABASE_ANON_KEY</code>. Never configure a service-role key. Once set in the Secrets / Environment panel, reload this page.
+      <div className="my-12 lg:my-0 max-w-md space-y-3">
+        <div className="h-[3px] w-4 rounded-full bg-[#88BDF2]" />
+        <p className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-white">
+          Governed enterprise staffing for HQ, hiring companies, vendor agencies, and candidates.
+        </p>
+        <p className="text-[13px] leading-[20px] text-[#D6E1EC]">
+          One source of truth for requirements, vendor SLAs, candidate ownership, structured interviews, and 6-dimension quality scoring.
         </p>
       </div>
-    </Card>
+
+      <div className="text-[12px] leading-[16px] text-[#8FA6BC] font-mono tabular-nums">
+        HireNest Workforce Operations
+      </div>
+    </div>
+
+    {/* Right 58% Storm 50 Canvas with 400px White Form Card */}
+    <div className="flex-1 lg:w-[58%] flex items-center justify-center p-6 sm:p-12 bg-[var(--app-bg)]">
+      <div
+        className={`w-full ${maxWidthClass} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7 space-y-6 text-left`}
+      >
+        {children}
+      </div>
+    </div>
   </div>
+);
+
+// 1. Setup Screen when VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing
+export const SetupGuideScreen: React.FC = () => (
+  <AuthSplitLayout maxWidthClass="max-w-[560px]">
+    <div className="space-y-1">
+      <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+        Connect your Supabase project
+      </h1>
+      <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+        Configure environment variables to enable authentication, row-level security, and the 25 database RPCs.
+      </p>
+    </div>
+
+    <ol className="divide-y divide-[var(--border)] border-y border-[var(--border)] text-[13px] leading-[20px]">
+      <li className="py-3 flex gap-3">
+        <span className="font-mono tabular-nums text-[var(--text-tertiary)]">1</span>
+        <span className="text-[var(--text-primary)]">
+          Open your Supabase project settings and copy your project URL and publishable anon key.
+        </span>
+      </li>
+      <li className="py-3 flex gap-3">
+        <span className="font-mono tabular-nums text-[var(--text-tertiary)]">2</span>
+        <span className="text-[var(--text-primary)]">
+          Add the required variables below to your environment configuration (never use a service-role key in client variables).
+        </span>
+      </li>
+      <li className="py-3 flex gap-3">
+        <span className="font-mono tabular-nums text-[var(--text-tertiary)]">3</span>
+        <span className="text-[var(--text-primary)]">
+          Reload the application to sign in and activate your first HQ admin account.
+        </span>
+      </li>
+    </ol>
+
+    <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] p-4 font-mono text-[12px] leading-[18px] overflow-x-auto">
+{`VITE_SUPABASE_URL="https://<your-project-ref>.supabase.co"
+VITE_SUPABASE_ANON_KEY="<your-publishable-anon-key>"
+GEMINI_API_KEY="<optional-server-only-gemini-key>"`}
+    </pre>
+  </AuthSplitLayout>
 );
 
 // 2. Sign In Page
@@ -131,106 +173,100 @@ export const SignInPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-7 space-y-6">
-        <div>
-          <div className="inline-flex h-8 w-8 items-center justify-center rounded bg-indigo-600 text-white font-bold text-sm mb-3">
-            H
+    <AuthSplitLayout>
+      <div className="space-y-1">
+        <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Sign in
+        </h1>
+        <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          Enter your credentials to access your workspace.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="email"
+          placeholder="name@company.com"
+          {...register('email')}
+          error={errors.email?.message}
+        />
+        <Input
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          {...register('password')}
+          error={errors.password?.message}
+        />
+
+        {authError && (
+          <div className="rounded-[6px] border border-[var(--border)] bg-[var(--status-danger-bg)] p-3 text-[12px] leading-[16px] text-[var(--status-danger)] space-y-1.5">
+            <div className="flex items-center gap-1.5 font-medium">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)] shrink-0" />
+              <span>{authError}</span>
+            </div>
+            {authError.toLowerCase().includes('confirm') && (
+              <p className="text-[var(--text-secondary)]">
+                Confirm email is enabled on your Supabase project. Check your inbox or run the SQL snippet below in the Supabase SQL Editor.
+              </p>
+            )}
           </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-            Sign in to HireNestOS
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Governed enterprise staffing portal for HQ, Clients, Vendors, and Candidates.
-          </p>
+        )}
+
+        <div className="flex items-center justify-between text-[12px] leading-[16px]">
+          <button
+            type="button"
+            onClick={() => setShowBootstrapHelp((v) => !v)}
+            className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] underline cursor-pointer"
+          >
+            {showBootstrapHelp ? 'Hide admin SQL' : 'Admin SQL setup'}
+          </button>
+          <Link
+            to="/forgot-password"
+            className="text-[var(--accent)] hover:underline"
+          >
+            Forgot password?
+          </Link>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Input
-            label="Work or Personal Email"
-            type="email"
-            autoComplete="email"
-            placeholder="name@company.com"
-            {...register('email')}
-            error={errors.email?.message}
-          />
-          <Input
-            label="Password"
-            type="password"
-            autoComplete="current-password"
-            placeholder="••••••••"
-            {...register('password')}
-            error={errors.password?.message}
-          />
-
-          {authError && (
-            <div className="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300 space-y-1.5">
-              <p className="font-semibold">{authError}</p>
-              {authError.toLowerCase().includes('confirm') && (
-                <p>
-                  Your Supabase project has <strong>Confirm email</strong> enabled. Check your
-                  inbox for the verification link, or run the SQL snippet below in your
-                  Supabase SQL Editor to confirm and activate immediately.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setShowBootstrapHelp((v) => !v)}
-              className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline cursor-pointer"
-            >
-              {showBootstrapHelp ? 'Hide Admin SQL setup' : 'First-time Admin SQL setup'}
-            </button>
-            <Link
-              to="/forgot-password"
-              className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
-
-          {showBootstrapHelp && (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900 p-3 space-y-2 text-xs">
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
-                Confirm Email & Activate as HQ Admin (Supabase SQL Editor):
-              </p>
-              <pre className="rounded bg-slate-950 text-slate-100 p-2.5 font-mono text-[11px] overflow-x-auto select-all">
-{`-- 1. Confirm email in Supabase Auth
-update auth.users
+        {showBootstrapHelp && (
+          <div className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 space-y-2 text-[12px] leading-[16px]">
+            <p className="font-medium text-[var(--text-primary)]">
+              Confirm email & activate HQ Admin (Supabase SQL Editor):
+            </p>
+            <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] p-2.5 font-mono text-[11px] overflow-x-auto select-all">
+{`update auth.users
 set email_confirmed_at = coalesce(email_confirmed_at, now())
 where email = '${typedEmail.trim()}';
 
--- 2. Activate as HQ Admin in public.profiles
 update public.profiles
 set role = 'admin', status = 'active'
 where email = '${typedEmail.trim()}';`}
-              </pre>
-            </div>
-          )}
+            </pre>
+          </div>
+        )}
 
-          <Button type="submit" className="w-full" loading={loading}>
-            Sign In
-          </Button>
-        </form>
+        <Button type="submit" className="w-full" loading={loading}>
+          Sign in
+        </Button>
+      </form>
 
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-          Don&apos;t have an account?{' '}
-          <Link
-            to="/signup"
-            className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-          >
-            Create an account
-          </Link>
-        </div>
-      </Card>
-    </div>
+      <div className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+        No account?{' '}
+        <Link
+          to="/signup"
+          className="font-medium text-[var(--accent)] hover:underline"
+        >
+          Create an account
+        </Link>
+      </div>
+    </AuthSplitLayout>
   );
 };
 
-// 3. Sign Up Page (Section 4.2: options.data = { full_name, signup_intent: 'candidate'|'vendor'|'client', company_name })
+// 3. Sign Up Page
 const signUpSchema = z
   .object({
     full_name: z.string().min(2, 'Full name is required'),
@@ -306,10 +342,9 @@ export const SignUpPage: React.FC = () => {
 
       if (error) throw error;
 
-      // Supabase returns empty identities array when email is already registered
       if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
         setSignUpError(
-          'An account with this email already exists. Please Sign In or confirm your email in Supabase.'
+          'An account with this email already exists. Sign in or confirm your email in Supabase.'
         );
         setAwaitingEmailConfirm({
           email: cleanEmail,
@@ -319,7 +354,6 @@ export const SignUpPage: React.FC = () => {
         return;
       }
 
-      // If Supabase has "Confirm email" enabled (mailer_autoconfirm: false), data.session is null
       if (data.user && !data.session) {
         setAwaitingEmailConfirm({
           email: cleanEmail,
@@ -328,7 +362,6 @@ export const SignUpPage: React.FC = () => {
         });
         toast({
           title: 'Account created — confirmation needed',
-          description: 'Confirm your email or run the SQL snippet shown to sign in right away.',
           tone: 'info',
         });
         return;
@@ -336,10 +369,6 @@ export const SignUpPage: React.FC = () => {
 
       toast({
         title: 'Account registered',
-        description:
-          values.signup_intent === 'candidate'
-            ? 'Welcome to HireNestOS.'
-            : 'HireNest will verify your company and activate your access.',
         tone: 'success',
       });
 
@@ -385,166 +414,146 @@ export const SignUpPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-7 space-y-6">
-        <div>
-          <div className="inline-flex h-8 w-8 items-center justify-center rounded bg-indigo-600 text-white font-bold text-sm mb-3">
-            H
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-            Register for HireNestOS
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Role assignment is governed automatically by the database.
-          </p>
-        </div>
+    <AuthSplitLayout>
+      <div className="space-y-1">
+        <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Create account
+        </h1>
+        <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          Role assignment is governed automatically by the database.
+        </p>
+      </div>
 
-        {awaitingEmailConfirm ? (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 p-3.5 text-xs text-emerald-900 dark:text-emerald-200 space-y-1.5">
-              <p className="font-semibold">
-                Account registered for <span className="font-mono">{awaitingEmailConfirm.email}</span>
-              </p>
-              <p>
-                Your Supabase project requires email confirmation before issuing a session.
-                Either click the link sent to your email, <strong>or</strong> run the SQL below
-                in your <strong>Supabase Dashboard → SQL Editor</strong> to confirm and activate
-                immediately:
-              </p>
+      {awaitingEmailConfirm ? (
+        <div className="space-y-4">
+          <div className="rounded-[6px] border border-[var(--border)] bg-[var(--status-success-bg)] p-3 text-[12px] leading-[16px] space-y-1.5">
+            <div className="flex items-center gap-1.5 font-medium text-[var(--status-success)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-success-dot)] shrink-0" />
+              <span>
+                Registered <span className="font-mono">{awaitingEmailConfirm.email}</span>
+              </span>
             </div>
+            <p className="text-[var(--text-secondary)]">
+              Confirm your email via the link sent to your inbox, or run the SQL below in your Supabase SQL Editor:
+            </p>
+          </div>
 
-            <pre className="rounded-lg bg-slate-950 text-slate-100 p-3 font-mono text-[11px] overflow-x-auto select-all">
-{`-- Run in Supabase SQL Editor to confirm email & make HQ Admin:
-update auth.users
+          <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] p-2.5 font-mono text-[11px] overflow-x-auto select-all">
+{`update auth.users
 set email_confirmed_at = coalesce(email_confirmed_at, now())
 where email = '${awaitingEmailConfirm.email}';
 
 update public.profiles
 set role = 'admin', status = 'active'
 where email = '${awaitingEmailConfirm.email}';`}
-            </pre>
+          </pre>
 
-            {signUpError && (
-              <div className="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300">
-                {signUpError}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                className="w-full"
-                loading={loading}
-                onClick={handleSignInAfterConfirm}
-              >
-                I&apos;ve Confirmed / Ran SQL — Sign In Now
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => setAwaitingEmailConfirm(null)}
-              >
-                Back to Registration Form
-              </Button>
+          {signUpError && (
+            <div className="text-[12px] leading-[16px] text-[var(--status-danger)]">
+              {signUpError}
             </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              className="w-full"
+              loading={loading}
+              onClick={handleSignInAfterConfirm}
+            >
+              Sign in now
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => setAwaitingEmailConfirm(null)}
+            >
+              Back to form
+            </Button>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input
-              label="Full Name"
-              placeholder="Aarav Mehta"
-              {...register('full_name')}
-              error={errors.full_name?.message}
-            />
-            <Input
-              label="Email Address"
-              type="email"
-              placeholder="name@company.com"
-              {...register('email')}
-              error={errors.email?.message}
-            />
-            <Input
-              label="Password"
-              type="password"
-              placeholder="Minimum 8 characters"
-              {...register('password')}
-              error={errors.password?.message}
-            />
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <Input
+            label="Full name"
+            placeholder="Aarav Mehta"
+            {...register('full_name')}
+            error={errors.full_name?.message}
+          />
+          <Input
+            label="Email"
+            type="email"
+            placeholder="name@company.com"
+            {...register('email')}
+            error={errors.email?.message}
+          />
+          <Input
+            label="Password"
+            type="password"
+            placeholder="Minimum 8 characters"
+            {...register('password')}
+            error={errors.password?.message}
+          />
 
-            <Select
-              label="I am a…"
-              {...register('signup_intent')}
-              error={errors.signup_intent?.message}
-              options={[
-                { value: 'candidate', label: 'Candidate (Direct applicant)' },
-                { value: 'vendor', label: 'Vendor agency' },
-                { value: 'client', label: 'Hiring company' },
-              ]}
+          <Select
+            label="Account type"
+            {...register('signup_intent')}
+            error={errors.signup_intent?.message}
+            options={[
+              { value: 'candidate', label: 'Candidate (Direct applicant)' },
+              { value: 'vendor', label: 'Vendor agency' },
+              { value: 'client', label: 'Hiring company' },
+            ]}
+          />
+
+          {(intent === 'vendor' || intent === 'client') && (
+            <Input
+              label="Company name"
+              placeholder={
+                intent === 'vendor'
+                  ? 'e.g. Apex Talent Partners'
+                  : 'e.g. FinCore Technologies'
+              }
+              {...register('company_name')}
+              error={errors.company_name?.message}
             />
+          )}
 
-            {(intent === 'vendor' || intent === 'client') && (
-              <Input
-                label="Company Name"
-                placeholder={
-                  intent === 'vendor'
-                    ? 'e.g. Apex Talent Partners'
-                    : 'e.g. FinCore Technologies Pvt Ltd'
-                }
-                {...register('company_name')}
-                error={errors.company_name?.message}
-              />
-            )}
-
-            {signUpError && (
-              <div className="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300 space-y-2">
-                <p className="font-semibold">{signUpError}</p>
-                {signUpError.toLowerCase().includes('rate limit') && (
-                  <div className="space-y-2 text-slate-700 dark:text-slate-300">
-                    <p>
-                      Supabase blocked the signup because its free-tier SMTP only sends ~2
-                      confirmation emails per hour. Fix it in 10 seconds using either method:
-                    </p>
-                    <ol className="list-decimal list-inside space-y-1">
-                      <li>
-                        <strong>Turn off Confirm Email (Recommended):</strong> In{' '}
-                        <strong>Supabase Dashboard → Authentication → Providers → Email</strong>,
-                        toggle <strong>Confirm email</strong> OFF and click <strong>Save</strong>.
-                        Then click <strong>Create Account</strong> again.
-                      </li>
-                      <li>
-                        <strong>Or create user in Supabase Dashboard:</strong> Go to{' '}
-                        <strong>Authentication → Users → Add user → Create new user</strong>{' '}
-                        (keep <em>Auto Confirm User</em> checked), then run in SQL Editor:
-                      </li>
-                    </ol>
-                    <pre className="rounded bg-slate-950 text-slate-100 p-2 font-mono text-[11px] overflow-x-auto select-all">
+          {signUpError && (
+            <div className="rounded-[6px] border border-[var(--border)] bg-[var(--status-danger-bg)] p-3 text-[12px] leading-[16px] space-y-2">
+              <p className="font-medium text-[var(--status-danger)]">{signUpError}</p>
+              {signUpError.toLowerCase().includes('rate limit') && (
+                <div className="space-y-2 text-[var(--text-secondary)]">
+                  <p>
+                    Supabase free-tier SMTP limits confirmation emails to ~2/hour. Disable Confirm email in Authentication → Providers → Email, or create the user in Authentication → Users and run:
+                  </p>
+                  <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] p-2 font-mono text-[11px] overflow-x-auto select-all">
 {`update public.profiles
 set role = 'admin', status = 'active'
 where email = '${currentEmail.trim()}';`}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            )}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
 
-            <Button type="submit" className="w-full" loading={loading}>
-              Create Account
-            </Button>
-          </form>
-        )}
+          <Button type="submit" className="w-full" loading={loading}>
+            Create account
+          </Button>
+        </form>
+      )}
 
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-          Already registered?{' '}
-          <Link
-            to="/signin"
-            className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-          >
-            Sign in
-          </Link>
-        </div>
-      </Card>
-    </div>
+      <div className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+        Already registered?{' '}
+        <Link
+          to="/signin"
+          className="font-medium text-[var(--accent)] hover:underline"
+        >
+          Sign in
+        </Link>
+      </div>
+    </AuthSplitLayout>
   );
 };
 
@@ -567,7 +576,6 @@ export const ForgotPasswordPage: React.FC = () => {
       setSent(true);
       toast({
         title: 'Password reset email sent',
-        description: 'Check your inbox for the reset link.',
         tone: 'success',
       });
     } catch (err) {
@@ -582,47 +590,45 @@ export const ForgotPasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-7 space-y-5">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-            Reset Your Password
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            We will send a password recovery link to your registered email.
-          </p>
-        </div>
+    <AuthSplitLayout>
+      <div className="space-y-1">
+        <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Reset password
+        </h1>
+        <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          We will send a recovery link to your registered email.
+        </p>
+      </div>
 
-        {sent ? (
-          <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 p-4 text-xs text-emerald-800 dark:text-emerald-200">
-            Password recovery instructions have been sent to <strong>{email}</strong>.
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Email Address"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-            />
-            <Button type="submit" className="w-full" loading={loading}>
-              Send Recovery Link
-            </Button>
-          </form>
-        )}
-
-        <div className="text-center text-xs">
-          <Link
-            to="/signin"
-            className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-          >
-            ← Back to Sign In
-          </Link>
+      {sent ? (
+        <div className="rounded-[6px] border border-[var(--border)] bg-[var(--status-success-bg)] p-3 text-[13px] leading-[20px] text-[var(--status-success)]">
+          Recovery instructions sent to <span className="font-mono">{email}</span>.
         </div>
-      </Card>
-    </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@company.com"
+          />
+          <Button type="submit" className="w-full" loading={loading}>
+            Send recovery link
+          </Button>
+        </form>
+      )}
+
+      <div className="text-[13px] leading-[20px]">
+        <Link
+          to="/signin"
+          className="text-[var(--accent)] hover:underline"
+        >
+          ← Back to sign in
+        </Link>
+      </div>
+    </AuthSplitLayout>
   );
 };
 
@@ -637,8 +643,7 @@ export const UpdatePasswordPage: React.FC = () => {
     e.preventDefault();
     if (password.length < 8) {
       toast({
-        title: 'Password too short',
-        description: 'Password must be at least 8 characters.',
+        title: 'Password must be at least 8 characters',
         tone: 'error',
       });
       return;
@@ -649,7 +654,6 @@ export const UpdatePasswordPage: React.FC = () => {
       if (error) throw error;
       toast({
         title: 'Password updated',
-        description: 'Your password has been updated.',
         tone: 'success',
       });
       navigate('/signin', { replace: true });
@@ -665,35 +669,33 @@ export const UpdatePasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-7 space-y-5">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-            Set New Password
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Enter a new password for your HireNestOS account.
-          </p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="New Password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Minimum 8 characters"
-          />
-          <Button type="submit" className="w-full" loading={loading}>
-            Update Password
-          </Button>
-        </form>
-      </Card>
-    </div>
+    <AuthSplitLayout>
+      <div className="space-y-1">
+        <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Set new password
+        </h1>
+        <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          Enter a new password for your account.
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="New password"
+          type="password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Minimum 8 characters"
+        />
+        <Button type="submit" className="w-full" loading={loading}>
+          Update password
+        </Button>
+      </form>
+    </AuthSplitLayout>
   );
 };
 
-// 6. Pending Approval Page (Section 4.2)
+// 6. Pending Approval Page
 export const PendingApprovalPage: React.FC = () => {
   const { profile, signOut, refreshProfile, homeRoute } = useAuth();
   const navigate = useNavigate();
@@ -715,99 +717,96 @@ export const PendingApprovalPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
-      <Card className="max-w-lg w-full p-8 text-center space-y-5">
-        <div className="mx-auto h-12 w-12 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
-          <Clock className="h-6 w-6" />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-            Account Pending Verification
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            HireNest will verify your company and activate your access.
-          </p>
-        </div>
-        {profile && (
-          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 text-left text-xs space-y-1.5">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Name:</span>
-              <span className="font-medium">{profile.full_name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Email:</span>
-              <span className="font-mono">{profile.email}</span>
-            </div>
-            {profile.requested_company && (
-              <div className="flex justify-between">
-                <span className="text-slate-500">Requested Company:</span>
-                <span className="font-medium">{profile.requested_company}</span>
-              </div>
-            )}
-            {profile.requested_role && (
-              <div className="flex justify-between">
-                <span className="text-slate-500">Requested Intent:</span>
-                <span className="font-medium capitalize">{profile.requested_role}</span>
-              </div>
-            )}
-          </div>
-        )}
+    <AuthSplitLayout>
+      <div className="space-y-1">
+        <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Account pending verification
+        </h1>
+        <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          HireNest will verify your company and activate your access.
+        </p>
+      </div>
 
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900 p-3 text-left space-y-1.5 text-xs">
-          <p className="font-semibold text-slate-800 dark:text-slate-200">
-            Setting up your first HQ Admin? Run in Supabase SQL Editor:
-          </p>
-          <pre className="rounded bg-slate-950 text-slate-100 p-2.5 font-mono text-[11px] overflow-x-auto select-all">
+      {profile && (
+        <div className="border-y border-[var(--border)] py-3 space-y-1.5 text-[13px] leading-[20px]">
+          <div className="flex justify-between">
+            <span className="text-[var(--text-secondary)]">Name</span>
+            <span className="font-medium text-[var(--text-primary)]">{profile.full_name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-[var(--text-secondary)]">Email</span>
+            <span className="font-mono text-[12px] text-[var(--text-primary)]">
+              {profile.email}
+            </span>
+          </div>
+          {profile.requested_company && (
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Company</span>
+              <span className="text-[var(--text-primary)]">{profile.requested_company}</span>
+            </div>
+          )}
+          {profile.requested_role && (
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Intent</span>
+              <span className="capitalize text-[var(--text-primary)]">
+                {profile.requested_role}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 space-y-1.5 text-[12px] leading-[16px]">
+        <p className="font-medium text-[var(--text-primary)]">
+          First HQ Admin? Run in Supabase SQL Editor:
+        </p>
+        <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] p-2 font-mono text-[11px] overflow-x-auto select-all">
 {`update public.profiles
 set role = 'admin', status = 'active'
 where email = '${profile?.email || 'your-email@example.com'}';`}
-          </pre>
-        </div>
+        </pre>
+      </div>
 
-        <div className="flex items-center justify-center gap-3 pt-2">
-          <Button variant="primary" size="sm" loading={checking} onClick={handleCheckStatus}>
-            Check Status Again
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => signOut()}>
-            <LogOut className="h-3.5 w-3.5" />
-            Sign Out
-          </Button>
-        </div>
-      </Card>
-    </div>
+      <div className="flex items-center gap-2">
+        <Button variant="primary" size="md" loading={checking} onClick={handleCheckStatus}>
+          Check status
+        </Button>
+        <Button variant="ghost" size="md" onClick={() => signOut()}>
+          <LogOut className="h-3.5 w-3.5" />
+          Sign out
+        </Button>
+      </div>
+    </AuthSplitLayout>
   );
 };
 
-// 7. Access Suspended Page (Section 4.2)
+// 7. Access Suspended Page
 export const SuspendedAccessPage: React.FC = () => {
   const { profile, organization, signOut } = useAuth();
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
-      <Card className="max-w-lg w-full p-8 text-center space-y-5">
-        <div className="mx-auto h-12 w-12 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 flex items-center justify-center">
-          <Lock className="h-6 w-6" />
+    <AuthSplitLayout>
+      <div className="space-y-1">
+        <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Access suspended
+        </h1>
+        <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          {organization && organization.status !== 'approved'
+            ? `Your organization (${organization.name}) is currently marked "${organization.status}".`
+            : 'Your user profile has been suspended by HireNest HQ.'}{' '}
+          Contact HireNest Workforce Operations for assistance.
+        </p>
+      </div>
+      {profile && (
+        <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono">
+          {profile.email}
         </div>
-        <div className="space-y-2">
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-            Access Suspended
-          </h1>
-          <p className="text-xs text-slate-600 dark:text-slate-400">
-            {organization && organization.status !== 'approved'
-              ? `Your organization (${organization.name}) is currently marked "${organization.status}".`
-              : 'Your user profile has been suspended by HireNest HQ.'}{' '}
-            Please contact HireNest Workforce Operations for assistance.
-          </p>
-        </div>
-        {profile && (
-          <div className="text-xs text-slate-500 font-mono">{profile.email}</div>
-        )}
-        <div className="pt-2">
-          <Button variant="outline" size="sm" onClick={() => signOut()}>
-            <LogOut className="h-3.5 w-3.5" />
-            Sign Out
-          </Button>
-        </div>
-      </Card>
-    </div>
+      )}
+      <div>
+        <Button variant="outline" size="md" onClick={() => signOut()}>
+          <LogOut className="h-3.5 w-3.5" />
+          Sign out
+        </Button>
+      </div>
+    </AuthSplitLayout>
   );
 };

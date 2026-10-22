@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Calendar, Ban, Star, Clock, ShieldCheck } from 'lucide-react';
 import {
   Drawer,
   Button,
   Badge,
-  Card,
   Dialog,
   Textarea,
   Skeleton,
@@ -56,7 +54,6 @@ export const SubmissionDetailDrawer: React.FC<{
   const isClient = role === 'client_manager' || role === 'client_member';
   const isCandidate = role === 'candidate';
 
-  // Confirmation modal states for transitions & mark invalid
   const [targetStage, setTargetStage] = useState<SubmissionStage | null>(null);
   const [transitionReason, setTransitionReason] = useState('');
   const [transitionLoading, setTransitionLoading] = useState(false);
@@ -65,7 +62,6 @@ export const SubmissionDetailDrawer: React.FC<{
   const [invalidReason, setInvalidReason] = useState('');
   const [invalidLoading, setInvalidLoading] = useState(false);
 
-  // Interview & Quality rating modals
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [feedbackInterview, setFeedbackInterview] = useState<Interview | null>(null);
   const [screeningInterview, setScreeningInterview] = useState<Interview | null>(null);
@@ -110,7 +106,7 @@ export const SubmissionDetailDrawer: React.FC<{
     if (needsReason && !transitionReason.trim()) {
       toast({
         title: 'Reason required',
-        description: `Please provide a reason to move to ${STAGE_LABELS[targetStage]}.`,
+        description: `Provide a reason to move to ${STAGE_LABELS[targetStage]}.`,
         tone: 'error',
       });
       return;
@@ -193,26 +189,22 @@ export const SubmissionDetailDrawer: React.FC<{
     <Drawer
       open={Boolean(submissionId)}
       onClose={onClose}
-      title={
-        submission?.candidates?.full_name
-          ? `Pipeline Record · ${submission.candidates.full_name}`
-          : 'Submission Detail'
-      }
+      title={submission?.candidates?.full_name || 'Submission detail'}
       subtitle={submission?.requirements?.title || ''}
-      widthClass="max-w-2xl"
+      widthClass="max-w-[480px]"
     >
       {isLoading || !submission ? (
         <div className="space-y-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Header summary & Three-Way Attribution (Rule 7) */}
-          <Card className="p-4 space-y-3">
+          {/* Key Facts & Attribution */}
+          <div className="space-y-3 pb-4 border-b border-[var(--border)]">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <StageBadge stage={submission.stage} candidateView={isCandidate} />
                 {!isCandidate && (
                   <SourceBadge
@@ -224,73 +216,70 @@ export const SubmissionDetailDrawer: React.FC<{
                   <Badge tone="red">Invalid: {submission.invalid_reason}</Badge>
                 )}
               </div>
-              <span className="text-xs font-mono tabular-nums text-slate-500">
-                Submitted: {formatLocalDateTime(submission.created_at)}
+              <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)]">
+                {formatLocalDateTime(submission.created_at)}
               </span>
             </div>
 
             {!isCandidate && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-                <div>
-                  <span className="text-slate-500 block">Submission Source</span>
-                  <span className="font-medium capitalize">
+              <div className="space-y-1.5 pt-2 text-[13px] leading-[20px]">
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Submission source</span>
+                  <span className="text-[var(--text-primary)]">
                     {submission.source === 'vendor'
-                      ? `Vendor (${submission.organizations?.name || 'Agency'})`
+                      ? `Vendor · ${submission.organizations?.name || 'Agency'}`
                       : submission.source === 'direct'
-                        ? 'Direct Applicant'
-                        : 'HireNest Sourced'}
+                        ? 'Direct'
+                        : 'HireNest'}
                   </span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block">Original Candidate Source</span>
-                  <span className="font-medium capitalize">
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Original candidate source</span>
+                  <span className="text-[var(--text-primary)] capitalize">
                     {submission.candidates?.original_source || '—'}
                   </span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block">Current Vendor Association</span>
-                  <span className="font-medium">
-                    {submission.candidates?.owner_vendor?.name || 'None (Direct / Internal)'}
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Vendor association</span>
+                  <span className="text-[var(--text-primary)]">
+                    {submission.candidates?.owner_vendor?.name || 'None'}
                   </span>
                 </div>
               </div>
             )}
 
             {isClient && (
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                <span>Contact details are managed by HireNest</span>
-                <span>·</span>
-                <span>Resume available on request from HireNest</span>
-              </div>
+              <p className="text-[12px] leading-[16px] text-[var(--text-tertiary)] pt-1">
+                Contact details are managed by HireNest · Resume available on request.
+              </p>
             )}
-          </Card>
+          </div>
 
-          {/* Allowed Stage Transition Actions (Section 5.5) */}
-          <Card className="p-4 space-y-3">
+          {/* Actions */}
+          <div className="space-y-3 pb-4 border-b border-[var(--border)]">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                Available Actions
+              <h3 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+                Actions
               </h3>
               {isHq && submission.is_valid && (
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => setMarkInvalidOpen(true)}
-                  className="text-red-600 dark:text-red-400"
+                  className="text-[var(--status-danger)]"
                 >
-                  <Ban className="h-3.5 w-3.5" />
-                  Mark Invalid
+                  Mark invalid
                 </Button>
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {allowedTransitions.map((nextStage) => {
                 const label =
                   nextStage === 'client_review'
                     ? 'Share with client'
                     : isCandidate && nextStage === 'withdrawn'
-                      ? 'Withdraw Application'
+                      ? 'Withdraw application'
                       : `Move to ${STAGE_LABELS[nextStage]}`;
                 const variant =
                   nextStage === 'rejected' ||
@@ -322,11 +311,10 @@ export const SubmissionDetailDrawer: React.FC<{
                   submission.stage === 'interviewing') && (
                   <Button
                     size="sm"
-                    variant="secondary"
+                    variant="outline"
                     onClick={() => setScheduleOpen(true)}
                   >
-                    <Calendar className="h-3.5 w-3.5" />
-                    Schedule Interview
+                    Schedule interview
                   </Button>
                 )}
 
@@ -336,26 +324,27 @@ export const SubmissionDetailDrawer: React.FC<{
                   variant="outline"
                   onClick={() => setQualityModalOpen(true)}
                 >
-                  <Star className="h-3.5 w-3.5" />
-                  Rate Candidate Quality
+                  Rate quality
                 </Button>
               )}
 
               {allowedTransitions.length === 0 && !isHq && !isClient && (
-                <span className="text-xs text-slate-500">
+                <span className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
                   No stage transitions available for your role at this stage.
                 </span>
               )}
             </div>
-          </Card>
+          </div>
 
-          {/* Interviews & Structured Ratings */}
-          <Card className="p-4 space-y-3">
-            <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+          {/* Interviews */}
+          <div className="space-y-3 pb-4 border-b border-[var(--border)]">
+            <h3 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               Interviews ({interviewsData?.data?.length || 0})
             </h3>
             {!interviewsData?.data?.length ? (
-              <p className="text-xs text-slate-500">No interview rounds scheduled yet.</p>
+              <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                No interview rounds scheduled.
+              </p>
             ) : (
               <div className="space-y-3">
                 {interviewsData.data.map((iv) => {
@@ -363,65 +352,68 @@ export const SubmissionDetailDrawer: React.FC<{
                   return (
                     <div
                       key={iv.id}
-                      className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 space-y-2 text-xs"
+                      className="rounded-[6px] border border-[var(--border)] p-3 space-y-2 text-[13px] leading-[20px]"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="font-semibold text-slate-900 dark:text-slate-100">
-                          Round #{iv.round_number}: {ROUND_LABELS[iv.round_type]} ({iv.mode})
+                        <div className="font-medium text-[var(--text-primary)]">
+                          <span className="font-mono tabular-nums mr-1.5 text-[var(--text-tertiary)]">
+                            #{iv.round_number}
+                          </span>
+                          {ROUND_LABELS[iv.round_type]} · {iv.mode}
                         </div>
                         <Badge
                           tone={
                             iv.status === 'completed'
                               ? 'emerald'
                               : iv.status === 'scheduled'
-                                ? 'indigo'
+                                ? 'slate'
                                 : 'red'
                           }
                         >
                           {iv.status}
                         </Badge>
                       </div>
-                      <div className="flex flex-wrap items-center gap-4 text-slate-500 font-mono tabular-nums">
-                        <span>Scheduled: {formatLocalDateTime(iv.scheduled_at)}</span>
-                        <span>Duration: {iv.duration_minutes}m</span>
+                      <div className="flex flex-wrap items-center gap-4 text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono tabular-nums">
+                        <span>{formatLocalDateTime(iv.scheduled_at)}</span>
+                        <span>{iv.duration_minutes}m</span>
                         {iv.meeting_link && (
                           <a
                             href={iv.meeting_link}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-indigo-600 dark:text-indigo-400 underline font-sans"
+                            className="text-[var(--accent)] underline font-sans"
                           >
-                            Meeting Link
+                            Meeting link
                           </a>
                         )}
                       </div>
 
                       {(isHq || isClient) && iv.status === 'scheduled' && (
-                        <div className="flex flex-wrap gap-2 pt-1">
+                        <div className="flex flex-wrap gap-1.5 pt-1">
                           <Button
                             size="sm"
                             variant="primary"
                             onClick={() => setScreeningInterview(iv)}
                           >
-                            Run Screening Session (Capture Q&A)
+                            Run screening session
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleUpdateInterviewStatus(iv.id, 'completed')}
                           >
-                            Mark Completed
+                            Complete
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleUpdateInterviewStatus(iv.id, 'no_show')}
                           >
-                            Mark No-Show
+                            No-show
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => handleUpdateInterviewStatus(iv.id, 'cancelled')}
                           >
                             Cancel
@@ -431,26 +423,22 @@ export const SubmissionDetailDrawer: React.FC<{
 
                       {(isHq || isClient) && iv.status === 'completed' && (
                         <div className="pt-1">
-                          <Button
-                            size="sm"
-                            onClick={() => setFeedbackInterview(iv)}
-                          >
-                            Submit Interview Feedback
+                          <Button size="sm" onClick={() => setFeedbackInterview(iv)}>
+                            Submit feedback
                           </Button>
                         </div>
                       )}
 
-                      {/* Feedback received */}
                       {feedbacks.length > 0 && !isCandidate && (
-                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                        <div className="pt-2 border-t border-[var(--border)] space-y-2">
                           {feedbacks.map((fb) => (
                             <div
                               key={fb.id}
-                              className="rounded bg-slate-50 dark:bg-slate-800/50 p-2.5 space-y-1"
+                              className="rounded-[6px] bg-[var(--bg-subtle)] p-2.5 space-y-1 text-[12px] leading-[16px]"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="font-semibold">
-                                  Overall: {fb.overall_rating}/5 · Skill: {fb.skill_rating}/5 · Comm:{' '}
+                                <span className="font-mono tabular-nums text-[var(--text-primary)]">
+                                  Overall {fb.overall_rating}/5 · Skill {fb.skill_rating}/5 · Comm{' '}
                                   {fb.communication_rating}/5
                                 </span>
                                 <Badge
@@ -465,9 +453,13 @@ export const SubmissionDetailDrawer: React.FC<{
                                   {fb.decision}
                                 </Badge>
                               </div>
-                              <p className="text-slate-700 dark:text-slate-300">{fb.feedback}</p>
+                              <p className="text-[13px] leading-[20px] text-[var(--text-primary)]">
+                                {fb.feedback}
+                              </p>
                               {fb.evidence && (
-                                <p className="text-slate-500">Evidence: {fb.evidence}</p>
+                                <p className="text-[var(--text-secondary)]">
+                                  Evidence: {fb.evidence}
+                                </p>
                               )}
                             </div>
                           ))}
@@ -478,59 +470,61 @@ export const SubmissionDetailDrawer: React.FC<{
                 })}
               </div>
             )}
-          </Card>
+          </div>
 
           {/* Candidate Quality Feedback List */}
           {!isCandidate && (qualityData?.data?.length || 0) > 0 && (
-            <Card className="p-4 space-y-3">
-              <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                Candidate Quality Ratings ({qualityData?.data?.length})
+            <div className="space-y-3 pb-4 border-b border-[var(--border)]">
+              <h3 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+                Quality ratings ({qualityData?.data?.length})
               </h3>
               <div className="space-y-2">
                 {qualityData!.data.map((qf) => (
                   <div
                     key={qf.id}
-                    className="rounded border border-slate-200 dark:border-slate-800 p-3 text-xs space-y-1.5"
+                    className="rounded-[6px] border border-[var(--border)] p-3 text-[12px] leading-[16px] space-y-1"
                   >
-                    <div className="flex items-center justify-between font-mono tabular-nums">
-                      <span>Overall Suitability: {qf.overall_suitability}/5</span>
-                      <span>JD Align: {qf.jd_skill_alignment}/5</span>
-                      <span>Readiness: {qf.interview_readiness}/5</span>
+                    <div className="flex items-center justify-between font-mono tabular-nums text-[var(--text-primary)]">
+                      <span>Suitability {qf.overall_suitability}/5</span>
+                      <span>JD align {qf.jd_skill_alignment}/5</span>
+                      <span>Readiness {qf.interview_readiness}/5</span>
                     </div>
                     {qf.comments && (
-                      <p className="text-slate-600 dark:text-slate-300">{qf.comments}</p>
+                      <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                        {qf.comments}
+                      </p>
                     )}
                   </div>
                 ))}
               </div>
-            </Card>
+            </div>
           )}
 
-          {/* Phase 2 Disabled Card: AI screening interview (Section 7.E) */}
           {!isCandidate && (
             <Phase2ComingSoonCard
-              title="AI Screening Interview (Coming soon, Ollama)"
-              description="Autonomous voice/text screening via local Ollama is disabled in MVP behind platform_settings.ai_screening_enabled."
+              title="Autonomous screening"
+              description="Disabled in v1 behind platform_settings.ai_screening_enabled."
             />
           )}
 
-          {/* Stage Timeline (submission_stage_history) */}
-          <Card className="p-4 space-y-3">
-            <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-slate-400" />
-              Stage History Timeline
+          {/* Stage Timeline */}
+          <div className="space-y-3">
+            <h3 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+              Stage history
             </h3>
             {history.length === 0 ? (
-              <p className="text-xs text-slate-500">No stage transitions logged yet.</p>
+              <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                No transitions logged.
+              </p>
             ) : (
-              <div className="space-y-2.5">
+              <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
                 {history.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-2.5 last:border-0 last:pb-0 text-xs"
+                    className="py-2.5 flex items-start justify-between gap-4 text-[13px] leading-[20px]"
                   >
-                    <div className="space-y-0.5">
-                      <div className="font-medium text-slate-900 dark:text-slate-100">
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="text-[var(--text-primary)]">
                         {item.from_stage
                           ? `${
                               isCandidate
@@ -538,34 +532,31 @@ export const SubmissionDetailDrawer: React.FC<{
                                 : STAGE_LABELS[item.from_stage]
                             } → `
                           : ''}
-                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                        <span className="font-medium">
                           {isCandidate
                             ? CANDIDATE_STAGE_LABELS[item.to_stage]
                             : STAGE_LABELS[item.to_stage]}
                         </span>
                       </div>
                       {!isCandidate && (
-                        <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <ShieldCheck className="h-3 w-3" />
-                          <span>
-                            Actor: {item.profiles?.full_name || item.actor_role} ({item.actor_role})
-                          </span>
+                        <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
+                          {item.profiles?.full_name || item.actor_role} · {item.actor_role}
                         </div>
                       )}
                       {item.reason && (
-                        <p className="text-slate-600 dark:text-slate-400">
-                          Reason: {item.reason}
+                        <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+                          {item.reason}
                         </p>
                       )}
                     </div>
-                    <span className="text-[11px] font-mono tabular-nums text-slate-400 shrink-0">
+                    <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)] shrink-0">
                       {formatLocalDateTime(item.created_at)}
                     </span>
                   </div>
                 ))}
               </div>
             )}
-          </Card>
+          </div>
         </div>
       )}
 
@@ -575,50 +566,50 @@ export const SubmissionDetailDrawer: React.FC<{
         onClose={() => setTargetStage(null)}
         title={
           targetStage === 'client_review'
-            ? 'Share Candidate with Client'
+            ? `Share ${submission?.candidates?.full_name || 'candidate'} with client?`
             : targetStage
-              ? `Confirm Transition to ${STAGE_LABELS[targetStage]}`
-              : 'Confirm Transition'
+              ? `Move ${submission?.candidates?.full_name || 'candidate'} to ${STAGE_LABELS[targetStage]}?`
+              : 'Confirm transition'
         }
-        description="Every pipeline transition is logged in submission_stage_history."
+        description="Logged in submission_stage_history."
       >
         <div className="space-y-4">
           <Textarea
             label={
               targetStage && transitionRequiresReason(targetStage)
-                ? 'Reason (Required)'
-                : 'Transition Note / Reason (Optional)'
+                ? 'Reason (required)'
+                : 'Note / reason (optional)'
             }
             rows={3}
             value={transitionReason}
             onChange={(e) => setTransitionReason(e.target.value)}
-            placeholder="Provide context for the audit trail..."
+            placeholder="Context for audit history..."
           />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setTargetStage(null)}>
               Cancel
             </Button>
             <Button onClick={handleConfirmTransition} loading={transitionLoading}>
-              Confirm Transition
+              Confirm
             </Button>
           </div>
         </div>
       </Dialog>
 
-      {/* Mark Invalid Dialog (HQ only) */}
+      {/* Mark Invalid Dialog */}
       <Dialog
         open={markInvalidOpen}
         onClose={() => setMarkInvalidOpen(false)}
-        title="Mark Submission Invalid"
-        description="Marks this submission non-compliant for vendor process compliance metrics."
+        title={`Mark submission for ${submission?.candidates?.full_name || 'candidate'} invalid?`}
+        description="Flags this submission non-compliant for vendor process compliance metrics."
       >
         <div className="space-y-4">
           <Textarea
-            label="Invalidity Reason (Required)"
+            label="Reason (required)"
             rows={3}
             value={invalidReason}
             onChange={(e) => setInvalidReason(e.target.value)}
-            placeholder="e.g. Candidate did not consent to submission or profile skills fabricated."
+            placeholder="e.g. Candidate did not consent to submission."
           />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setMarkInvalidOpen(false)}>
@@ -630,7 +621,7 @@ export const SubmissionDetailDrawer: React.FC<{
               disabled={!invalidReason.trim()}
               onClick={handleMarkInvalid}
             >
-              Mark Invalid
+              Mark invalid
             </Button>
           </div>
         </div>
@@ -676,7 +667,7 @@ export const SubmissionDetailDrawer: React.FC<{
         />
       )}
 
-      {/* First-Round Screening Interview Runner Modal */}
+      {/* Screening Interview Runner Modal */}
       {screeningInterview && submission && (
         <ScreeningInterviewRunnerModal
           open={Boolean(screeningInterview)}

@@ -1,7 +1,6 @@
 import React from 'react';
 import { parseISO, isAfter } from 'date-fns';
-import { AlertCircle, CheckCircle2, Clock, Sparkles, Lock } from 'lucide-react';
-import { Badge } from '../ui/kit';
+import { Badge, Button, type BadgeTone } from '../ui/kit';
 import {
   CANDIDATE_STAGE_LABELS,
   REQUIREMENT_STATUS_LABELS,
@@ -14,62 +13,61 @@ import type {
   SubmissionStage,
 } from '../../types/db';
 
-// SourceBadge: Vendor · <name> / Direct applicant / HireNest sourced
-// Rule 7: Source attribution must always be correct and visible:
-// vendor (shows vendor agency name), direct (never show a vendor), internal (HireNest sourced).
+// SourceBadge: soft-tint chip ("Vendor · Acme Staffing" in storm-blue, "Direct" in sky, "HireNest" in rich-blue)
 export const SourceBadge: React.FC<{
   source: CandidateSource;
   vendorName?: string | null;
 }> = ({ source, vendorName }) => {
   if (source === 'vendor') {
     return (
-      <Badge tone="indigo">
-        Vendor · {vendorName || 'Partner Agency'}
+      <Badge tone="storm_blue">
+        Vendor · {vendorName || 'Partner agency'}
       </Badge>
     );
   }
   if (source === 'direct') {
-    return <Badge tone="emerald">Direct applicant</Badge>;
+    return <Badge tone="sky">Direct</Badge>;
   }
-  return <Badge tone="slate">HireNest sourced</Badge>;
+  return <Badge tone="rich_blue">HireNest</Badge>;
 };
 
-// StageBadge: one colour per stage
+// StageBadge: soft-tint chip + 6px dot
+// applied Storm neutral · recruiter_review storm-blue · client_review Rich Blue · interviewing Sky · offered teal · offer_accepted/onboarded success · offer_declined/withdrawn Storm neutral · rejected danger
 export const StageBadge: React.FC<{
   stage: SubmissionStage;
   candidateView?: boolean;
 }> = ({ stage, candidateView = false }) => {
   const label = candidateView ? CANDIDATE_STAGE_LABELS[stage] : STAGE_LABELS[stage];
-  const toneMap: Record<SubmissionStage, 'slate' | 'indigo' | 'emerald' | 'amber' | 'red'> = {
-    applied: 'slate',
-    recruiter_review: 'indigo',
-    client_review: 'amber',
-    interviewing: 'indigo',
-    offered: 'emerald',
-    offer_accepted: 'emerald',
-    onboarded: 'emerald',
-    offer_declined: 'red',
-    rejected: 'red',
-    withdrawn: 'slate',
+  const toneMap: Record<SubmissionStage, BadgeTone> = {
+    applied: 'neutral',
+    recruiter_review: 'storm_blue',
+    client_review: 'rich_blue',
+    interviewing: 'sky',
+    offered: 'teal',
+    offer_accepted: 'success',
+    onboarded: 'success',
+    offer_declined: 'neutral',
+    withdrawn: 'neutral',
+    rejected: 'danger',
   };
-  return <Badge tone={toneMap[stage] || 'slate'}>{label}</Badge>;
+  return <Badge tone={toneMap[stage] || 'neutral'}>{label}</Badge>;
 };
 
 export const RequirementStatusBadge: React.FC<{
   status: RequirementStatus;
 }> = ({ status }) => {
-  const toneMap: Record<RequirementStatus, 'slate' | 'indigo' | 'emerald' | 'amber' | 'red'> = {
-    draft: 'slate',
-    pending_approval: 'amber',
-    open: 'emerald',
-    on_hold: 'amber',
-    closed: 'red',
-    filled: 'indigo',
+  const toneMap: Record<RequirementStatus, BadgeTone> = {
+    draft: 'neutral',
+    pending_approval: 'warning',
+    open: 'rich_blue',
+    on_hold: 'warning',
+    closed: 'neutral',
+    filled: 'success',
   };
   return <Badge tone={toneMap[status]}>{REQUIREMENT_STATUS_LABELS[status]}</Badge>;
 };
 
-// SlaBadge: On time / Late / Pending / Missed or live countdown
+// SlaBadge: on time = success chip · due within 12h = warning chip with mono timer · overdue = danger chip
 export const SlaBadge: React.FC<{
   dueAt: string | null | undefined;
   firstSubmissionAt?: string | null;
@@ -77,10 +75,10 @@ export const SlaBadge: React.FC<{
   showCountdown?: boolean;
 }> = ({ dueAt, firstSubmissionAt, revokedAt, showCountdown = false }) => {
   if (revokedAt) {
-    return <Badge tone="slate">Revoked</Badge>;
+    return <Badge tone="neutral">Revoked</Badge>;
   }
   if (!dueAt) {
-    return <Badge tone="slate">No SLA</Badge>;
+    return <Badge tone="neutral">No SLA</Badge>;
   }
 
   if (firstSubmissionAt) {
@@ -89,76 +87,67 @@ export const SlaBadge: React.FC<{
       const dueDate = parseISO(dueAt);
       const onTime = !isAfter(subDate, dueDate);
       return onTime ? (
-        <Badge tone="emerald">
-          <CheckCircle2 className="h-3 w-3" />
-          On time
-        </Badge>
+        <Badge tone="success">On time</Badge>
       ) : (
-        <Badge tone="red">
-          <AlertCircle className="h-3 w-3" />
-          Late
-        </Badge>
+        <Badge tone="danger">Late</Badge>
       );
     } catch {
-      return <Badge tone="slate">—</Badge>;
+      return <Badge tone="neutral">—</Badge>;
     }
   }
 
   const countdown = formatSlaCountdown(dueAt);
   if (countdown.tone === 'red') {
     return (
-      <Badge tone="red">
-        <AlertCircle className="h-3 w-3" />
-        {showCountdown ? countdown.label : 'Missed'}
+      <Badge tone="danger" className="font-mono tabular-nums">
+        {showCountdown ? countdown.label : 'Overdue'}
+      </Badge>
+    );
+  }
+  if (countdown.tone === 'amber') {
+    return (
+      <Badge tone="warning" className="font-mono tabular-nums">
+        {countdown.label}
       </Badge>
     );
   }
 
   return (
-    <Badge tone={countdown.tone}>
-      <Clock className="h-3 w-3" />
-      {showCountdown ? countdown.label : 'Pending'}
+    <Badge tone="success" className="font-mono tabular-nums">
+      {showCountdown ? countdown.label : 'On time'}
     </Badge>
   );
 };
 
-// ScoreBar (0–100 with the number; never show 0 instead of null)
+// ScoreBar: 4px bar, track Storm 100, fill Rich Blue 500 (below 40: danger), number in mono
 export const ScoreBar: React.FC<{
   score: number | null | undefined;
   isOverridden?: boolean;
   size?: 'sm' | 'md';
-}> = ({ score, isOverridden = false, size = 'md' }) => {
+}> = ({ score, isOverridden = false }) => {
   if (score === null || score === undefined) {
     return <NotEnoughData />;
   }
 
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   const barColor =
-    clamped >= 75
-      ? 'bg-emerald-600 dark:bg-emerald-500'
-      : clamped >= 50
-        ? 'bg-amber-500 dark:bg-amber-400'
-        : 'bg-red-500 dark:bg-red-400';
+    clamped < 40 ? 'bg-[var(--status-danger-dot)]' : 'bg-[#2F63DE]';
 
   return (
-    <div className="flex items-center gap-2.5 min-w-[110px]">
-      <div
-        className={`flex-1 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden ${
-          size === 'sm' ? 'h-1.5' : 'h-2'
-        }`}
-      >
+    <div className="inline-flex items-center gap-2 min-w-[96px]">
+      <span className="font-mono tabular-nums text-[13px] leading-[20px] font-medium text-[var(--text-primary)] w-7 text-right">
+        {clamped}
+      </span>
+      <div className="w-14 h-1 rounded-[2px] bg-[var(--track)] overflow-hidden shrink-0">
         <div
-          className={`h-full rounded-full transition-all ${barColor}`}
+          className={`h-full transition-all ${barColor}`}
           style={{ width: `${clamped}%` }}
         />
       </div>
-      <span className="font-mono tabular-nums text-xs font-semibold text-slate-900 dark:text-slate-100">
-        {clamped}
-      </span>
       {isOverridden && (
         <span
           title="Overridden by recruiter"
-          className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400"
+          className="text-[12px] leading-[16px] text-[var(--text-tertiary)]"
         >
           Override
         </span>
@@ -171,51 +160,52 @@ export const NotEnoughData: React.FC<{
   sampleCount?: number;
   minSampleSize?: number;
 }> = ({ sampleCount, minSampleSize }) => (
-  <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+  <span className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
     Not enough data
-    {sampleCount !== undefined && minSampleSize !== undefined
-      ? ` (${sampleCount} of ${minSampleSize})`
-      : ''}
+    {sampleCount !== undefined && minSampleSize !== undefined && (
+      <span className="ml-1 font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+        ({sampleCount} of {minSampleSize})
+      </span>
+    )}
   </span>
 );
 
-// Mandatory AI Attribution Label: "AI suggestion: review before use"
+// AI Attribution Header: "Suggestion: review before use" with Use / Dismiss ghost buttons
 export const AiSuggestionBanner: React.FC<{
   label?: string;
+  onUse?: () => void;
   onDismiss?: () => void;
-}> = ({ label = 'AI suggestion: review before use', onDismiss }) => (
-  <div className="flex items-center justify-between gap-2 rounded border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/30 px-3 py-1.5 text-xs text-indigo-800 dark:text-indigo-300">
-    <span className="inline-flex items-center gap-1.5 font-medium">
-      <Sparkles className="h-3.5 w-3.5 shrink-0" />
-      {label}
+}> = ({ label = 'Suggestion: review before use', onUse, onDismiss }) => (
+  <div className="flex items-center justify-between gap-2 text-[12px] leading-[16px] text-[var(--text-secondary)]">
+    <span className="font-medium text-[var(--text-secondary)]">
+      {label === 'AI suggestion: review before use' ? 'Suggestion: review before use' : label}
     </span>
-    {onDismiss && (
-      <button
-        type="button"
-        onClick={onDismiss}
-        className="text-xs underline hover:no-underline cursor-pointer"
-      >
-        Dismiss
-      </button>
-    )}
+    <div className="flex items-center gap-1">
+      {onUse && (
+        <Button type="button" size="sm" variant="ghost" onClick={onUse}>
+          Use
+        </Button>
+      )}
+      {onDismiss && (
+        <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
+          Dismiss
+        </Button>
+      )}
+    </div>
   </div>
 );
 
-// Phase 2 Coming Soon Card (AI resume parsing / AI screening via Ollama)
+// Phase 2 Note (Ollama local runtime)
 export const Phase2ComingSoonCard: React.FC<{
   title: string;
   description: string;
 }> = ({ title, description }) => (
-  <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/50 p-4 flex items-start gap-3">
-    <div className="rounded bg-slate-200/80 dark:bg-slate-800 p-2 text-slate-600 dark:text-slate-400 shrink-0">
-      <Lock className="h-4 w-4" />
+  <div className="rounded-[6px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] px-3 py-2 flex items-baseline justify-between gap-3">
+    <div className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+      <span className="font-medium text-[var(--text-primary)]">{title}:</span> {description}
     </div>
-    <div>
-      <div className="flex items-center gap-2">
-        <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
-        <Badge tone="slate">Coming soon · Phase 2 (Ollama)</Badge>
-      </div>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{description}</p>
-    </div>
+    <span className="text-[12px] leading-[16px] font-mono text-[var(--text-tertiary)] shrink-0">
+      Phase 2
+    </span>
   </div>
 );

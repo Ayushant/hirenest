@@ -2,19 +2,9 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays, parseISO } from 'date-fns';
-import {
-  Plus,
-  RefreshCw,
-  Share2,
-  Sliders,
-  Edit3,
-  Globe,
-  Send,
-  Eye,
-} from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import {
   PageHeader,
-  Card,
   Button,
   Input,
   Select,
@@ -57,7 +47,6 @@ import {
 import {
   fetchSubmissions,
   submitCandidateRpc,
-  fetchSubmissionStageHistory,
 } from '../../api/submissions';
 import { fetchOrganizations, fetchAuditLogs } from '../../api/admin';
 import { useAuth } from '../../auth/AuthProvider';
@@ -118,66 +107,75 @@ export const HqRequirementsListPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Requirements"
-        description="Governed client requisitions, SLA timers, vendor distributions, and deterministic candidate matches."
+        description="Client requisitions, SLA timers, vendor distributions, and deterministic candidate matches."
         actions={
           <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Create Requirement
+            <Plus className="h-3.5 w-3.5" />
+            New requirement
           </Button>
         }
       />
 
       {/* Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-        <Input
-          placeholder="Search title (.ilike)..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Select
-          value={clientOrgId}
-          onChange={(e) => {
-            setClientOrgId(e.target.value);
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Clients' },
-            ...(clientsData?.data || []).map((c) => ({ value: c.id, label: c.name })),
-          ]}
-        />
-        <Select
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as RequirementStatus | '');
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Statuses' },
-            { value: 'draft', label: 'Draft' },
-            { value: 'pending_approval', label: 'Pending Approval' },
-            { value: 'open', label: 'Open' },
-            { value: 'on_hold', label: 'On Hold' },
-            { value: 'closed', label: 'Closed' },
-            { value: 'filled', label: 'Filled' },
-          ]}
-        />
-        <Select
-          value={publicFilter}
-          onChange={(e) => {
-            setPublicFilter(e.target.value);
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Visibility' },
-            { value: 'true', label: 'Public Job Board' },
-            { value: 'false', label: 'Private / Vendor Only' },
-          ]}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-56">
+          <Input
+            placeholder="Search title..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="w-48">
+          <Select
+            value={clientOrgId}
+            onChange={(e) => {
+              setClientOrgId(e.target.value);
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All clients' },
+              ...(clientsData?.data || []).map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+        </div>
+        <div className="w-44">
+          <Select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as RequirementStatus | '');
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All statuses' },
+              { value: 'draft', label: 'Draft' },
+              { value: 'pending_approval', label: 'Pending approval' },
+              { value: 'open', label: 'Open' },
+              { value: 'on_hold', label: 'On hold' },
+              { value: 'closed', label: 'Closed' },
+              { value: 'filled', label: 'Filled' },
+            ]}
+          />
+        </div>
+        <div className="w-44">
+          <Select
+            value={publicFilter}
+            onChange={(e) => {
+              setPublicFilter(e.target.value);
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All visibility' },
+              { value: 'true', label: 'Public job board' },
+              { value: 'false', label: 'Private / vendor only' },
+            ]}
+          />
+        </div>
         {(search || clientOrgId || status || publicFilter) && (
           <Button
+            size="sm"
             variant="ghost"
             onClick={() => {
               setSearch('');
@@ -199,58 +197,57 @@ export const HqRequirementsListPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No requirements found"
-          description="Create a new requirement or adjust your active filters."
-          actionLabel="Create Requirement"
+          description="New client requisitions and published roles will appear here."
+          actionLabel="New requirement"
           onAction={() => setCreateOpen(true)}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Requirement Title</th>
-                  <th className="py-3 px-4">Client</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Location & Mode</th>
-                  <th className="py-3 px-4 text-right">Vendor Budget</th>
-                  <th className="py-3 px-4 text-right">SLA (Hrs)</th>
-                  <th className="py-3 px-4">Created</th>
+                <tr>
+                  <th>Requirement</th>
+                  <th>Client</th>
+                  <th>Status</th>
+                  <th>Location & mode</th>
+                  <th className="text-right">Vendor budget</th>
+                  <th className="text-right">SLA</th>
+                  <th>Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <tbody>
                 {data.data.map((req) => (
                   <tr
                     key={req.id}
                     onClick={() => navigate(`${prefix}/requirements/${req.id}`)}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
+                    className="cursor-pointer"
                   >
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">
+                    <td>
+                      <div className="font-medium text-[var(--text-primary)]">
                         {req.title}
                       </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        {req.min_experience}–{req.max_experience} yrs · {req.openings} opening
-                        {req.openings > 1 ? 's' : ''}{' '}
-                        {req.is_public ? '· Public' : ''}
+                      <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono tabular-nums">
+                        {req.min_experience}–{req.max_experience}y · {req.openings} open
+                        {req.is_public ? ' · Public' : ''}
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-medium">
+                    <td className="text-[var(--text-secondary)]">
                       {req.organizations?.name || '—'}
                     </td>
-                    <td className="py-3 px-4">
+                    <td>
                       <RequirementStatusBadge status={req.status} />
                     </td>
-                    <td className="py-3 px-4 capitalize text-slate-600 dark:text-slate-400">
+                    <td className="text-[var(--text-secondary)] capitalize">
                       {req.location} · {req.work_mode}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono tabular-nums">
+                    <td className="text-right font-mono tabular-nums">
                       {formatCurrency(req.vendor_visible_budget, req.currency)}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono tabular-nums">
+                    <td className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
                       {req.submission_sla_hours}h
                     </td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
+                    <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                       {formatLocalDate(req.created_at)}
                     </td>
                   </tr>
@@ -259,7 +256,7 @@ export const HqRequirementsListPage: React.FC = () => {
             </table>
           </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       <RequirementFormModal
@@ -277,7 +274,7 @@ export const HqRequirementsListPage: React.FC = () => {
   );
 };
 
-// 2. HQ Requirement Detail Page (6 Tabs: Overview, Status, Vendor Sharing, Matches, Pipeline, Activity)
+// 2. HQ Requirement 360 Detail Page: Two columns at 1200px (main ~760px with tabs + 320px right rail with key facts & actions)
 export const HqRequirementDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
@@ -294,24 +291,20 @@ export const HqRequirementDetailPage: React.FC = () => {
   const [pipelineView, setPipelineView] = useState<'kanban' | 'table'>('kanban');
   const [drawerSubmissionId, setDrawerSubmissionId] = useState<string | null>(null);
 
-  // Status dialog
   const [statusTarget, setStatusTarget] = useState<RequirementStatus | null>(null);
   const [statusReason, setStatusReason] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
 
-  // Vendor sharing state
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([]);
   const [shareSlaHours, setShareSlaHours] = useState<number>(48);
   const [sharingLoading, setSharingLoading] = useState(false);
 
-  // Match Evidence & Override modal (HQ only)
   const [evidenceTarget, setEvidenceTarget] = useState<CandidateMatch | null>(null);
   const [overrideTarget, setOverrideTarget] = useState<CandidateMatch | null>(null);
   const [overrideScoreInput, setOverrideScoreInput] = useState<string>('');
   const [overrideReasonInput, setOverrideReasonInput] = useState('');
   const [overrideLoading, setOverrideLoading] = useState(false);
 
-  // Submit Candidate from Match modal
   const [submitMatchTarget, setSubmitMatchTarget] = useState<CandidateMatch | null>(null);
   const [submitNotes, setSubmitNotes] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -414,14 +407,14 @@ export const HqRequirementDetailPage: React.FC = () => {
       });
       toast({
         title: !req.is_public
-          ? 'Requirement published to Direct Candidates'
+          ? 'Published to direct candidates'
           : 'Requirement made private',
         tone: 'success',
       });
       refreshAll();
     } catch (err) {
       toast({
-        title: 'Could not update public visibility',
+        title: 'Could not update visibility',
         description: mapSupabaseError(err),
         tone: 'error',
       });
@@ -476,7 +469,6 @@ export const HqRequirementDetailPage: React.FC = () => {
       await recomputeRequirementMatches(req.id);
       toast({
         title: 'Matches recomputed',
-        description: 'Deterministic match scores refreshed.',
         tone: 'success',
       });
       refreshAll();
@@ -556,654 +548,683 @@ export const HqRequirementDetailPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title={req.title}
-        description={`Client: ${req.organizations?.name || '—'} · ${req.location} (${req.work_mode}) · ${req.min_experience}–${req.max_experience} yrs`}
+        description={`${req.organizations?.name || 'Client'} · ${req.location} · ${req.work_mode}`}
         actions={
           <div className="flex items-center gap-2">
-            <RequirementStatusBadge status={req.status} />
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Edit3 className="h-3.5 w-3.5" />
-              Edit Requirement
+            <Button size="sm" variant="outline" onClick={handleRecomputeMatches}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Recompute matches
+            </Button>
+            <Button size="sm" onClick={() => setEditOpen(true)}>
+              Edit requirement
             </Button>
           </div>
         }
       />
 
-      <Tabs
-        tabs={[
-          { id: 'overview', label: 'Overview' },
-          { id: 'status', label: 'Status Actions' },
-          { id: 'vendors', label: 'Vendor Sharing', count: shares.length },
-          {
-            id: 'matches',
-            label: 'Matches (Requirement → Candidates)',
-            count: matchesData?.count || 0,
-          },
-          { id: 'pipeline', label: 'Pipeline', count: submissions.length },
-          { id: 'activity', label: 'Activity & Audit' },
-        ]}
-        activeTab={activeTab}
-        onChange={setActiveTab}
-      />
+      {/* Two columns at 1200px: main (~760px) with tabs + right rail (320px) with key facts & primary actions */}
+      <div className="flex flex-col lg:flex-row items-start gap-8">
+        {/* Main Column */}
+        <div className="flex-1 min-w-0 w-full space-y-6">
+          <Tabs
+            tabs={[
+              { id: 'overview', label: 'Overview' },
+              { id: 'status', label: 'Status' },
+              { id: 'vendors', label: 'Vendor sharing', count: shares.length },
+              {
+                id: 'matches',
+                label: 'Matches',
+                count: matchesData?.count || 0,
+              },
+              { id: 'pipeline', label: 'Pipeline', count: submissions.length },
+              { id: 'activity', label: 'Activity' },
+            ]}
+            activeTab={activeTab}
+            onChange={setActiveTab}
+          />
 
-      {/* TAB 1: OVERVIEW */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 p-6 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Job Description
-            </h3>
-            {/* Section 10: No dangerouslySetInnerHTML. Render JD text as plain text with line breaks. */}
-            <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
-              {req.description}
-            </p>
+          {/* TAB 1: OVERVIEW */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                  Description
+                </h3>
+                <p className="text-[14px] leading-[20px] text-[var(--text-primary)] whitespace-pre-line">
+                  {req.description}
+                </p>
+              </div>
 
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-              <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                Required Skills
-              </h4>
-              <div className="flex flex-wrap gap-1.5">
-                {req.skills.map((skill) => (
-                  <Badge key={skill} tone="indigo">
-                    {skill}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Commercials & SLA Governance
-            </h3>
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-              <div className="py-2.5 flex justify-between">
-                <span className="text-slate-500">Openings:</span>
-                <span className="font-mono tabular-nums font-semibold">{req.openings}</span>
-              </div>
-              <div className="py-2.5 flex justify-between">
-                <span className="text-slate-500">Employment Type:</span>
-                <span className="capitalize">{req.employment_type.replace(/_/g, ' ')}</span>
-              </div>
-              <div className="py-2.5 flex justify-between">
-                <span className="text-slate-500">Submission SLA:</span>
-                <span className="font-mono tabular-nums">{req.submission_sla_hours} hours</span>
-              </div>
-              <div className="py-2.5 flex justify-between">
-                <span className="text-slate-500">Public Job Board:</span>
-                <span>{req.is_public ? 'Yes (Public)' : 'No (Private)'}</span>
-              </div>
-              <div className="py-2.5 flex justify-between">
-                <span className="text-slate-500">Vendor-Visible Budget:</span>
-                <span className="font-mono tabular-nums font-semibold">
-                  {formatCurrency(req.vendor_visible_budget, req.currency)}
-                </span>
-              </div>
-              <div className="py-2.5 flex justify-between">
-                <span className="text-slate-500">Actual Client Budget (HQ + Client):</span>
-                <span className="font-mono tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">
-                  {formatCurrency(financials?.actual_client_budget, req.currency)}
-                </span>
-              </div>
-              {financials?.notes && (
-                <div className="py-2.5">
-                  <span className="text-slate-500 block">Financial Notes:</span>
-                  <span className="text-slate-700 dark:text-slate-300">{financials.notes}</span>
+              <div className="pt-4 border-t border-[var(--border)] space-y-2">
+                <h4 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                  Required skills ({req.skills.length})
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {req.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[12px] leading-[16px] font-medium text-[var(--text-primary)]"
+                    >
+                      {skill}
+                    </span>
+                  ))}
                 </div>
-              )}
-              {isAdmin && (
-                <div className="py-2.5 flex justify-between">
-                  <span className="text-slate-500">Platform Margin (Admin Only):</span>
-                  <span className="font-mono tabular-nums font-semibold text-emerald-600">
-                    {margins?.platform_margin !== null &&
-                    margins?.platform_margin !== undefined
-                      ? margins.margin_type === 'percentage'
-                        ? `${margins.platform_margin}%`
-                        : formatCurrency(margins.platform_margin, req.currency)
-                      : '—'}
-                  </span>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: STATUS ACTIONS */}
+          {activeTab === 'status' && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">
+                  Requirement status
+                </h3>
+                <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                  Transition requirement status via <code className="font-mono">set_requirement_status</code>.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {(
+                    ['draft', 'pending_approval', 'open', 'on_hold', 'closed', 'filled'] as const
+                  ).map((st) => (
+                    <Button
+                      key={st}
+                      size="sm"
+                      variant={req.status === st ? 'primary' : 'outline'}
+                      disabled={req.status === st}
+                      onClick={() => {
+                        setStatusTarget(st);
+                        setStatusReason('');
+                      }}
+                    >
+                      {st.replace('_', ' ')}
+                    </Button>
+                  ))}
                 </div>
-              )}
+              </div>
+
+              <div className="pt-4 border-t border-[var(--border)] flex items-center justify-between">
+                <div>
+                  <h4 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">
+                    Direct candidate job board visibility
+                  </h4>
+                  <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                    Currently {req.is_public ? 'public on candidate job board' : 'private to HQ & shared vendors'}.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={handleTogglePublic}>
+                  {req.is_public ? 'Make private' : 'Publish to job board'}
+                </Button>
+              </div>
             </div>
-          </Card>
-        </div>
-      )}
+          )}
 
-      {/* TAB 2: STATUS ACTIONS */}
-      {activeTab === 'status' && (
-        <Card className="p-6 space-y-5">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Requirement Status Governance
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Transition requirement status via <code className="font-mono">set_requirement_status</code> or toggle public candidate portal visibility via <code className="font-mono">set_requirement_public</code>.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {(
-              ['draft', 'pending_approval', 'open', 'on_hold', 'closed', 'filled'] as const
-            ).map((st) => (
-              <Button
-                key={st}
-                size="sm"
-                variant={req.status === st ? 'primary' : 'outline'}
-                disabled={req.status === st}
-                onClick={() => {
-                  setStatusTarget(st);
-                  setStatusReason('');
-                }}
-              >
-                Set Status: {st.replace('_', ' ')}
-              </Button>
-            ))}
-          </div>
-
-          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <div>
-              <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                Direct Candidate Portal Visibility
-              </h4>
-              <p className="text-xs text-slate-500">
-                Currently: <strong>{req.is_public ? 'Public' : 'Private'}</strong>
-              </p>
-            </div>
-            <Button size="sm" variant="outline" onClick={handleTogglePublic}>
-              <Globe className="h-3.5 w-3.5" />
-              {req.is_public ? 'Make Private' : 'Publish to Direct Candidates'}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* TAB 3: VENDOR SHARING */}
-      {activeTab === 'vendors' && (
-        <div className="space-y-6">
-          <Card className="p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Share Requirement with Approved Vendors
-            </h3>
-            {req.status !== 'open' ? (
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                Requirement must be in <strong>open</strong> status before sharing with vendors.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {(approvedVendors?.data || []).map((v) => {
-                    const selected = selectedVendorIds.includes(v.id);
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() =>
-                          setSelectedVendorIds((prev) =>
-                            selected ? prev.filter((id) => id !== v.id) : [...prev, v.id]
-                          )
-                        }
-                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                          selected
-                            ? 'border-indigo-600 bg-indigo-600 text-white'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200'
-                        }`}
+          {/* TAB 3: VENDOR SHARING */}
+          {activeTab === 'vendors' && (
+            <div className="space-y-6">
+              <div className="rounded-[8px] border border-[var(--border)] p-4 space-y-3">
+                <h3 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">
+                  Share with approved vendors
+                </h3>
+                {req.status !== 'open' ? (
+                  <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                    Requirement must be in <strong>open</strong> status before sharing with vendors.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {(approvedVendors?.data || []).map((v) => {
+                        const selected = selectedVendorIds.includes(v.id);
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() =>
+                              setSelectedVendorIds((prev) =>
+                                selected ? prev.filter((id) => id !== v.id) : [...prev, v.id]
+                              )
+                            }
+                            className={`h-7 px-2.5 rounded-[6px] border text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                              selected
+                                ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg)]'
+                                : 'border-[var(--border)] bg-[var(--bg)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                            }`}
+                          >
+                            {v.name} · {v.sla_tier}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-end gap-2 max-w-xs">
+                      <Input
+                        label="SLA hours"
+                        type="number"
+                        value={shareSlaHours}
+                        onChange={(e) => setShareSlaHours(Number(e.target.value))}
+                      />
+                      <Button
+                        onClick={handleShareWithVendors}
+                        loading={sharingLoading}
+                        disabled={selectedVendorIds.length === 0}
                       >
-                        {v.name} ({v.sla_tier})
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex items-end gap-3 max-w-md">
-                  <Input
-                    label="Submission SLA Hours"
-                    type="number"
-                    value={shareSlaHours}
-                    onChange={(e) => setShareSlaHours(Number(e.target.value))}
-                  />
-                  <Button
-                    onClick={handleShareWithVendors}
-                    loading={sharingLoading}
-                    disabled={selectedVendorIds.length === 0}
-                  >
-                    <Share2 className="h-3.5 w-3.5" />
-                    Share ({selectedVendorIds.length})
-                  </Button>
-                </div>
+                        Share ({selectedVendorIds.length})
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </Card>
 
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    <th className="py-3 px-4">Vendor Agency</th>
-                    <th className="py-3 px-4">Shared At</th>
-                    <th className="py-3 px-4">SLA Due At</th>
-                    <th className="py-3 px-4">Acknowledged At</th>
-                    <th className="py-3 px-4">First Valid Submission</th>
-                    <th className="py-3 px-4">SLA Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                  {shares.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-6 text-center text-slate-500">
-                        Not shared with any vendor agencies yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    shares.map((sh) => {
-                      const vendorSubs = submissions
-                        .filter((s) => s.vendor_org_id === sh.vendor_org_id && s.is_valid)
-                        .sort((a, b) => a.created_at.localeCompare(b.created_at));
-                      const firstSubAt = vendorSubs[0]?.created_at || null;
-                      return (
-                        <tr key={sh.id}>
-                          <td className="py-3 px-4 font-semibold">
-                            {sh.organizations?.name || sh.vendor_org_id}
-                          </td>
-                          <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                            {formatLocalDateTime(sh.shared_at)}
-                          </td>
-                          <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                            {formatLocalDateTime(sh.due_at)}
-                          </td>
-                          <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                            {formatLocalDateTime(sh.acknowledged_at)}
-                          </td>
-                          <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                            {formatLocalDateTime(firstSubAt)}
-                          </td>
-                          <td className="py-3 px-4">
-                            <SlaBadge
-                              dueAt={sh.due_at}
-                              firstSubmissionAt={firstSubAt}
-                              revokedAt={sh.revoked_at}
-                            />
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            {!sh.revoked_at && (
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                onClick={() => handleRevokeShare(sh.vendor_org_id)}
-                              >
-                                Revoke
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* TAB 4: MATCHES (Requirement -> Candidates) */}
-      {activeTab === 'matches' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">
-              Deterministic advisory matches from <code className="font-mono">candidate_matches</code>. A potential match is not an application until explicitly submitted.
-            </p>
-            <Button size="sm" variant="outline" onClick={handleRecomputeMatches}>
-              <RefreshCw className="h-3.5 w-3.5" />
-              Recompute Matches
-            </Button>
-          </div>
-
-          {matchesLoading ? (
-            <TableSkeleton rows={5} cols={6} />
-          ) : !matchesData?.data.length ? (
-            <EmptyState
-              title="No potential matches computed yet"
-              description="Ensure the requirement is open and click Recompute Matches to run the deterministic engine."
-              actionLabel="Recompute Matches"
-              onAction={handleRecomputeMatches}
-            />
-          ) : (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto border-t border-[var(--border)]">
+                <table>
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                      <th className="py-3 px-4">Candidate</th>
-                      <th className="py-3 px-4">Original Source</th>
-                      <th className="py-3 px-4">Owner Vendor</th>
-                      <th className="py-3 px-4">Pipeline / Attribution Status</th>
-                      <th className="py-3 px-4">Final Score</th>
-                      <th className="py-3 px-4">Matched / Unproven Skills</th>
-                      <th className="py-3 px-4">Experience Note & Engine</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
+                    <tr>
+                      <th>Vendor agency</th>
+                      <th>Shared</th>
+                      <th>SLA due</th>
+                      <th>Acknowledged</th>
+                      <th>First submission</th>
+                      <th>SLA status</th>
+                      <th className="text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                    {matchesData.data.map((m) => {
+                  <tbody>
+                    {shares.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-[var(--text-secondary)]">
+                          Not shared with any vendor agencies yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      shares.map((sh) => {
+                        const vendorSubs = submissions
+                          .filter((s) => s.vendor_org_id === sh.vendor_org_id && s.is_valid)
+                          .sort((a, b) => a.created_at.localeCompare(b.created_at));
+                        const firstSubAt = vendorSubs[0]?.created_at || null;
+                        return (
+                          <tr key={sh.id}>
+                            <td className="font-medium">
+                              {sh.organizations?.name || sh.vendor_org_id}
+                            </td>
+                            <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                              {formatLocalDateTime(sh.shared_at)}
+                            </td>
+                            <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                              {formatLocalDateTime(sh.due_at)}
+                            </td>
+                            <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                              {formatLocalDateTime(sh.acknowledged_at)}
+                            </td>
+                            <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                              {formatLocalDateTime(firstSubAt)}
+                            </td>
+                            <td>
+                              <SlaBadge
+                                dueAt={sh.due_at}
+                                firstSubmissionAt={firstSubAt}
+                                revokedAt={sh.revoked_at}
+                              />
+                            </td>
+                            <td className="text-right">
+                              {!sh.revoked_at && (
+                                <Button
+                                  size="sm"
+                                  variant="danger"
+                                  onClick={() => handleRevokeShare(sh.vendor_org_id)}
+                                >
+                                  Revoke
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: MATCHES (Requirement -> Candidates) */}
+          {activeTab === 'matches' && (
+            <div className="space-y-4">
+              {matchesLoading ? (
+                <TableSkeleton rows={5} cols={6} />
+              ) : !matchesData?.data.length ? (
+                <EmptyState
+                  title="No potential matches computed yet"
+                  description="Ensure the requirement is open and recompute matches to run the deterministic engine."
+                  actionLabel="Recompute matches"
+                  onAction={handleRecomputeMatches}
+                />
+              ) : (
+                <div>
+                  <div className="border-t border-[var(--border)] divide-y divide-[var(--border)]">
+                    {matchesData.data.map((m, idx) => {
+                      const rank = (matchesPage - 1) * 25 + idx + 1;
                       const cand = m.candidates;
                       const existingSub = submissions.find(
                         (s) => s.candidate_id === m.candidate_id
                       );
+                      const isOverridden =
+                        m.override_score !== null && m.override_score !== undefined;
+
                       return (
-                        <tr key={m.id} className="align-top">
-                          <td className="py-3.5 px-4">
-                            <Link
-                              to={`${prefix}/candidates/${m.candidate_id}`}
-                              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                            >
-                              {cand?.full_name || m.candidate_id}
-                            </Link>
-                            <div className="text-[11px] text-slate-500">
-                              {cand?.current_title || '—'} ·{' '}
-                              {cand?.total_experience_years ?? '—'} yrs
+                        <div
+                          key={m.id}
+                          className="py-3 px-2 hover:bg-[var(--bg-hover)] transition-colors space-y-2"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="font-mono tabular-nums text-[12px] leading-[16px] text-[var(--text-tertiary)] w-6">
+                                #{rank}
+                              </span>
+                              <Link
+                                to={`${prefix}/candidates/${m.candidate_id}`}
+                                className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)] hover:text-[var(--accent)] truncate"
+                              >
+                                {cand?.full_name || m.candidate_id}
+                              </Link>
+                              <span className="text-[13px] leading-[20px] text-[var(--text-secondary)] truncate">
+                                {cand?.current_title || '—'} ·{' '}
+                                <span className="font-mono tabular-nums">
+                                  {cand?.total_experience_years ?? '—'}y
+                                </span>
+                              </span>
+                              {cand && (
+                                <SourceBadge
+                                  source={cand.original_source}
+                                  vendorName={cand.source_vendor?.name}
+                                />
+                              )}
                             </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {cand && (
-                              <SourceBadge
-                                source={cand.original_source}
-                                vendorName={cand.source_vendor?.name}
-                              />
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
-                            {cand?.owner_vendor?.name || 'None (Direct / Internal)'}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {!existingSub ? (
-                              <Badge tone="amber">Potential Match (Not Applied)</Badge>
-                            ) : existingSub.source === 'direct' ? (
-                              <Badge tone="emerald">
-                                Direct Applied · {STAGE_LABELS[existingSub.stage]}
-                              </Badge>
-                            ) : existingSub.source === 'vendor' ? (
-                              <Badge tone="indigo">
-                                Vendor Submitted · {STAGE_LABELS[existingSub.stage]}
-                              </Badge>
-                            ) : (
-                              <Badge tone="slate">
-                                HQ Submitted · {STAGE_LABELS[existingSub.stage]}
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <ScoreBar
-                              score={m.final_score}
-                              isOverridden={m.override_score !== null}
-                            />
-                            {m.override_score !== null && (
-                              <div className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1">
-                                Overridden by recruiter: {m.override_reason}
+
+                            <div className="flex items-center gap-3 shrink-0">
+                              {!existingSub ? (
+                                <Badge tone="amber">Potential match</Badge>
+                              ) : (
+                                <Badge tone="emerald">
+                                  {STAGE_LABELS[existingSub.stage]}
+                                </Badge>
+                              )}
+                              <ScoreBar score={m.final_score} isOverridden={isOverridden} />
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEvidenceTarget(m)}
+                                >
+                                  Evidence
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setOverrideTarget(m);
+                                    setOverrideScoreInput(
+                                      m.override_score !== null ? String(m.override_score) : ''
+                                    );
+                                    setOverrideReasonInput(m.override_reason || '');
+                                  }}
+                                >
+                                  Override
+                                </Button>
+                                {existingSub ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setDrawerSubmissionId(existingSub.id)}
+                                  >
+                                    Pipeline
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setSubmitMatchTarget(m);
+                                      setSubmitNotes('');
+                                    }}
+                                  >
+                                    Submit
+                                  </Button>
+                                )}
                               </div>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 max-w-xs">
-                            <div className="flex flex-wrap gap-1 mb-1">
+                            </div>
+                          </div>
+
+                          {/* Matched & Unproven Skill Chips + Experience Note + Override Line */}
+                          <div className="pl-9 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               {(m.matched_skills || []).map((sk) => (
                                 <span
                                   key={sk}
-                                  className="rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 text-[10px] text-emerald-800 dark:text-emerald-300"
+                                  className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[12px] leading-[16px] text-[var(--text-primary)]"
                                 >
-                                  ✓ {sk}
+                                  {sk}
                                 </span>
                               ))}
-                            </div>
-                            <div className="flex flex-wrap gap-1">
                               {(m.unproven_skills || []).map((sk) => (
                                 <span
                                   key={sk}
                                   title="Not found on profile; not proof the skill is missing"
-                                  className="rounded border border-dashed border-slate-300 dark:border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-500"
+                                  className="inline-flex items-center rounded-[6px] border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[12px] leading-[16px] text-[var(--text-tertiary)]"
                                 >
-                                  ? {sk}
+                                  {sk}
                                 </span>
                               ))}
+                              {m.experience_note && (
+                                <span className="text-[12px] leading-[16px] text-[var(--text-secondary)] ml-1">
+                                  · {m.experience_note}
+                                </span>
+                              )}
                             </div>
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-500">
-                            <div>{m.experience_note || '—'}</div>
-                            <div className="text-[10px] font-mono tabular-nums text-slate-400 mt-1">
-                              {m.engine_version} · {formatLocalDateTime(m.calculated_at)}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4 text-right space-x-1.5">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEvidenceTarget(m)}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Evidence
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setOverrideTarget(m);
-                                setOverrideScoreInput(
-                                  m.override_score !== null ? String(m.override_score) : ''
-                                );
-                                setOverrideReasonInput(m.override_reason || '');
-                              }}
-                            >
-                              <Sliders className="h-3.5 w-3.5" />
-                              Override
-                            </Button>
-                            {existingSub ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDrawerSubmissionId(existingSub.id)}
-                              >
-                                View Pipeline
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSubmitMatchTarget(m);
-                                  setSubmitNotes('');
-                                }}
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                                Submit
-                              </Button>
+
+                            {isOverridden && (
+                              <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono tabular-nums">
+                                Overridden by recruiter · {m.override_score}
+                                {m.override_reason ? ` · '${m.override_reason}'` : ''}
+                              </div>
                             )}
-                          </td>
-                        </tr>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination
-                page={matchesPage}
-                totalCount={matchesData.count}
-                onPageChange={setMatchesPage}
-              />
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* TAB 5: PIPELINE (Kanban + Table view) */}
-      {activeTab === 'pipeline' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500">
-              Click any submission card or row to open the stage governance drawer.
-            </span>
-            <div className="flex gap-1.5">
-              <Button
-                size="sm"
-                variant={pipelineView === 'kanban' ? 'primary' : 'outline'}
-                onClick={() => setPipelineView('kanban')}
-              >
-                Kanban Board
-              </Button>
-              <Button
-                size="sm"
-                variant={pipelineView === 'table' ? 'primary' : 'outline'}
-                onClick={() => setPipelineView('table')}
-              >
-                Table View
-              </Button>
+                  </div>
+                  <Pagination
+                    page={matchesPage}
+                    totalCount={matchesData.count}
+                    onPageChange={setMatchesPage}
+                  />
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
-          {submissions.length === 0 ? (
-            <EmptyState
-              title="No pipeline submissions yet"
-              description="Submit candidates from the Matches tab or share this requirement with vendors."
-            />
-          ) : pipelineView === 'kanban' ? (
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {(
-                [
-                  'applied',
-                  'recruiter_review',
-                  'client_review',
-                  'interviewing',
-                  'offered',
-                  'offer_accepted',
-                  'onboarded',
-                  'rejected',
-                ] as SubmissionStage[]
-              ).map((st) => {
-                const colSubs = submissions.filter((s) => s.stage === st);
-                return (
-                  <div
-                    key={st}
-                    className="w-72 shrink-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/50 p-3 space-y-2.5"
+          {/* TAB 5: PIPELINE (Kanban + Table view) */}
+          {activeTab === 'pipeline' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                  Select any candidate to inspect history or transition stage.
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant={pipelineView === 'kanban' ? 'primary' : 'outline'}
+                    onClick={() => setPipelineView('kanban')}
                   >
-                    <div className="flex items-center justify-between px-1">
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                        {STAGE_LABELS[st]}
-                      </span>
-                      <span className="text-xs font-mono tabular-nums text-slate-500">
-                        {colSubs.length}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {colSubs.map((sub) => {
-                        const daysInStage = Math.max(
+                    Kanban
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={pipelineView === 'table' ? 'primary' : 'outline'}
+                    onClick={() => setPipelineView('table')}
+                  >
+                    Table
+                  </Button>
+                </div>
+              </div>
+
+              {submissions.length === 0 ? (
+                <EmptyState
+                  title="No pipeline submissions yet"
+                  description="Submit candidates from the Matches tab or share this requirement with vendors."
+                />
+              ) : pipelineView === 'kanban' ? (
+                <div className="flex gap-3 overflow-x-auto pb-4">
+                  {(
+                    [
+                      'applied',
+                      'recruiter_review',
+                      'client_review',
+                      'interviewing',
+                      'offered',
+                      'offer_accepted',
+                      'onboarded',
+                      'rejected',
+                    ] as SubmissionStage[]
+                  ).map((st) => {
+                    const colSubs = submissions.filter((s) => s.stage === st);
+                    const stageHeaderColors: Record<SubmissionStage, string> = {
+                      applied: 'text-[var(--status-neutral)]',
+                      recruiter_review: 'text-[var(--chip-storm-blue-text)]',
+                      client_review: 'text-[var(--chip-rich-blue-text)]',
+                      interviewing: 'text-[var(--chip-sky-text)]',
+                      offered: 'text-[var(--chip-teal-text)]',
+                      offer_accepted: 'text-[var(--status-success)]',
+                      onboarded: 'text-[var(--status-success)]',
+                      offer_declined: 'text-[var(--status-neutral)]',
+                      withdrawn: 'text-[var(--status-neutral)]',
+                      rejected: 'text-[var(--status-danger)]',
+                    };
+                    return (
+                      <div
+                        key={st}
+                        className="w-64 shrink-0 rounded-[10px] border border-[var(--border)] bg-[var(--app-bg)] p-2.5 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between px-1">
+                          <span
+                            className={`text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] ${stageHeaderColors[st]}`}
+                          >
+                            {STAGE_LABELS[st]}
+                          </span>
+                          <span className="rounded-[6px] bg-[var(--track)] px-1.5 py-0.5 text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-secondary)]">
+                            {colSubs.length}
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {colSubs.map((sub) => {
+                            const daysInStage = Math.max(
+                              0,
+                              differenceInDays(new Date(), parseISO(sub.stage_changed_at))
+                            );
+                            return (
+                              <div
+                                key={sub.id}
+                                onClick={() => setDrawerSubmissionId(sub.id)}
+                                className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-2 cursor-pointer hover:border-[var(--border-strong)] transition-colors"
+                              >
+                                <div className="text-[13px] leading-[20px] font-medium text-[var(--text-primary)] truncate">
+                                  {sub.candidates?.full_name || sub.candidate_id}
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <SourceBadge
+                                    source={sub.source}
+                                    vendorName={sub.organizations?.name}
+                                  />
+                                  <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)]">
+                                    {daysInStage}d
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="overflow-x-auto border-t border-[var(--border)]">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Candidate</th>
+                        <th>Source</th>
+                        <th>Stage</th>
+                        <th className="text-right">Days in stage</th>
+                        <th>Submitted</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {submissions.map((sub) => {
+                        const days = Math.max(
                           0,
                           differenceInDays(new Date(), parseISO(sub.stage_changed_at))
                         );
                         return (
-                          <div
+                          <tr
                             key={sub.id}
                             onClick={() => setDrawerSubmissionId(sub.id)}
-                            className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2 cursor-pointer hover:border-indigo-500 transition-colors"
+                            className="cursor-pointer"
                           >
-                            <div className="font-semibold text-xs text-slate-900 dark:text-slate-100">
+                            <td className="font-medium">
                               {sub.candidates?.full_name || sub.candidate_id}
-                            </div>
-                            <div className="flex items-center justify-between">
+                            </td>
+                            <td>
                               <SourceBadge
                                 source={sub.source}
                                 vendorName={sub.organizations?.name}
                               />
-                              <span className="text-[11px] font-mono tabular-nums text-slate-400">
-                                {daysInStage}d in stage
-                              </span>
-                            </div>
-                          </div>
+                            </td>
+                            <td>
+                              <StageBadge stage={sub.stage} />
+                            </td>
+                            <td className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
+                              {days}d
+                            </td>
+                            <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                              {formatLocalDateTime(sub.created_at)}
+                            </td>
+                          </tr>
                         );
                       })}
-                    </div>
-                  </div>
-                );
-              })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          ) : (
-            <Card className="overflow-hidden">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                    <th className="py-3 px-4">Candidate</th>
-                    <th className="py-3 px-4">Submission Source</th>
-                    <th className="py-3 px-4">Stage</th>
-                    <th className="py-3 px-4">Days in Stage</th>
-                    <th className="py-3 px-4">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {submissions.map((sub) => {
-                    const days = Math.max(
-                      0,
-                      differenceInDays(new Date(), parseISO(sub.stage_changed_at))
-                    );
-                    return (
-                      <tr
-                        key={sub.id}
-                        onClick={() => setDrawerSubmissionId(sub.id)}
-                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                      >
-                        <td className="py-3 px-4 font-semibold">
-                          {sub.candidates?.full_name || sub.candidate_id}
-                        </td>
-                        <td className="py-3 px-4">
-                          <SourceBadge
-                            source={sub.source}
-                            vendorName={sub.organizations?.name}
-                          />
-                        </td>
-                        <td className="py-3 px-4">
-                          <StageBadge stage={sub.stage} />
-                        </td>
-                        <td className="py-3 px-4 font-mono tabular-nums">{days}d</td>
-                        <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                          {formatLocalDateTime(sub.created_at)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </Card>
           )}
-        </div>
-      )}
 
-      {/* TAB 6: ACTIVITY & AUDIT */}
-      {activeTab === 'activity' && (
-        <div className="space-y-6">
-          <Card className="p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Requirement Audit Entries
-            </h3>
-            {!isAdmin ? (
-              <p className="text-xs text-slate-500">
-                Audit logs are restricted to HireNest Admin role. Inspect individual submission stage timelines inside the Pipeline tab.
-              </p>
-            ) : !auditData?.data.length ? (
-              <p className="text-xs text-slate-500">No audit entries recorded for this requirement.</p>
-            ) : (
-              <div className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                {auditData.data.map((log) => (
-                  <div key={log.id} className="py-2.5 flex items-center justify-between">
-                    <div>
-                      <span className="font-mono font-semibold uppercase">{log.action}</span>
-                      <span className="ml-2 text-slate-500">
-                        by {log.actor_role || 'system'}
+          {/* TAB 6: ACTIVITY & AUDIT */}
+          {activeTab === 'activity' && (
+            <div className="space-y-3">
+              {!isAdmin ? (
+                <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                  Audit logs are restricted to HireNest Admin role. Inspect individual submission stage timelines inside the Pipeline tab.
+                </p>
+              ) : !auditData?.data.length ? (
+                <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                  No audit entries recorded for this requirement.
+                </p>
+              ) : (
+                <div className="border-y border-[var(--border)] divide-y divide-[var(--border)]">
+                  {auditData.data.map((log) => (
+                    <div
+                      key={log.id}
+                      className="h-10 px-3 flex items-center justify-between text-[13px] leading-[20px]"
+                    >
+                      <div>
+                        <span className="font-mono font-medium uppercase">
+                          {log.action}
+                        </span>
+                        <span className="ml-2 text-[var(--text-secondary)]">
+                          by {log.actor_role || 'system'}
+                        </span>
+                      </div>
+                      <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                        {formatLocalDateTime(log.created_at)}
                       </span>
                     </div>
-                    <span className="font-mono tabular-nums text-slate-400">
-                      {formatLocalDateTime(log.created_at)}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right Rail (320px): Key facts as label/value pairs + Primary actions */}
+        <aside className="w-full lg:w-[320px] shrink-0 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+              Key facts
+            </span>
+            <RequirementStatusBadge status={req.status} />
+          </div>
+
+          <div className="divide-y divide-[var(--border)] text-[13px] leading-[20px]">
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Client</span>
+              <span className="font-medium text-[var(--text-primary)] truncate">
+                {req.organizations?.name || '—'}
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Openings</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
+                {req.openings}
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Experience</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
+                {req.min_experience}–{req.max_experience} yrs
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Location</span>
+              <span className="text-[var(--text-primary)]">{req.location}</span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Work mode</span>
+              <span className="capitalize text-[var(--text-primary)]">{req.work_mode}</span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Employment</span>
+              <span className="capitalize text-[var(--text-primary)]">
+                {req.employment_type.replace(/_/g, ' ')}
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Submission SLA</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
+                {req.submission_sla_hours}h
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Job board</span>
+              <span className="text-[var(--text-primary)]">
+                {req.is_public ? 'Public' : 'Private'}
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Vendor budget</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
+                {formatCurrency(req.vendor_visible_budget, req.currency)}
+              </span>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Client budget</span>
+              <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                {formatCurrency(financials?.actual_client_budget, req.currency)}
+              </span>
+            </div>
+            {financials?.notes && (
+              <div className="py-2 space-y-0.5">
+                <span className="text-[12px] text-[var(--text-secondary)] block">
+                  Financial notes
+                </span>
+                <span className="text-[12px] text-[var(--text-primary)]">
+                  {financials.notes}
+                </span>
               </div>
             )}
-          </Card>
-        </div>
-      )}
+            {isAdmin && (
+              <div className="py-2 flex justify-between gap-2">
+                <span className="text-[var(--text-secondary)]">Platform margin</span>
+                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                  {margins?.platform_margin !== null &&
+                  margins?.platform_margin !== undefined
+                    ? margins.margin_type === 'percentage'
+                      ? `${margins.platform_margin}%`
+                      : formatCurrency(margins.platform_margin, req.currency)
+                    : '—'}
+                </span>
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
 
       {/* Edit Requirement Modal */}
       <RequirementFormModal
@@ -1221,11 +1242,11 @@ export const HqRequirementDetailPage: React.FC = () => {
       <Dialog
         open={Boolean(statusTarget)}
         onClose={() => setStatusTarget(null)}
-        title={`Change Requirement Status to ${statusTarget}`}
+        title={`Change status of ${req.title} to ${statusTarget}?`}
       >
         <div className="space-y-4">
           <Textarea
-            label="Reason / Governance Note (Optional)"
+            label="Reason / note (optional)"
             rows={3}
             value={statusReason}
             onChange={(e) => setStatusReason(e.target.value)}
@@ -1235,7 +1256,7 @@ export const HqRequirementDetailPage: React.FC = () => {
               Cancel
             </Button>
             <Button onClick={handleConfirmStatusChange} loading={statusSaving}>
-              Confirm Status Change
+              Confirm
             </Button>
           </div>
         </div>
@@ -1245,12 +1266,12 @@ export const HqRequirementDetailPage: React.FC = () => {
       <Dialog
         open={Boolean(overrideTarget)}
         onClose={() => setOverrideTarget(null)}
-        title="Recruiter Match Score Override"
-        description="Recruiter override wins and displays 'Overridden by recruiter' with your reason."
+        title="Override match score"
+        description="Recruiter override takes precedence and logs your reason."
       >
         <div className="space-y-4">
           <Input
-            label="Override Score (0–100, or leave blank to clear override)"
+            label="Override score (0–100, or blank to clear)"
             type="number"
             min={0}
             max={100}
@@ -1258,7 +1279,7 @@ export const HqRequirementDetailPage: React.FC = () => {
             onChange={(e) => setOverrideScoreInput(e.target.value)}
           />
           <Textarea
-            label="Override Reason (Required)"
+            label="Reason (required)"
             rows={3}
             value={overrideReasonInput}
             onChange={(e) => setOverrideReasonInput(e.target.value)}
@@ -1273,7 +1294,7 @@ export const HqRequirementDetailPage: React.FC = () => {
               loading={overrideLoading}
               disabled={!overrideReasonInput.trim()}
             >
-              Save Override
+              Save override
             </Button>
           </div>
         </div>
@@ -1283,15 +1304,15 @@ export const HqRequirementDetailPage: React.FC = () => {
       <Dialog
         open={Boolean(submitMatchTarget)}
         onClose={() => setSubmitMatchTarget(null)}
-        title="Submit Candidate to Requirement"
-        description="Review match evidence before creating a formal pipeline submission."
-        maxWidth="max-w-xl"
+        title="Submit candidate to requirement"
+        description="Review match evidence before creating a pipeline submission."
+        maxWidth="max-w-[640px]"
       >
         {submitMatchTarget && (
           <div className="space-y-4">
             <MatchEvidencePanel match={submitMatchTarget} />
             <Textarea
-              label="Submission Notes (Optional)"
+              label="Submission notes (optional)"
               rows={3}
               value={submitNotes}
               onChange={(e) => setSubmitNotes(e.target.value)}
@@ -1302,7 +1323,7 @@ export const HqRequirementDetailPage: React.FC = () => {
                 Cancel
               </Button>
               <Button onClick={handleConfirmSubmitCandidate} loading={submitLoading}>
-                Confirm Submission
+                Confirm submission
               </Button>
             </div>
           </div>
@@ -1325,9 +1346,9 @@ export const HqRequirementDetailPage: React.FC = () => {
       <Dialog
         open={Boolean(evidenceTarget)}
         onClose={() => setEvidenceTarget(null)}
-        title="Explainable Match Evidence Breakdown"
-        description="Deterministic score, matched vs unproven skills, experience alignment, and recruiter override."
-        maxWidth="max-w-xl"
+        title="Match evidence"
+        description="Deterministic score, matched vs unproven skills, and recruiter override."
+        maxWidth="max-w-[640px]"
       >
         {evidenceTarget && (
           <div className="space-y-4">

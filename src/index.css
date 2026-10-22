@@ -1,32 +1,410 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Geist', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Brand "Rich Blue" */
+  --color-rich-blue-50: #EEF4FF;
+  --color-rich-blue-100: #DAE6FF;
+  --color-rich-blue-200: #B6CCFD;
+  --color-rich-blue-300: #86A9F7;
+  --color-rich-blue-400: #5383EE;
+  --color-rich-blue-500: #2F63DE;
+  --color-rich-blue-600: #1F4CC4;
+  --color-rich-blue-700: #1B3EA0;
+  --color-rich-blue-800: #1B3680;
+  --color-rich-blue-900: #1A2F66;
+  --color-rich-blue-950: #111D40;
+
+  /* Stormy Morning (secondary family) */
+  --color-storm-slate: #384959;
+  --color-storm-blue: #6A89A7;
+  --color-storm-sky: #88BDF2;
+  --color-storm-mist: #BDDDFC;
+  --color-sky-50: #F2F8FE;
+  --color-sky-100: #E3F0FD;
+  --color-sky-200: #BDDDFC;
+  --color-sky-300: #88BDF2;
+  --color-sky-500: #4F95DB;
+  --color-sky-700: #1F5F99;
+
+  /* Neutrals "Storm" (blue-grey built from storm-slate) */
+  --color-storm-0: #FFFFFF;
+  --color-storm-25: #F9FBFD;
+  --color-storm-50: #F3F6F9;
+  --color-storm-100: #E6ECF2;
+  --color-storm-200: #D3DCE6;
+  --color-storm-300: #B4C2D0;
+  --color-storm-400: #8A9CAF;
+  --color-storm-500: #66788A;
+  --color-storm-600: #4D5E6F;
+  --color-storm-700: #384959;
+  --color-storm-800: #27333F;
+  --color-storm-900: #18212A;
+  --color-storm-950: #0E141A;
+}
+
 @layer base {
   :root {
-    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-sans: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    --font-sans: 'Geist', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Brand Rich Blue scale */
+    --rich-blue-50: #EEF4FF;
+    --rich-blue-100: #DAE6FF;
+    --rich-blue-200: #B6CCFD;
+    --rich-blue-300: #86A9F7;
+    --rich-blue-400: #5383EE;
+    --rich-blue-500: #2F63DE;
+    --rich-blue-600: #1F4CC4;
+    --rich-blue-700: #1B3EA0;
+    --rich-blue-800: #1B3680;
+    --rich-blue-900: #1A2F66;
+    --rich-blue-950: #111D40;
+
+    /* Stormy Morning secondary scale */
+    --storm-slate: #384959;
+    --storm-blue: #6A89A7;
+    --storm-sky: #88BDF2;
+    --storm-mist: #BDDDFC;
+    --sky-50: #F2F8FE;
+    --sky-100: #E3F0FD;
+    --sky-200: #BDDDFC;
+    --sky-300: #88BDF2;
+    --sky-500: #4F95DB;
+    --sky-700: #1F5F99;
+
+    /* Storm neutrals */
+    --storm-0: #FFFFFF;
+    --storm-25: #F9FBFD;
+    --storm-50: #F3F6F9;
+    --storm-100: #E6ECF2;
+    --storm-200: #D3DCE6;
+    --storm-300: #B4C2D0;
+    --storm-400: #8A9CAF;
+    --storm-500: #66788A;
+    --storm-600: #4D5E6F;
+    --storm-700: #384959;
+    --storm-800: #27333F;
+    --storm-900: #18212A;
+    --storm-950: #0E141A;
+
+    /* Light surface mapping */
+    --app-bg: #F3F6F9;        /* Storm 50 */
+    --bg: #FFFFFF;            /* Content surface */
+    --surface: #FFFFFF;       /* Content surface */
+    --bg-subtle: #F9FBFD;     /* Storm 25 */
+    --bg-hover: #F9FBFD;      /* Storm 25 */
+    --border: #D3DCE6;        /* Storm 200 */
+    --border-strong: #B4C2D0; /* Storm 300 */
+    --track: #E6ECF2;         /* Storm 100 */
+
+    /* Light text mapping */
+    --text-primary: #18212A;   /* Storm 900 */
+    --text-secondary: #4D5E6F; /* Storm 600 */
+    --text-tertiary: #66788A;  /* Storm 500 */
+    --text-button-sec: #27333F;/* Storm 800 */
+
+    /* Primary & Accent mapping */
+    --primary-bg: #1F4CC4;         /* Rich Blue 600 */
+    --primary-hover: #1B3EA0;      /* Rich Blue 700 */
+    --primary-text: #FFFFFF;
+    --accent: #1F4CC4;             /* Rich Blue 600 */
+    --focus-ring: #DAE6FF;         /* Rich Blue 100 */
+    --focus-border: #1F4CC4;       /* Rich Blue 600 */
+    --row-selected-bg: #EEF4FF;    /* Rich Blue 50 */
+    --row-selected-bar: #1F4CC4;   /* Rich Blue 600 */
+    --highlight-soft: #E3F0FD;     /* Sky 100 */
+    --marker-new: #4F95DB;         /* Sky 500 */
+    --header-band-bg: #F2F8FE;     /* Sky 50 */
+    --drawer-header-bg: #F2F8FE;   /* Sky 50 */
+    --ai-block-bg: #F2F8FE;        /* Sky 50 */
+    --ai-block-border: #BDDDFC;    /* Sky 200 */
+
+    /* Sidebar (Storm-Slate Deep) */
+    --sidebar-bg: #1E2A36;
+    --sidebar-border: rgba(255, 255, 255, 0.08);
+    --sidebar-text: #D6E1EC;
+    --sidebar-muted: #8FA6BC;
+    --sidebar-hover: rgba(255, 255, 255, 0.06);
+    --sidebar-active-bg: rgba(136, 189, 242, 0.14);
+    --sidebar-active-bar: #88BDF2;
+    --sidebar-active-text: #FFFFFF;
+
+    /* Semantic soft-tint tokens (700 text on soft tint background) */
+    --status-success: #17734A;
+    --status-success-bg: #E7F4EC;
+    --status-warning: #8F5A0A;
+    --status-warning-bg: #FDF1DC;
+    --status-danger: #B8322B;
+    --status-danger-bg: #FBEAE8;
+    --status-info: #1F5F99;
+    --status-info-bg: #E3F0FD;
+    --status-neutral: #4D5E6F;
+    --status-neutral-bg: #E6ECF2;
+
+    /* Extended stage / source soft-tint chips */
+    --chip-storm-blue-text: #384959;
+    --chip-storm-blue-bg: #E6ECF2;
+    --chip-storm-blue-dot: #6A89A7;
+    --chip-rich-blue-text: #1B3EA0;
+    --chip-rich-blue-bg: #EEF4FF;
+    --chip-rich-blue-dot: #1F4CC4;
+    --chip-sky-text: #1F5F99;
+    --chip-sky-bg: #E3F0FD;
+    --chip-sky-dot: #4F95DB;
+    --chip-teal-text: #176B60;
+    --chip-teal-bg: #E3F5F2;
+    --chip-teal-dot: #2A9D8F;
+
+    /* Chart & category palette (in order) */
+    --cat-1: #1F4CC4; /* rich blue */
+    --cat-2: #4F95DB; /* sky */
+    --cat-3: #6A89A7; /* storm blue */
+    --cat-4: #384959; /* storm slate */
+    --cat-5: #2A9D8F; /* teal */
+    --cat-6: #D99A2B; /* amber */
+
+    /* Floating elevation only */
+    --shadow-floating: 0 8px 24px rgba(14, 20, 26, 0.10);
+  }
+
+  .dark {
+    --app-bg: #0E141A;
+    --bg: #141C24;
+    --surface: #141C24;
+    --bg-subtle: #18222C;
+    --bg-hover: #18222C;
+    --border: #253240;
+    --border-strong: #2F3F50;
+    --track: #1E2A36;
+
+    --text-primary: #E4ECF4;
+    --text-secondary: #A3B4C5;
+    --text-tertiary: #73879B;
+    --text-button-sec: #E4ECF4;
+
+    --primary-bg: #5383EE;         /* Rich Blue 400 */
+    --primary-hover: #86A9F7;      /* Rich Blue 300 */
+    --primary-text: #111D40;       /* Rich Blue 950 */
+    --accent: #88BDF2;             /* Sky */
+    --focus-ring: rgba(83, 131, 238, 0.25);
+    --focus-border: #5383EE;
+    --row-selected-bg: rgba(83, 131, 238, 0.12);
+    --row-selected-bar: #5383EE;
+    --highlight-soft: rgba(79, 149, 219, 0.18);
+    --marker-new: #88BDF2;
+    --header-band-bg: #121C27;
+    --drawer-header-bg: #121C27;
+    --ai-block-bg: #121C27;
+    --ai-block-border: #253240;
+
+    --sidebar-bg: #0A1016;
+    --sidebar-border: #18222C;
+    --sidebar-text: #D6E1EC;
+    --sidebar-muted: #8FA6BC;
+    --sidebar-hover: rgba(255, 255, 255, 0.06);
+    --sidebar-active-bg: rgba(136, 189, 242, 0.14);
+    --sidebar-active-bar: #88BDF2;
+    --sidebar-active-text: #FFFFFF;
+
+    /* Semantic tints at 15% opacity with 300-shade text */
+    --status-success: #6EE7B7;
+    --status-success-bg: rgba(23, 115, 74, 0.18);
+    --status-warning: #FCD34D;
+    --status-warning-bg: rgba(217, 154, 43, 0.18);
+    --status-danger: #FCA5A5;
+    --status-danger-bg: rgba(184, 50, 43, 0.18);
+    --status-info: #88BDF2;
+    --status-info-bg: rgba(79, 149, 219, 0.18);
+    --status-neutral: #B4C2D0;
+    --status-neutral-bg: rgba(102, 120, 138, 0.18);
+
+    --chip-storm-blue-text: #BDDDFC;
+    --chip-storm-blue-bg: rgba(106, 137, 167, 0.18);
+    --chip-storm-blue-dot: #88BDF2;
+    --chip-rich-blue-text: #86A9F7;
+    --chip-rich-blue-bg: rgba(47, 99, 222, 0.18);
+    --chip-rich-blue-dot: #5383EE;
+    --chip-sky-text: #88BDF2;
+    --chip-sky-bg: rgba(79, 149, 219, 0.18);
+    --chip-sky-dot: #88BDF2;
+    --chip-teal-text: #5EEAD4;
+    --chip-teal-bg: rgba(42, 157, 143, 0.18);
+    --chip-teal-dot: #2A9D8F;
+
+    --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.45);
   }
 
   html {
     font-family: var(--font-sans);
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 20px;
+    background-color: var(--app-bg);
+    color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  h1, h2, h3, h4, .font-display {
-    font-family: var(--font-display);
-    text-wrap: balance;
+  body {
+    background-color: var(--app-bg);
+    color: var(--text-primary);
+    margin: 0;
   }
 
-  .font-mono, .tabular-nums {
+  h1, h2, h3, h4 {
+    font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+
+  .font-mono,
+  .tabular-nums,
+  code,
+  pre {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
+
+  /* Tables: white surface with 1px Storm 200 border, header Storm 25 with 12px uppercase Storm 500 labels, rows 44px */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    line-height: 20px;
+    background-color: var(--surface);
+  }
+
+  thead {
+    background-color: var(--bg-subtle);
+    border-bottom: 1px solid var(--border);
+  }
+
+  thead th {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    padding: 10px 16px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    height: 44px;
+    border-bottom: 1px solid var(--border);
+    transition: background-color 120ms ease-out;
+  }
+
+  tbody tr:hover {
+    background-color: var(--bg-hover);
+  }
+
+  tbody tr[data-selected="true"],
+  tbody tr.row-selected {
+    background-color: var(--row-selected-bg);
+    box-shadow: inset 2px 0 0 0 var(--row-selected-bar);
+  }
+
+  tbody td {
+    padding: 10px 16px;
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--text-primary);
+    vertical-align: middle;
+  }
 }
 
-/* Custom subtle scrollbars for enterprise tables and drawers */
+/* Type scale utilities (strict 6-step scale) */
+.type-label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.type-table-header {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.type-secondary {
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.type-body {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.type-section-title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.type-page-title {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.type-greeting {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Atmosphere: Workspace dashboard header band in Sky 50 (dark: #121C27) with faint 24px dot grid in storm-blue at 8% opacity */
+.dashboard-header-band {
+  background-color: var(--header-band-bg);
+  background-image: radial-gradient(rgba(106, 137, 167, 0.14) 1px, transparent 1px);
+  background-size: 24px 24px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+/* Section titles preceded by a 16×3px bar in sky #88BDF2 (section titles only) */
+.section-title-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title-bar::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  border-radius: 1.5px;
+  background-color: #88BDF2;
+  flex-shrink: 0;
+}
+
+/* Motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Minimal scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -35,9 +413,6 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
+  background: var(--border-strong);
   border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.55);
 }

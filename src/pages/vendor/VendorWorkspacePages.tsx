@@ -2,18 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  CheckCircle2,
-  Plus,
-  Send,
-  Upload,
-  AlertTriangle,
-  FileText,
-  Eye,
-} from 'lucide-react';
-import {
   PageHeader,
-  StatCard,
-  Card,
+  MetricStrip,
   Button,
   Input,
   Select,
@@ -70,7 +60,6 @@ import { useAuth } from '../../auth/AuthProvider';
 import { mapSupabaseError } from '../../lib/errors';
 import { computeFileSha256, validateResumeFile } from '../../lib/hash';
 import {
-  STAGE_LABELS,
   formatCurrency,
   formatLocalDate,
   formatLocalDateTime,
@@ -114,86 +103,90 @@ export const VendorDashboardPage: React.FC = () => {
     enabled: Boolean(profile?.org_id),
   });
 
-  const unacknowledged = shares.filter((s) => !s.acknowledged_at && !s.revoked_at);
+  const activeShares = shares.filter((s) => !s.revoked_at);
+  const unacknowledged = activeShares.filter((s) => !s.acknowledged_at);
+  const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Vendor Agency Workspace"
-        description="Track shared requirement SLAs, manage your deduplicated candidate pool, and monitor your 3-pillar agency score."
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Unacknowledged Requirements"
-          value={unacknowledged.length}
-          tone={unacknowledged.length > 0 ? 'amber' : 'default'}
-          sublabel="Acknowledge to record response speed"
-          onClick={() => navigate('/vendor/requirements')}
-        />
-        <StatCard
-          label="Active Shared Requirements"
-          value={shares.filter((s) => !s.revoked_at).length}
-          sublabel="With active SLA countdowns"
-          onClick={() => navigate('/vendor/requirements')}
-        />
-        <StatCard
-          label="My Submissions"
-          value={subsData?.count ?? 0}
-          sublabel="Submitted across requirements"
-          onClick={() => navigate('/vendor/submissions')}
-        />
-        <StatCard
-          label="Upcoming Candidate Interviews"
-          value={interviewsData?.count ?? 0}
-          sublabel="Scheduled rounds"
-          onClick={() => navigate('/vendor/submissions')}
-        />
+    <div className="space-y-8">
+      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5">
+        <h1 className="type-greeting text-[var(--text-primary)]">
+          Good day, {firstName}
+        </h1>
+        <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          Shared requirements, SLA countdowns, and agency performance standing.
+        </p>
       </div>
 
-      {/* Active SLA Countdowns */}
-      {shares.filter((s) => !s.revoked_at).length > 0 && (
-        <Card className="p-5 space-y-3">
-          <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-            Active Shared Requirements & SLA Countdowns
-          </h3>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-            {shares
-              .filter((s) => !s.revoked_at)
-              .slice(0, 8)
-              .map((sh) => (
-                <div
-                  key={sh.id}
-                  onClick={() => navigate(`/vendor/requirements/${sh.requirement_id}`)}
-                  className="py-2.5 flex flex-wrap items-center justify-between gap-2 cursor-pointer hover:text-indigo-600"
-                >
-                  <div>
-                    <span className="font-semibold">
-                      {sh.requirements?.title || sh.requirement_id}
-                    </span>
-                    {!sh.acknowledged_at && (
-                      <Badge tone="amber" className="ml-2">
-                        Unacknowledged
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono tabular-nums text-slate-500">
-                      Due: {formatLocalDateTime(sh.due_at)}
-                    </span>
-                    <SlaBadge dueAt={sh.due_at} showCountdown />
-                  </div>
+      {/* Needs attention */}
+      <div className="space-y-2.5">
+        <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Needs attention
+        </h2>
+        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+          {activeShares.length === 0 ? (
+            <div className="flex h-11 items-center px-4 text-[13px] text-[var(--text-secondary)]">
+              No active requirement shares right now.
+            </div>
+          ) : (
+            activeShares.slice(0, 8).map((sh) => (
+              <div
+                key={sh.id}
+                onClick={() => navigate(`/vendor/requirements/${sh.requirement_id}`)}
+                className="flex h-11 items-center justify-between gap-4 px-4 hover:bg-[var(--bg-hover)] cursor-pointer text-[13px]"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-medium text-[var(--text-primary)] truncate">
+                    {sh.requirements?.title || sh.requirement_id}
+                  </span>
+                  {!sh.acknowledged_at && (
+                    <Badge tone="warning">Unacknowledged</Badge>
+                  )}
                 </div>
-              ))}
-          </div>
-        </Card>
-      )}
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="font-mono tabular-nums text-[12px] text-[var(--text-secondary)]">
+                    Due {formatLocalDateTime(sh.due_at)}
+                  </span>
+                  <SlaBadge dueAt={sh.due_at} showCountdown />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 4-Metric Strip */}
+      <MetricStrip
+        items={[
+          {
+            label: 'Unacknowledged shares',
+            value: unacknowledged.length,
+            tone: unacknowledged.length > 0 ? 'warning' : 'default',
+            onClick: () => navigate('/vendor/requirements'),
+          },
+          {
+            label: 'Active requirements',
+            value: activeShares.length,
+            onClick: () => navigate('/vendor/requirements'),
+          },
+          {
+            label: 'Total submissions',
+            value: subsData?.count ?? 0,
+            onClick: () => navigate('/vendor/submissions'),
+          },
+          {
+            label: 'Scheduled interviews',
+            value: interviewsData?.count ?? 0,
+            onClick: () => navigate('/vendor/submissions'),
+          },
+        ]}
+      />
 
       {perf && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            My Agency Performance Standing
-          </h3>
+        <div className="space-y-3">
+          <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Agency performance standing
+          </h2>
           <VendorPerformancePanel performance={perf} />
         </div>
       )}
@@ -221,13 +214,13 @@ export const VendorRequirementsPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="Requirements Shared with Us"
-        description="RLS returns only requirements shared with your agency. Client internal budgets and margins are never exposed."
+        title="Shared requirements"
+        description="Requirements shared with your agency. Acknowledge shares promptly to record SLA response speed."
       />
 
-      <div className="max-w-xs">
+      <div className="mb-4 max-w-xs">
         <Input
           placeholder="Search requirement title..."
           value={search}
@@ -239,79 +232,81 @@ export const VendorRequirementsPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={5} cols={6} />
+        <TableSkeleton rows={5} cols={5} />
       ) : error ? (
         <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
       ) : !data?.data.length ? (
         <EmptyState
           title="No requirements shared with your agency yet"
-          description="HireNest HQ will share open requirements with your agency here."
+          description="HireNest HQ shares open requirements with your agency here."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                <th className="py-3 px-4">Requirement Title</th>
-                <th className="py-3 px-4">Location & Mode</th>
-                <th className="py-3 px-4 text-right">Vendor-Visible Budget</th>
-                <th className="py-3 px-4">Acknowledgement</th>
-                <th className="py-3 px-4">SLA Due Countdown</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.data.map((req) => {
-                const share = shares.find((s) => s.requirement_id === req.id);
-                return (
-                  <tr
-                    key={req.id}
-                    onClick={() => navigate(`/vendor/requirements/${req.id}`)}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                  >
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">
-                        {req.title}
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        {req.min_experience}–{req.max_experience} yrs · {req.openings} opening(s)
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 capitalize text-slate-500">
-                      {req.location} · {req.work_mode}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold">
-                      {formatCurrency(req.vendor_visible_budget, req.currency)}
-                    </td>
-                    <td className="py-3 px-4">
-                      {share?.acknowledged_at ? (
-                        <Badge tone="emerald">Acknowledged</Badge>
-                      ) : (
-                        <Badge tone="amber">Needs Acknowledgement</Badge>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <SlaBadge dueAt={share?.due_at} showCountdown />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div>
+          <div className="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Requirement</th>
+                  <th>Location & mode</th>
+                  <th className="text-right">Vendor budget</th>
+                  <th>Acknowledgement</th>
+                  <th>SLA countdown</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.data.map((req) => {
+                  const share = shares.find((s) => s.requirement_id === req.id);
+                  return (
+                    <tr
+                      key={req.id}
+                      onClick={() => navigate(`/vendor/requirements/${req.id}`)}
+                      className="cursor-pointer"
+                    >
+                      <td>
+                        <div className="font-medium text-[var(--text-primary)]">
+                          {req.title}
+                        </div>
+                        <div className="text-[12px] text-[var(--text-secondary)]">
+                          {req.min_experience}–{req.max_experience} yrs · {req.openings} opening(s)
+                        </div>
+                      </td>
+                      <td className="capitalize text-[var(--text-secondary)]">
+                        {req.location} · {req.work_mode}
+                      </td>
+                      <td className="text-right font-mono tabular-nums text-[var(--text-primary)]">
+                        {formatCurrency(req.vendor_visible_budget, req.currency)}
+                      </td>
+                      <td>
+                        {share?.acknowledged_at ? (
+                          <Badge tone="success">Acknowledged</Badge>
+                        ) : (
+                          <Badge tone="warning">Needs acknowledgement</Badge>
+                        )}
+                      </td>
+                      <td>
+                        <SlaBadge dueAt={share?.due_at} showCountdown />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
     </div>
   );
 };
 
-// 3. Vendor Shared Requirement Detail Page (Acknowledge button, My matching candidates, My submissions)
+// 3. Vendor Shared Requirement Detail Page (2-column 1200px layout)
 export const VendorRequirementDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'matches' | 'submissions'>('matches');
+  const [activeTab, setActiveTab] = useState<'matches' | 'submissions' | 'overview'>('matches');
   const [acking, setAcking] = useState(false);
   const [submitTarget, setSubmitTarget] = useState<CandidateMatch | null>(null);
   const [submitNotes, setSubmitNotes] = useState('');
@@ -410,10 +405,10 @@ export const VendorRequirementDetailPage: React.FC = () => {
   const mySubmissions = submissionsData?.data || [];
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1200px]">
       <PageHeader
         title={req.title}
-        description={`${req.location} (${req.work_mode}) · ${req.min_experience}–${req.max_experience} yrs · Vendor Budget: ${formatCurrency(
+        description={`${req.location} (${req.work_mode}) · ${req.min_experience}–${req.max_experience} yrs · Vendor budget: ${formatCurrency(
           req.vendor_visible_budget,
           req.currency
         )}`}
@@ -422,180 +417,237 @@ export const VendorRequirementDetailPage: React.FC = () => {
             {share && <SlaBadge dueAt={share.due_at} showCountdown />}
             {share && !share.acknowledged_at && (
               <Button onClick={handleAcknowledge} loading={acking}>
-                <CheckCircle2 className="h-4 w-4" />
-                Acknowledge Requirement
+                Acknowledge requirement
               </Button>
             )}
           </div>
         }
       />
 
-      <Card className="p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-          <span>
-            SLA Due Time:{' '}
-            <strong className="font-mono text-slate-900 dark:text-slate-100">
-              {formatLocalDateTime(share?.due_at)}
-            </strong>
-          </span>
-          <span>
-            Acknowledged:{' '}
-            <strong className="font-mono text-slate-900 dark:text-slate-100">
-              {share?.acknowledged_at ? formatLocalDateTime(share.acknowledged_at) : 'Pending'}
-            </strong>
-          </span>
-        </div>
-        <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
-          {req.description}
-        </p>
-        <div className="flex flex-wrap gap-1.5 pt-2">
-          {req.skills.map((s) => (
-            <Badge key={s} tone="indigo">
-              {s}
-            </Badge>
-          ))}
-        </div>
-      </Card>
-
-      <Tabs
-        tabs={[
-          {
-            id: 'matches',
-            label: 'My Matching Candidates',
-            count: matchesData?.count || 0,
-          },
-          {
-            id: 'submissions',
-            label: 'My Submissions',
-            count: mySubmissions.length,
-          },
-        ]}
-        activeTab={activeTab}
-        onChange={(t) => setActiveTab(t as 'matches' | 'submissions')}
-      />
-
-      {activeTab === 'matches' ? (
-        !matchesData?.data.length ? (
-          <EmptyState
-            title="No matching candidates in your pool yet"
-            description="Add candidates with matching skills in your Candidate Pool to see ranked matches here."
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        <div className="flex-1 min-w-0 w-full space-y-6">
+          <Tabs
+            tabs={[
+              {
+                id: 'matches',
+                label: 'Matching candidates',
+                count: matchesData?.count || 0,
+              },
+              {
+                id: 'submissions',
+                label: 'Submissions',
+                count: mySubmissions.length,
+              },
+              {
+                id: 'overview',
+                label: 'Specification',
+              },
+            ]}
+            activeTab={activeTab}
+            onChange={(t) => setActiveTab(t as 'matches' | 'submissions' | 'overview')}
           />
-        ) : (
-          <Card className="overflow-hidden">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Candidate</th>
-                  <th className="py-3 px-4">Advisory Match Score</th>
-                  <th className="py-3 px-4">Matched / Unproven Skills</th>
-                  <th className="py-3 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                {matchesData.data.map((m) => {
+
+          {activeTab === 'matches' && (
+            !matchesData?.data.length ? (
+              <EmptyState
+                title="No matching candidates in your pool yet"
+                description="Add candidates with matching skills in your Candidate Pool to see ranked matches here."
+              />
+            ) : (
+              <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+                {matchesData.data.map((m, idx) => {
                   const alreadySubmitted = mySubmissions.some(
                     (s) => s.candidate_id === m.candidate_id
                   );
                   return (
-                    <tr key={m.id}>
-                      <td className="py-3 px-4">
-                        <div className="font-semibold">
-                          {m.candidates?.full_name || m.candidate_id}
-                        </div>
-                        <div className="text-[11px] text-slate-500">
-                          {m.candidates?.current_title || '—'} ·{' '}
-                          {m.candidates?.total_experience_years ?? '—'} yrs
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <ScoreBar
-                          score={m.final_score}
-                          isOverridden={m.override_score !== null}
-                        />
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-emerald-700 font-medium">
-                          {m.matched_skills?.length || 0} matched
-                        </span>{' '}
-                        ·{' '}
-                        <span className="text-slate-500">
-                          {m.unproven_skills?.length || 0} unproven
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        {alreadySubmitted ? (
-                          <Badge tone="emerald">Submitted</Badge>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSubmitTarget(m);
-                              setSubmitNotes('');
-                            }}
+                    <div key={m.id} className="py-3 flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)] w-6">
+                            #{idx + 1}
+                          </span>
+                          <Link
+                            to={`/vendor/candidates/${m.candidate_id}`}
+                            className="text-[14px] font-medium text-[var(--text-primary)] hover:underline truncate"
                           >
-                            <Send className="h-3.5 w-3.5" />
-                            Review & Submit
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
+                            {m.candidates?.full_name || m.candidate_id}
+                          </Link>
+                          <span className="text-[13px] text-[var(--text-secondary)]">
+                            {m.candidates?.current_title || '—'} ·{' '}
+                            <span className="font-mono tabular-nums">
+                              {m.candidates?.total_experience_years ?? '—'} yrs
+                            </span>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <ScoreBar
+                            score={m.final_score}
+                            isOverridden={m.override_score !== null}
+                          />
+                          {alreadySubmitted ? (
+                            <Badge tone="success">Submitted</Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSubmitTarget(m);
+                                setSubmitNotes('');
+                              }}
+                            >
+                              Review & submit
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="pl-9 flex flex-wrap gap-1.5">
+                        {(m.matched_skills || []).map((sk) => (
+                          <span
+                            key={`m-${sk}`}
+                            className="inline-flex items-center rounded-[6px] border border-[var(--border)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]"
+                          >
+                            {sk}
+                          </span>
+                        ))}
+                        {(m.unproven_skills || []).map((sk) => (
+                          <span
+                            key={`u-${sk}`}
+                            title="Not in resume; not proof of absence"
+                            className="inline-flex items-center rounded-[6px] border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[12px] text-[var(--text-tertiary)]"
+                          >
+                            {sk}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </Card>
-        )
-      ) : !mySubmissions.length ? (
-        <EmptyState
-          title="No submissions for this requirement yet"
-          description="Select a candidate from My Matching Candidates to submit."
-        />
-      ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                <th className="py-3 px-4">Candidate</th>
-                <th className="py-3 px-4">Stage</th>
-                <th className="py-3 px-4">Submitted At</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {mySubmissions.map((sub) => (
-                <tr
-                  key={sub.id}
-                  onClick={() => setDrawerSubId(sub.id)}
-                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                >
-                  <td className="py-3 px-4 font-semibold">
-                    {sub.candidates?.full_name || sub.candidate_id}
-                  </td>
-                  <td className="py-3 px-4">
-                    <StageBadge stage={sub.stage} />
-                  </td>
-                  <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                    {formatLocalDateTime(sub.created_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
+              </div>
+            )
+          )}
+
+          {activeTab === 'submissions' && (
+            !mySubmissions.length ? (
+              <EmptyState
+                title="No submissions for this requirement yet"
+                description="Select a candidate from Matching candidates to submit."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Candidate</th>
+                      <th>Stage</th>
+                      <th>Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mySubmissions.map((sub) => (
+                      <tr
+                        key={sub.id}
+                        onClick={() => setDrawerSubId(sub.id)}
+                        className="cursor-pointer"
+                      >
+                        <td className="font-medium text-[var(--text-primary)]">
+                          {sub.candidates?.full_name || sub.candidate_id}
+                        </td>
+                        <td>
+                          <StageBadge stage={sub.stage} />
+                        </td>
+                        <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                          {formatLocalDateTime(sub.created_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-[12px] font-medium text-[var(--text-secondary)] mb-2">
+                  Description
+                </h3>
+                <p className="text-[14px] leading-[22px] text-[var(--text-primary)] whitespace-pre-line">
+                  {req.description}
+                </p>
+              </div>
+              <div className="pt-4 border-t border-[var(--border)]">
+                <h3 className="text-[12px] font-medium text-[var(--text-secondary)] mb-2">
+                  Required skills ({req.skills.length})
+                </h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {req.skills.map((s) => (
+                    <span
+                      key={s}
+                      className="inline-flex items-center rounded-[6px] border border-[var(--border)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right key-facts rail (320px) */}
+        <aside className="w-full lg:w-[320px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] pt-6 lg:pt-0 lg:pl-6 space-y-4">
+          <h3 className="text-[12px] font-medium text-[var(--text-secondary)]">
+            Key facts
+          </h3>
+          <dl className="divide-y divide-[var(--border)] text-[13px]">
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Vendor budget</dt>
+              <dd className="font-mono tabular-nums text-[var(--text-primary)]">
+                {formatCurrency(req.vendor_visible_budget, req.currency)}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">SLA due</dt>
+              <dd className="font-mono tabular-nums text-[var(--text-primary)]">
+                {formatLocalDateTime(share?.due_at)}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Acknowledged</dt>
+              <dd className="font-mono tabular-nums text-[var(--text-secondary)]">
+                {share?.acknowledged_at ? formatLocalDateTime(share.acknowledged_at) : 'Pending'}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Experience</dt>
+              <dd className="font-mono tabular-nums text-[var(--text-primary)]">
+                {req.min_experience}–{req.max_experience} yrs
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Openings</dt>
+              <dd className="font-mono tabular-nums text-[var(--text-primary)]">
+                {req.openings}
+              </dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
 
       {/* Submit Candidate Dialog showing Match Evidence first */}
       <Dialog
         open={Boolean(submitTarget)}
         onClose={() => setSubmitTarget(null)}
-        title="Submit Candidate to Requirement"
+        title="Submit candidate to requirement"
         description="Verify match evidence and add submission notes before submitting."
-        maxWidth="max-w-xl"
       >
         {submitTarget && (
           <div className="space-y-4">
             <MatchEvidencePanel match={submitTarget} />
             <Textarea
-              label="Vendor Submission Notes"
+              label="Submission notes"
               rows={3}
               value={submitNotes}
               onChange={(e) => setSubmitNotes(e.target.value)}
@@ -606,7 +658,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
                 Cancel
               </Button>
               <Button onClick={handleConfirmSubmit} loading={submitting}>
-                Confirm Submission
+                Confirm submission
               </Button>
             </div>
           </div>
@@ -650,19 +702,16 @@ export const VendorCandidatePoolPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="My Agency Candidate Pool"
-        description="Add and manage candidates owned by your agency. Resume SHA-256 deduplication runs automatically in browser."
+        title="Candidate pool"
+        description="Manage candidates owned by your agency. Resume SHA-256 deduplication runs automatically on upload."
         actions={
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Add Candidate
-          </Button>
+          <Button onClick={() => setAddOpen(true)}>Add candidate</Button>
         }
       />
 
-      <div className="max-w-xs">
+      <div className="mb-4 max-w-xs">
         <Input
           placeholder="Search candidate name..."
           value={search}
@@ -674,70 +723,78 @@ export const VendorCandidatePoolPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={5} cols={5} />
+        <TableSkeleton rows={5} cols={4} />
       ) : error ? (
         <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
       ) : !data?.data.length ? (
         <EmptyState
           title="No candidates in your agency pool yet"
           description="Add a candidate with resume upload to start matching against shared requirements."
-          actionLabel="Add Candidate"
+          actionLabel="Add candidate"
           onAction={() => setAddOpen(true)}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                <th className="py-3 px-4">Candidate</th>
-                <th className="py-3 px-4">Masked Contact (List View)</th>
-                <th className="py-3 px-4">Skills</th>
-                <th className="py-3 px-4">Added</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.data.map((c) => {
-                const rawContacts = Array.isArray(c.candidate_contacts)
-                  ? c.candidate_contacts[0]
-                  : (c.candidate_contacts as CandidateContacts | null);
-                return (
-                  <tr
-                    key={c.id}
-                    onClick={() => navigate(`/vendor/candidates/${c.id}`)}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                  >
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">
-                        {c.full_name}
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        {c.current_title || '—'} · {c.total_experience_years ?? '—'} yrs ·{' '}
-                        {c.location || '—'}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500">
-                      <div>{maskEmail(rawContacts?.email)}</div>
-                      <div>{maskPhone(rawContacts?.phone)}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex flex-wrap gap-1">
-                        {(c.skills || []).slice(0, 5).map((sk) => (
-                          <Badge key={sk} tone="slate">
-                            {sk}
-                          </Badge>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                      {formatLocalDate(c.created_at)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div>
+          <div className="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Masked contact</th>
+                  <th>Skills</th>
+                  <th>Added</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.data.map((c) => {
+                  const rawContacts = Array.isArray(c.candidate_contacts)
+                    ? c.candidate_contacts[0]
+                    : (c.candidate_contacts as CandidateContacts | null);
+                  return (
+                    <tr
+                      key={c.id}
+                      onClick={() => navigate(`/vendor/candidates/${c.id}`)}
+                      className="cursor-pointer"
+                    >
+                      <td>
+                        <div className="font-medium text-[var(--text-primary)]">
+                          {c.full_name}
+                        </div>
+                        <div className="text-[12px] text-[var(--text-secondary)]">
+                          {c.current_title || '—'} ·{' '}
+                          <span className="font-mono tabular-nums">
+                            {c.total_experience_years ?? '—'} yrs
+                          </span>{' '}
+                          · {c.location || '—'}
+                        </div>
+                      </td>
+                      <td className="font-mono text-[12px] text-[var(--text-secondary)]">
+                        <div>{maskEmail(rawContacts?.email)}</div>
+                        <div>{maskPhone(rawContacts?.phone)}</div>
+                      </td>
+                      <td>
+                        <div className="flex flex-wrap gap-1">
+                          {(c.skills || []).slice(0, 5).map((sk) => (
+                            <span
+                              key={sk}
+                              className="inline-flex items-center rounded-[6px] border border-[var(--border)] px-1.5 py-0.5 text-[12px] text-[var(--text-primary)]"
+                            >
+                              {sk}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                        {formatLocalDate(c.created_at)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       <CandidateFormModal
@@ -752,14 +809,14 @@ export const VendorCandidatePoolPage: React.FC = () => {
   );
 };
 
-// 5. Vendor Candidate Detail & Edit Page (with Two-Way Discovery: Candidate -> Requirements)
+// 5. Vendor Candidate Detail & Edit Page (2-column 1200px layout)
 export const VendorCandidateDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'matches' | 'submissions' | 'profile'>('matches');
+  const [activeTab, setActiveTab] = useState<'matches' | 'submissions' | 'overview'>('matches');
   const [matchesPage, setMatchesPage] = useState(1);
   const [evidenceTarget, setEvidenceTarget] = useState<CandidateMatch | null>(null);
   const [submitTarget, setSubmitTarget] = useState<CandidateMatch | null>(null);
@@ -930,7 +987,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
   const mySubmissions = submissionsData?.data || [];
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1200px]">
       <PageHeader
         title={cand.full_name}
         description={`${cand.current_title || 'Candidate'} · ${cand.location || '—'} · ${
@@ -940,13 +997,11 @@ export const VendorCandidateDetailPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             {cand.resume_path && (
               <Button size="sm" variant="outline" onClick={handleViewResume}>
-                <FileText className="h-3.5 w-3.5" />
-                View Resume (5m Signed URL)
+                View resume
               </Button>
             )}
-            <label className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
-              <Upload className="h-3.5 w-3.5 text-indigo-600" />
-              <span>{cand.resume_path ? 'Replace Resume' : 'Upload Resume'}</span>
+            <label className="inline-flex h-7 items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[12px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)]">
+              <span>{cand.resume_path ? 'Replace resume' : 'Upload resume'}</span>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
@@ -955,251 +1010,264 @@ export const VendorCandidateDetailPage: React.FC = () => {
               />
             </label>
             <Button size="sm" onClick={startEdit}>
-              Edit Candidate
+              Edit candidate
             </Button>
           </div>
         }
       />
 
-      {/* Candidate 360 Header & Source Attribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 p-5 space-y-4 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-3 border-b border-slate-100 dark:border-slate-800">
-            <div>
-              <span className="text-slate-500 block mb-1">Original Source</span>
-              <SourceBadge
-                source={cand.original_source}
-                vendorName={cand.source_vendor?.name}
-              />
-            </div>
-            <div>
-              <span className="text-slate-500 block mb-1">Owner Vendor Association</span>
-              <span className="font-semibold text-slate-900 dark:text-slate-100">
-                {cand.owner_vendor?.name || 'My Agency'}
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-500 block mb-1">Resume SHA-256</span>
-              <span className="font-mono text-[11px] text-slate-500">
-                {cand.resume_hash ? cand.resume_hash.slice(0, 12) + '…' : '—'}
-              </span>
-            </div>
-          </div>
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        <div className="flex-1 min-w-0 w-full space-y-6">
+          <Tabs
+            tabs={[
+              {
+                id: 'matches',
+                label: 'Matching requirements',
+                count: matchesData?.count || 0,
+              },
+              {
+                id: 'submissions',
+                label: 'Submissions',
+                count: mySubmissions.length,
+              },
+              {
+                id: 'overview',
+                label: 'Overview',
+              },
+            ]}
+            activeTab={activeTab}
+            onChange={(t) => setActiveTab(t as 'matches' | 'submissions' | 'overview')}
+          />
 
-          <div>
-            <span className="font-semibold block mb-1">Summary</span>
-            <p className="text-slate-600 dark:text-slate-300 whitespace-pre-line">
-              {cand.summary || 'No summary provided.'}
-            </p>
-          </div>
-          <div>
-            <span className="font-semibold block mb-2">
-              Verified Profile Skills ({cand.skills?.length || 0})
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {(cand.skills || []).map((sk) => (
-                <Badge key={sk} tone="indigo">
-                  {sk}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-5 space-y-2 text-xs">
-          <h3 className="font-semibold">Contact Details (Owner Vendor Access)</h3>
-          <div className="py-1 flex justify-between">
-            <span className="text-slate-500">Email:</span>
-            <span className="font-mono">{contacts?.email || '—'}</span>
-          </div>
-          <div className="py-1 flex justify-between">
-            <span className="text-slate-500">Phone:</span>
-            <span className="font-mono">{contacts?.phone || '—'}</span>
-          </div>
-          <div className="py-1 flex justify-between">
-            <span className="text-slate-500">LinkedIn:</span>
-            <span className="truncate max-w-[180px]">{contacts?.linkedin_url || '—'}</span>
-          </div>
-        </Card>
-      </div>
-
-      {/* Bidirectional Discovery Tabs: Candidate -> Shared Requirements & Submissions */}
-      <Tabs
-        tabs={[
-          {
-            id: 'matches',
-            label: 'Matching Shared Requirements (Candidate → Requirements)',
-            count: matchesData?.count || 0,
-          },
-          {
-            id: 'submissions',
-            label: 'My Submissions for this Candidate',
-            count: mySubmissions.length,
-          },
-        ]}
-        activeTab={activeTab === 'profile' ? 'matches' : activeTab}
-        onChange={(t) => setActiveTab(t as 'matches' | 'submissions')}
-      />
-
-      {activeTab !== 'submissions' ? (
-        <div className="space-y-4">
-          <p className="text-xs text-slate-500">
-            Bidirectional discovery (<code className="font-mono">Candidate → Requirements</code>)
-            filtered to requirements shared with your vendor agency. A{' '}
-            <strong>Potential Match</strong> does not create a submission until you explicitly
-            click Review &amp; Submit.
-          </p>
-          {!matchesData?.data.length ? (
-            <EmptyState
-              title="No matching shared requirements yet"
-              description="When HireNest HQ shares open requirements matching this candidate's skills, they will appear here."
-            />
-          ) : (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                      <th className="py-3 px-4">Requirement</th>
-                      <th className="py-3 px-4">Pipeline Status</th>
-                      <th className="py-3 px-4">Advisory Match Score</th>
-                      <th className="py-3 px-4">Matched / Unproven Skills</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {matchesData.data.map((m) => {
+          {activeTab === 'matches' && (
+            <div className="space-y-4">
+              {!matchesData?.data.length ? (
+                <EmptyState
+                  title="No matching shared requirements yet"
+                  description="When HireNest HQ shares open requirements matching this candidate's skills, they appear here."
+                />
+              ) : (
+                <div>
+                  <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+                    {matchesData.data.map((m, idx) => {
                       const existingSub = mySubmissions.find(
                         (s) => s.requirement_id === m.requirement_id
                       );
                       return (
-                        <tr key={m.id}>
-                          <td className="py-3 px-4">
-                            <Link
-                              to={`/vendor/requirements/${m.requirement_id}`}
-                              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                            >
-                              {m.requirements?.title || m.requirement_id}
-                            </Link>
-                            <div className="text-[11px] text-slate-500">
-                              {m.requirements?.location || '—'} ({m.requirements?.work_mode || '—'})
+                        <div key={m.id} className="py-3 flex flex-col gap-2">
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)] w-6">
+                                #{idx + 1}
+                              </span>
+                              <Link
+                                to={`/vendor/requirements/${m.requirement_id}`}
+                                className="text-[14px] font-medium text-[var(--text-primary)] hover:underline truncate"
+                              >
+                                {m.requirements?.title || m.requirement_id}
+                              </Link>
+                              <span className="text-[13px] text-[var(--text-secondary)]">
+                                {m.requirements?.location || '—'} ({m.requirements?.work_mode || '—'})
+                              </span>
+                              {existingSub ? (
+                                <StageBadge stage={existingSub.stage} />
+                              ) : (
+                                <span className="text-[12px] text-[var(--text-tertiary)]">
+                                  Potential match
+                                </span>
+                              )}
                             </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            {existingSub ? (
-                              <Badge tone="indigo">
-                                Vendor Submitted · {STAGE_LABELS[existingSub.stage]}
-                              </Badge>
-                            ) : (
-                              <Badge tone="amber">Potential Match (Not Submitted)</Badge>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <ScoreBar
-                              score={m.final_score}
-                              isOverridden={m.override_score !== null}
-                            />
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-                              {m.matched_skills?.length || 0} matched
-                            </span>{' '}
-                            ·{' '}
-                            <span
-                              className="text-slate-500"
-                              title="Missing evidence is not proof of missing skill"
-                            >
-                              {m.unproven_skills?.length || 0} unproven
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right space-x-1.5">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEvidenceTarget(m)}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Evidence
-                            </Button>
-                            {existingSub ? (
+
+                            <div className="flex items-center gap-3">
+                              <ScoreBar
+                                score={m.final_score}
+                                isOverridden={m.override_score !== null}
+                              />
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => setDrawerSubId(existingSub.id)}
+                                variant="ghost"
+                                onClick={() => setEvidenceTarget(m)}
                               >
-                                View Pipeline
+                                Evidence
                               </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSubmitTarget(m);
-                                  setSubmitNotes('');
-                                }}
+                              {existingSub ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setDrawerSubId(existingSub.id)}
+                                >
+                                  View pipeline
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSubmitTarget(m);
+                                    setSubmitNotes('');
+                                  }}
+                                >
+                                  Submit
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="pl-9 flex flex-wrap gap-1.5">
+                            {(m.matched_skills || []).map((sk) => (
+                              <span
+                                key={`m-${sk}`}
+                                className="inline-flex items-center rounded-[6px] border border-[var(--border)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]"
                               >
-                                <Send className="h-3.5 w-3.5" />
-                                Review &amp; Submit
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
+                                {sk}
+                              </span>
+                            ))}
+                            {(m.unproven_skills || []).map((sk) => (
+                              <span
+                                key={`u-${sk}`}
+                                title="Not in resume; not proof of absence"
+                                className="inline-flex items-center rounded-[6px] border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[12px] text-[var(--text-tertiary)]"
+                              >
+                                {sk}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       );
                     })}
+                  </div>
+                  <Pagination
+                    page={matchesPage}
+                    totalCount={matchesData.count}
+                    onPageChange={setMatchesPage}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'submissions' && (
+            !mySubmissions.length ? (
+              <EmptyState
+                title="No submissions for this candidate yet"
+                description="Select a requirement from Matching requirements to submit this candidate."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Requirement</th>
+                      <th>Stage</th>
+                      <th>Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mySubmissions.map((sub) => (
+                      <tr
+                        key={sub.id}
+                        onClick={() => setDrawerSubId(sub.id)}
+                        className="cursor-pointer"
+                      >
+                        <td className="font-medium text-[var(--text-primary)]">
+                          {sub.requirements?.title || sub.requirement_id}
+                        </td>
+                        <td>
+                          <StageBadge stage={sub.stage} />
+                        </td>
+                        <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                          {formatLocalDateTime(sub.created_at)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
-              <Pagination
-                page={matchesPage}
-                totalCount={matchesData.count}
-                onPageChange={setMatchesPage}
-              />
-            </Card>
+            )
+          )}
+
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-[12px] font-medium text-[var(--text-secondary)] mb-2">
+                  Summary
+                </h3>
+                <p className="text-[14px] leading-[22px] text-[var(--text-primary)] whitespace-pre-line">
+                  {cand.summary || 'No summary provided.'}
+                </p>
+              </div>
+              <div className="pt-4 border-t border-[var(--border)]">
+                <h3 className="text-[12px] font-medium text-[var(--text-secondary)] mb-2">
+                  Skills ({cand.skills?.length || 0})
+                </h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {(cand.skills || []).map((sk) => (
+                    <span
+                      key={sk}
+                      className="inline-flex items-center rounded-[6px] border border-[var(--border)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]"
+                    >
+                      {sk}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </div>
-      ) : !mySubmissions.length ? (
-        <EmptyState
-          title="No submissions for this candidate yet"
-          description="Select a requirement from Matching Shared Requirements to submit this candidate."
-        />
-      ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                <th className="py-3 px-4">Requirement</th>
-                <th className="py-3 px-4">Stage</th>
-                <th className="py-3 px-4">Submitted At</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {mySubmissions.map((sub) => (
-                <tr
-                  key={sub.id}
-                  onClick={() => setDrawerSubId(sub.id)}
-                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                >
-                  <td className="py-3 px-4 font-semibold">
-                    {sub.requirements?.title || sub.requirement_id}
-                  </td>
-                  <td className="py-3 px-4">
-                    <StageBadge stage={sub.stage} />
-                  </td>
-                  <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                    {formatLocalDateTime(sub.created_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
+
+        {/* Right key-facts rail (320px) */}
+        <aside className="w-full lg:w-[320px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] pt-6 lg:pt-0 lg:pl-6 space-y-4">
+          <h3 className="text-[12px] font-medium text-[var(--text-secondary)]">
+            Key facts
+          </h3>
+          <dl className="divide-y divide-[var(--border)] text-[13px]">
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Source</dt>
+              <dd>
+                <SourceBadge
+                  source={cand.original_source}
+                  vendorName={cand.source_vendor?.name}
+                />
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Owner agency</dt>
+              <dd className="text-[var(--text-primary)]">
+                {cand.owner_vendor?.name || 'My agency'}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Email</dt>
+              <dd className="font-mono text-[12px] text-[var(--text-primary)]">
+                {contacts?.email || '—'}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Phone</dt>
+              <dd className="font-mono text-[12px] text-[var(--text-primary)]">
+                {contacts?.phone || '—'}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">LinkedIn</dt>
+              <dd className="truncate max-w-[180px] text-[12px] text-[var(--text-secondary)]">
+                {contacts?.linkedin_url || '—'}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Resume SHA-256</dt>
+              <dd className="font-mono text-[12px] text-[var(--text-tertiary)]">
+                {cand.resume_hash ? cand.resume_hash.slice(0, 10) : '—'}
+              </dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
 
       {/* Inspect Match Evidence Modal */}
       <Dialog
         open={Boolean(evidenceTarget)}
         onClose={() => setEvidenceTarget(null)}
-        title="Explainable Match Evidence Breakdown"
-        maxWidth="max-w-xl"
+        title="Match evidence"
       >
         {evidenceTarget && (
           <div className="space-y-4">
@@ -1217,15 +1285,14 @@ export const VendorCandidateDetailPage: React.FC = () => {
       <Dialog
         open={Boolean(submitTarget)}
         onClose={() => setSubmitTarget(null)}
-        title="Submit Candidate to Requirement"
+        title="Submit candidate to requirement"
         description="Verify match evidence and add submission notes before submitting."
-        maxWidth="max-w-xl"
       >
         {submitTarget && (
           <div className="space-y-4">
             <MatchEvidencePanel match={submitTarget} />
             <Textarea
-              label="Vendor Submission Notes"
+              label="Submission notes"
               rows={3}
               value={submitNotes}
               onChange={(e) => setSubmitNotes(e.target.value)}
@@ -1236,7 +1303,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
                 Cancel
               </Button>
               <Button onClick={handleSubmitToRequirement} loading={submitting}>
-                Confirm Submission
+                Confirm submission
               </Button>
             </div>
           </div>
@@ -1258,19 +1325,19 @@ export const VendorCandidateDetailPage: React.FC = () => {
       <Dialog
         open={editing}
         onClose={() => setEditing(false)}
-        title="Edit Candidate Profile"
-        maxWidth="max-w-xl"
+        title="Edit candidate profile"
+        maxWidth="max-w-[640px]"
       >
-        <form onSubmit={handleSave} className="space-y-3.5">
+        <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
-              label="Full Name"
+              label="Full name"
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
             <Input
-              label="Current Title"
+              label="Current title"
               value={currentTitle}
               onChange={(e) => setCurrentTitle(e.target.value)}
             />
@@ -1282,7 +1349,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
               onChange={(e) => setLocation(e.target.value)}
             />
             <Input
-              label="Total Experience (Years)"
+              label="Total experience (years)"
               type="number"
               step="0.5"
               value={expYears}
@@ -1319,7 +1386,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" loading={saving}>
-              Save Changes
+              Save changes
             </Button>
           </div>
         </form>
@@ -1347,13 +1414,13 @@ export const VendorSubmissionsPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="My Agency Submissions"
+        title="Submissions"
         description="Track pipeline stages, scheduled interviews, and withdraw submissions with a reason."
       />
 
-      <div className="max-w-xs">
+      <div className="mb-4 max-w-xs">
         <Select
           value={stage}
           onChange={(e) => {
@@ -1361,10 +1428,10 @@ export const VendorSubmissionsPage: React.FC = () => {
             setPage(1);
           }}
           options={[
-            { value: '', label: 'All Stages' },
+            { value: '', label: 'All stages' },
             { value: 'applied', label: 'Applied' },
-            { value: 'recruiter_review', label: 'Recruiter Review' },
-            { value: 'client_review', label: 'Client Review' },
+            { value: 'recruiter_review', label: 'Recruiter review' },
+            { value: 'client_review', label: 'Client review' },
             { value: 'interviewing', label: 'Interviewing' },
             { value: 'offered', label: 'Offered' },
             { value: 'onboarded', label: 'Onboarded' },
@@ -1381,52 +1448,54 @@ export const VendorSubmissionsPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No submissions recorded yet"
-          description="Submit candidates from a Shared Requirement to track their progress here."
+          description="Submit candidates from a shared requirement to track their progress here."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                <th className="py-3 px-4">Candidate</th>
-                <th className="py-3 px-4">Requirement</th>
-                <th className="py-3 px-4">Stage</th>
-                <th className="py-3 px-4">Compliance</th>
-                <th className="py-3 px-4">Submitted At</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.data.map((sub) => (
-                <tr
-                  key={sub.id}
-                  onClick={() => setDrawerSubId(sub.id)}
-                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                >
-                  <td className="py-3 px-4 font-semibold">
-                    {sub.candidates?.full_name || sub.candidate_id}
-                  </td>
-                  <td className="py-3 px-4">
-                    {sub.requirements?.title || sub.requirement_id}
-                  </td>
-                  <td className="py-3 px-4">
-                    <StageBadge stage={sub.stage} />
-                  </td>
-                  <td className="py-3 px-4">
-                    {sub.is_valid ? (
-                      <Badge tone="emerald">Valid</Badge>
-                    ) : (
-                      <Badge tone="red">Invalid: {sub.invalid_reason}</Badge>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                    {formatLocalDateTime(sub.created_at)}
-                  </td>
+        <div>
+          <div className="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Requirement</th>
+                  <th>Stage</th>
+                  <th>Compliance</th>
+                  <th>Submitted</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.data.map((sub) => (
+                  <tr
+                    key={sub.id}
+                    onClick={() => setDrawerSubId(sub.id)}
+                    className="cursor-pointer"
+                  >
+                    <td className="font-medium text-[var(--text-primary)]">
+                      {sub.candidates?.full_name || sub.candidate_id}
+                    </td>
+                    <td className="text-[var(--text-secondary)]">
+                      {sub.requirements?.title || sub.requirement_id}
+                    </td>
+                    <td>
+                      <StageBadge stage={sub.stage} />
+                    </td>
+                    <td>
+                      {sub.is_valid ? (
+                        <Badge tone="success">Valid</Badge>
+                      ) : (
+                        <Badge tone="danger">Invalid: {sub.invalid_reason}</Badge>
+                      )}
+                    </td>
+                    <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                      {formatLocalDateTime(sub.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       <SubmissionDetailDrawer
@@ -1438,7 +1507,7 @@ export const VendorSubmissionsPage: React.FC = () => {
   );
 };
 
-// 7. Vendor Ratings & Performance Page (3 score cards + shared feedback + Dispute button for vendor_admin)
+// 7. Vendor Ratings & Performance Page
 export const VendorRatingsPage: React.FC = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -1459,7 +1528,6 @@ export const VendorRatingsPage: React.FC = () => {
     enabled: Boolean(profile?.org_id),
   });
 
-  // RLS automatically filters interview_feedback & candidate_quality_feedback to visible_to_vendor = true
   const { data: sharedInterviewFb } = useQuery({
     queryKey: ['vendor_shared_interview_fb', profile?.org_id],
     queryFn: () => fetchInterviewFeedbackList({ page: 1, pageSize: 25 }),
@@ -1501,10 +1569,10 @@ export const VendorRatingsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        title="Ratings & Agency Performance"
-        description="Three-pillar standing (Timing, Quality, Compliance) and client feedback approved for sharing by HireNest HQ."
+        title="Ratings & performance"
+        description="Three-pillar standing (Timing, Quality, Compliance) and client feedback shared by HireNest HQ."
       />
 
       {loadingPerf ? (
@@ -1514,31 +1582,33 @@ export const VendorRatingsPage: React.FC = () => {
       ) : null}
 
       {/* Shared Interview Feedback */}
-      <Card className="p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-          Shared Interview Feedback ({sharedInterviewFb?.data?.length || 0})
+      <div className="space-y-3">
+        <h3 className="text-[16px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Shared interview feedback ({sharedInterviewFb?.data?.length || 0})
         </h3>
         {!sharedInterviewFb?.data?.length ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-[13px] text-[var(--text-secondary)]">
             No interview feedback has been approved for vendor sharing yet.
           </p>
         ) : (
-          <div className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+          <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
             {sharedInterviewFb.data.map((fb) => (
               <div
                 key={fb.id}
                 className="py-3 flex flex-wrap items-start justify-between gap-4"
               >
                 <div className="space-y-1 max-w-2xl">
-                  <div className="font-semibold">
+                  <div className="text-[14px] font-medium text-[var(--text-primary)]">
                     {fb.interviews?.submissions?.candidates?.full_name || 'Candidate'} ·{' '}
-                    {fb.interviews?.submissions?.requirements?.title || 'Requirement'}
+                    <span className="text-[var(--text-secondary)] font-normal">
+                      {fb.interviews?.submissions?.requirements?.title || 'Requirement'}
+                    </span>
                   </div>
-                  <div className="font-mono tabular-nums text-slate-500">
+                  <div className="font-mono tabular-nums text-[12px] text-[var(--text-secondary)]">
                     Overall: {fb.overall_rating}/5 · Skill: {fb.skill_rating}/5 · Comm:{' '}
                     {fb.communication_rating}/5 · Decision: {fb.decision}
                   </div>
-                  <p className="text-slate-700 dark:text-slate-300">{fb.feedback}</p>
+                  <p className="text-[13px] text-[var(--text-primary)]">{fb.feedback}</p>
                 </div>
                 {isVendorAdmin && !fb.excluded_from_score && (
                   <Button
@@ -1553,43 +1623,44 @@ export const VendorRatingsPage: React.FC = () => {
                       setDisputeReason('');
                     }}
                   >
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Dispute Rating
+                    Dispute rating
                   </Button>
                 )}
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Shared Candidate Quality Feedback */}
-      <Card className="p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-          Shared Candidate Quality Feedback ({sharedQualityFb?.data?.length || 0})
+      <div className="space-y-3">
+        <h3 className="text-[16px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Shared candidate quality feedback ({sharedQualityFb?.data?.length || 0})
         </h3>
         {!sharedQualityFb?.data?.length ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-[13px] text-[var(--text-secondary)]">
             No candidate quality ratings have been approved for vendor sharing yet.
           </p>
         ) : (
-          <div className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+          <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
             {sharedQualityFb.data.map((qf) => (
               <div
                 key={qf.id}
                 className="py-3 flex flex-wrap items-start justify-between gap-4"
               >
                 <div className="space-y-1 max-w-2xl">
-                  <div className="font-semibold">
+                  <div className="text-[14px] font-medium text-[var(--text-primary)]">
                     {qf.submissions?.candidates?.full_name || 'Candidate'} ·{' '}
-                    {qf.submissions?.requirements?.title || 'Requirement'}
+                    <span className="text-[var(--text-secondary)] font-normal">
+                      {qf.submissions?.requirements?.title || 'Requirement'}
+                    </span>
                   </div>
-                  <div className="font-mono tabular-nums text-slate-500">
-                    Overall Suitability: {qf.overall_suitability}/5 · JD Align:{' '}
+                  <div className="font-mono tabular-nums text-[12px] text-[var(--text-secondary)]">
+                    Overall suitability: {qf.overall_suitability}/5 · JD align:{' '}
                     {qf.jd_skill_alignment}/5 · Experience: {qf.relevant_experience}/5
                   </div>
                   {qf.comments && (
-                    <p className="text-slate-700 dark:text-slate-300">{qf.comments}</p>
+                    <p className="text-[13px] text-[var(--text-primary)]">{qf.comments}</p>
                   )}
                 </div>
                 {isVendorAdmin && !qf.excluded_from_score && (
@@ -1605,31 +1676,32 @@ export const VendorRatingsPage: React.FC = () => {
                       setDisputeReason('');
                     }}
                   >
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Dispute Rating
+                    Dispute rating
                   </Button>
                 )}
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </div>
 
       <Dialog
         open={Boolean(disputeTarget)}
         onClose={() => setDisputeTarget(null)}
-        title="Raise Rating Dispute (Vendor Admin)"
+        title="Raise rating dispute"
         description="Provide factual evidence (minimum 20 characters) for HireNest Admin review."
       >
         <div className="space-y-4">
-          <div className="rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 text-xs">
-            <span className="font-semibold block">Disputed Feedback:</span>
-            <p className="mt-1 text-slate-600 dark:text-slate-400">
+          <div className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[13px]">
+            <span className="text-[12px] font-medium text-[var(--text-secondary)] block">
+              Disputed feedback
+            </span>
+            <p className="mt-1 text-[var(--text-primary)]">
               {disputeTarget?.summary}
             </p>
           </div>
           <Textarea
-            label="Dispute Reason (Required, min 20 characters)"
+            label="Dispute reason (min 20 characters)"
             rows={4}
             value={disputeReason}
             onChange={(e) => setDisputeReason(e.target.value)}
@@ -1649,7 +1721,7 @@ export const VendorRatingsPage: React.FC = () => {
               loading={disputing}
               disabled={disputeReason.trim().length < 20}
             >
-              Submit Dispute
+              Submit dispute
             </Button>
           </div>
         </div>

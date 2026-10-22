@@ -86,12 +86,10 @@ function RootRedirect() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            Loading HireNestOS...
-          </p>
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] px-6">
+        <div className="w-full max-w-[360px] space-y-3">
+          <div className="h-4 w-24 rounded-[4px] bg-[var(--bg-hover)] animate-pulse" />
+          <div className="h-3 w-48 rounded-[4px] bg-[var(--bg-subtle)] animate-pulse" />
         </div>
       </div>
     );

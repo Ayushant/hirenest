@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit3, Star, Calendar } from 'lucide-react';
 import {
   PageHeader,
-  StatCard,
-  Card,
+  MetricStrip,
   Button,
   Input,
   Select,
   Badge,
+  Tabs,
   TableSkeleton,
   EmptyState,
   ErrorState,
@@ -96,69 +95,94 @@ export const ClientDashboardPage: React.FC = () => {
     enabled: Boolean(profile?.id),
   });
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Client Hiring Workspace"
-        description="Manage your organization's requirements, evaluate shortlisted candidates, and record interview outcomes."
-      />
+  const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="My Open Requirements"
-          value={openReqs?.count ?? 0}
-          sublabel="Active requisitions"
-          onClick={() => navigate('/client/requirements')}
-        />
-        <StatCard
-          label="Candidates Awaiting Review"
-          value={reviewSubs?.count ?? 0}
-          tone={(reviewSubs?.count ?? 0) > 0 ? 'amber' : 'default'}
-          sublabel="In client_review stage"
-          onClick={() => navigate('/client/candidates')}
-        />
-        <StatCard
-          label="Upcoming Interviews"
-          value={upcomingInterviews?.count ?? 0}
-          sublabel="Scheduled rounds"
-          onClick={() => navigate('/client/interviews')}
-        />
-        <StatCard
-          label="Pending Interview Feedback"
-          value={pendingFeedback.length}
-          tone={pendingFeedback.length > 0 ? 'red' : 'default'}
-          sublabel="Mandatory post-round ratings"
-          onClick={() => navigate('/client/interviews')}
-        />
+  return (
+    <div className="space-y-8">
+      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5">
+        <h1 className="type-greeting text-[var(--text-primary)]">
+          Good day, {firstName}
+        </h1>
+        <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          Client hiring overview and items awaiting your review.
+        </p>
       </div>
 
-      {/* Quick Pending Feedback List */}
-      {pendingFeedback.length > 0 && (
-        <Card className="p-5 border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/20 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-red-800 dark:text-red-200">
-              Action Required: Completed Interviews Pending Your Feedback
-            </h3>
-            <Badge tone="red">{pendingFeedback.length} Pending</Badge>
-          </div>
-          <div className="divide-y divide-red-200/60 dark:divide-red-900/40 text-xs">
-            {pendingFeedback.map((pf) => (
-              <div
-                key={pf.interview_id}
-                className="py-2 flex items-center justify-between"
-              >
-                <span>
-                  <strong>{pf.candidate_name}</strong> · {pf.requirement_title} (Round #
-                  {pf.round_number}: {ROUND_LABELS[pf.round_type]})
-                </span>
-                <Button size="sm" onClick={() => navigate('/client/interviews')}>
-                  Complete Rating
-                </Button>
+      {/* Needs attention */}
+      <div className="space-y-2.5">
+        <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Needs attention
+        </h2>
+        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+          {(reviewSubs?.count ?? 0) > 0 && (
+            <div
+              onClick={() => navigate('/client/candidates')}
+              className="flex h-11 items-center justify-between px-4 hover:bg-[var(--bg-hover)] cursor-pointer"
+            >
+              <div className="flex items-center gap-2 text-[13px]">
+                <Badge tone="warning">Candidates awaiting client review</Badge>
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
+              <span className="font-mono tabular-nums text-[13px] font-medium text-[var(--text-primary)]">
+                {reviewSubs?.count ?? 0}
+              </span>
+            </div>
+          )}
+          {pendingFeedback.map((pf) => (
+            <div
+              key={pf.interview_id}
+              onClick={() => navigate('/client/interviews')}
+              className="flex h-11 items-center justify-between px-4 hover:bg-[var(--bg-hover)] cursor-pointer"
+            >
+              <div className="flex items-center gap-2 text-[13px]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)]" />
+                <span className="font-medium text-[var(--text-primary)]">
+                  {pf.candidate_name}
+                </span>
+                <span className="text-[var(--text-secondary)]">
+                  · {pf.requirement_title} (Round {pf.round_number}:{' '}
+                  {ROUND_LABELS[pf.round_type]})
+                </span>
+              </div>
+              <span className="text-[12px] font-medium text-[var(--accent)]">
+                Submit feedback →
+              </span>
+            </div>
+          ))}
+          {(reviewSubs?.count ?? 0) === 0 && pendingFeedback.length === 0 && (
+            <div className="flex h-11 items-center px-4 text-[13px] text-[var(--text-secondary)]">
+              All candidate reviews and interview evaluations are up to date.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 4-Metric Strip */}
+      <MetricStrip
+        items={[
+          {
+            label: 'Open requirements',
+            value: openReqs?.count ?? 0,
+            onClick: () => navigate('/client/requirements'),
+          },
+          {
+            label: 'Awaiting review',
+            value: reviewSubs?.count ?? 0,
+            tone: (reviewSubs?.count ?? 0) > 0 ? 'warning' : 'default',
+            onClick: () => navigate('/client/candidates'),
+          },
+          {
+            label: 'Upcoming interviews',
+            value: upcomingInterviews?.count ?? 0,
+            onClick: () => navigate('/client/interviews'),
+          },
+          {
+            label: 'Pending feedback',
+            value: pendingFeedback.length,
+            tone: pendingFeedback.length > 0 ? 'danger' : 'default',
+            onClick: () => navigate('/client/interviews'),
+          },
+        ]}
+      />
     </div>
   );
 };
@@ -189,21 +213,18 @@ export const ClientRequirementsPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="My Organization's Requirements"
-        description="Author job specifications, manage private internal budgets, and submit requisitions to HireNest HQ."
+        title="Requirements"
+        description="Author job specifications, manage internal budgets, and submit requisitions to HireNest HQ."
         actions={
           isManager ? (
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Create Requirement
-            </Button>
+            <Button onClick={() => setCreateOpen(true)}>Create requirement</Button>
           ) : undefined
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl">
         <Input
           placeholder="Search requirement title..."
           value={search}
@@ -219,11 +240,11 @@ export const ClientRequirementsPage: React.FC = () => {
             setPage(1);
           }}
           options={[
-            { value: '', label: 'All Statuses' },
+            { value: '', label: 'All statuses' },
             { value: 'draft', label: 'Draft' },
-            { value: 'pending_approval', label: 'Pending Approval' },
+            { value: 'pending_approval', label: 'Pending approval' },
             { value: 'open', label: 'Open' },
-            { value: 'on_hold', label: 'On Hold' },
+            { value: 'on_hold', label: 'On hold' },
             { value: 'closed', label: 'Closed' },
             { value: 'filled', label: 'Filled' },
           ]}
@@ -242,49 +263,51 @@ export const ClientRequirementsPage: React.FC = () => {
               ? 'Create a draft requirement and submit it to HireNest HQ for approval.'
               : 'Your hiring manager has not created any requirements yet.'
           }
-          actionLabel={isManager ? 'Create Requirement' : undefined}
+          actionLabel={isManager ? 'Create requirement' : undefined}
           onAction={isManager ? () => setCreateOpen(true) : undefined}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                <th className="py-3 px-4">Requirement Title</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Location & Mode</th>
-                <th className="py-3 px-4 text-right">Vendor Budget</th>
-                <th className="py-3 px-4">Created</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.data.map((req) => (
-                <tr
-                  key={req.id}
-                  onClick={() => navigate(`/client/requirements/${req.id}`)}
-                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                >
-                  <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">
-                    {req.title}
-                  </td>
-                  <td className="py-3 px-4">
-                    <RequirementStatusBadge status={req.status} />
-                  </td>
-                  <td className="py-3 px-4 capitalize text-slate-500">
-                    {req.location} · {req.work_mode}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono tabular-nums">
-                    {formatCurrency(req.vendor_visible_budget, req.currency)}
-                  </td>
-                  <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                    {formatLocalDate(req.created_at)}
-                  </td>
+        <div>
+          <div className="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Location & mode</th>
+                  <th className="text-right">Vendor budget</th>
+                  <th>Created</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.data.map((req) => (
+                  <tr
+                    key={req.id}
+                    onClick={() => navigate(`/client/requirements/${req.id}`)}
+                    className="cursor-pointer"
+                  >
+                    <td className="font-medium text-[var(--text-primary)]">
+                      {req.title}
+                    </td>
+                    <td>
+                      <RequirementStatusBadge status={req.status} />
+                    </td>
+                    <td className="capitalize text-[var(--text-secondary)]">
+                      {req.location} · {req.work_mode}
+                    </td>
+                    <td className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
+                      {formatCurrency(req.vendor_visible_budget, req.currency)}
+                    </td>
+                    <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                      {formatLocalDate(req.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       {isManager && (
@@ -303,7 +326,7 @@ export const ClientRequirementsPage: React.FC = () => {
   );
 };
 
-// 3. Client Requirement Detail Page (with allowed client_manager status actions)
+// 3. Client Requirement Detail Page (2-column 1200px layout)
 export const ClientRequirementDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
@@ -311,6 +334,7 @@ export const ClientRequirementDetailPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const isManager = profile?.role === 'client_manager';
+  const [activeTab, setActiveTab] = useState<'overview'>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [targetStatus, setTargetStatus] = useState<RequirementStatus | null>(null);
   const [statusReason, setStatusReason] = useState('');
@@ -330,8 +354,6 @@ export const ClientRequirementDetailPage: React.FC = () => {
 
   if (isLoading || !req) return <TableSkeleton rows={4} cols={4} />;
 
-  // Section 5.4 & 6.2: Allowed status actions for client_manager:
-  // draft->pending_approval, pending_approval->draft, open<->on_hold, draft/open/on_hold->closed
   const allowedActions: Array<{ to: RequirementStatus; label: string }> = [];
   if (isManager) {
     if (req.status === 'draft') {
@@ -373,29 +395,13 @@ export const ClientRequirementDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1200px]">
       <PageHeader
         title={req.title}
         description={`${req.location} (${req.work_mode}) · ${req.min_experience}–${req.max_experience} yrs · ${req.openings} opening(s)`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <RequirementStatusBadge status={req.status} />
-            {isManager && (
-              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-                <Edit3 className="h-3.5 w-3.5" />
-                Edit JD & Budgets
-              </Button>
-            )}
-          </div>
-        }
-      />
-
-      {allowedActions.length > 0 && (
-        <Card className="p-4 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-slate-600 dark:text-slate-400">
-            Governed Status Actions:
-          </span>
-          <div className="flex flex-wrap gap-2">
             {allowedActions.map((act) => (
               <Button
                 key={act.to}
@@ -409,55 +415,93 @@ export const ClientRequirementDetailPage: React.FC = () => {
                 {act.label}
               </Button>
             ))}
-          </div>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 p-6 space-y-4">
-          <h3 className="text-sm font-semibold">Job Specification</h3>
-          <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
-            {req.description}
-          </p>
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-            <span className="text-xs font-semibold block mb-2">Required Skills</span>
-            <div className="flex flex-wrap gap-1.5">
-              {req.skills.map((s) => (
-                <Badge key={s} tone="indigo">
-                  {s}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 space-y-3 text-xs">
-          <h3 className="text-sm font-semibold">Budget & SLA Summary</h3>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-500">Vendor-Visible Budget:</span>
-              <span className="font-mono tabular-nums font-semibold">
-                {formatCurrency(req.vendor_visible_budget, req.currency)}
-              </span>
-            </div>
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-500">Internal Budget (Never shared with vendors):</span>
-              <span className="font-mono tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">
-                {formatCurrency(financials?.actual_client_budget, req.currency)}
-              </span>
-            </div>
-            {financials?.notes && (
-              <div className="py-2">
-                <span className="text-slate-500 block">Internal Notes:</span>
-                <span>{financials.notes}</span>
-              </div>
+            {isManager && (
+              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                Edit specification
+              </Button>
             )}
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-500">SLA Hours:</span>
-              <span className="font-mono tabular-nums">{req.submission_sla_hours}h</span>
+          </div>
+        }
+      />
+
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        <div className="flex-1 min-w-0 w-full space-y-6">
+          <Tabs
+            tabs={[{ id: 'overview', label: 'Specification' }]}
+            activeTab={activeTab}
+            onChange={() => setActiveTab('overview')}
+          />
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-[12px] font-medium text-[var(--text-secondary)] mb-2">
+                Description
+              </h3>
+              <p className="text-[14px] leading-[22px] text-[var(--text-primary)] whitespace-pre-line">
+                {req.description}
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-[var(--border)]">
+              <h3 className="text-[12px] font-medium text-[var(--text-secondary)] mb-2">
+                Required skills ({req.skills.length})
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {req.skills.map((s) => (
+                  <span
+                    key={s}
+                    className="inline-flex items-center rounded-[6px] border border-[var(--border)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
-        </Card>
+        </div>
+
+        {/* Right key-facts rail (320px) */}
+        <aside className="w-full lg:w-[320px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] pt-6 lg:pt-0 lg:pl-6 space-y-4">
+          <h3 className="text-[12px] font-medium text-[var(--text-secondary)]">
+            Key facts
+          </h3>
+          <dl className="divide-y divide-[var(--border)] text-[13px]">
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Status</dt>
+              <dd><RequirementStatusBadge status={req.status} /></dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Vendor budget</dt>
+              <dd className="font-mono tabular-nums text-[var(--text-primary)]">
+                {formatCurrency(req.vendor_visible_budget, req.currency)}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Internal budget</dt>
+              <dd className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                {formatCurrency(financials?.actual_client_budget, req.currency)}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Submission SLA</dt>
+              <dd className="font-mono tabular-nums text-[var(--text-primary)]">
+                {req.submission_sla_hours}h
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Created</dt>
+              <dd className="font-mono tabular-nums text-[var(--text-secondary)]">
+                {formatLocalDate(req.created_at)}
+              </dd>
+            </div>
+          </dl>
+          {financials?.notes && (
+            <div className="pt-2 border-t border-[var(--border)] text-[12px]">
+              <span className="text-[var(--text-secondary)] block mb-1">Internal notes</span>
+              <p className="text-[var(--text-primary)]">{financials.notes}</p>
+            </div>
+          )}
+        </aside>
       </div>
 
       {isManager && (
@@ -478,11 +522,11 @@ export const ClientRequirementDetailPage: React.FC = () => {
       <Dialog
         open={Boolean(targetStatus)}
         onClose={() => setTargetStatus(null)}
-        title={`Confirm Status Change to ${targetStatus}`}
+        title={`Move requirement to ${targetStatus}`}
       >
         <div className="space-y-4">
           <Textarea
-            label="Reason (Optional)"
+            label="Reason (optional)"
             rows={3}
             value={statusReason}
             onChange={(e) => setStatusReason(e.target.value)}
@@ -501,7 +545,7 @@ export const ClientRequirementDetailPage: React.FC = () => {
   );
 };
 
-// 4. Client Candidates for Review Page (Section 6.2: no contact details, resume on request, match evidence, quality rating)
+// 4. Client Candidates for Review Page
 export const ClientCandidatesReviewPage: React.FC = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -541,13 +585,13 @@ export const ClientCandidatesReviewPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="Candidates Shared for Client Review"
+        title="Candidates for review"
         description="Evaluate shortlisted candidates shared by HireNest HQ. Contact details are managed by HireNest."
       />
 
-      <div className="flex items-center gap-3">
+      <div className="mb-4 max-w-xs">
         <Select
           value={stageFilter}
           onChange={(e) => {
@@ -555,15 +599,14 @@ export const ClientCandidatesReviewPage: React.FC = () => {
             setPage(1);
           }}
           options={[
-            { value: '', label: 'All Shared Stages' },
-            { value: 'client_review', label: 'Client Review' },
+            { value: '', label: 'All shared stages' },
+            { value: 'client_review', label: 'Client review' },
             { value: 'interviewing', label: 'Interviewing' },
             { value: 'offered', label: 'Offered' },
-            { value: 'offer_accepted', label: 'Offer Accepted' },
+            { value: 'offer_accepted', label: 'Offer accepted' },
             { value: 'onboarded', label: 'Onboarded' },
             { value: 'rejected', label: 'Rejected' },
           ]}
-          className="max-w-xs"
         />
       </div>
 
@@ -574,119 +617,120 @@ export const ClientCandidatesReviewPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No candidates shared for review yet"
-          description="HireNest HQ will share shortlisted candidates here once recruiter screening is complete."
+          description="HireNest HQ shares shortlisted candidates here once recruiter screening is complete."
         />
       ) : (
-        <div className="space-y-4">
-          {data.data.map((sub) => (
-            <Card key={sub.id} className="p-5 space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {sub.candidates?.full_name || 'Candidate'}
-                    </h3>
-                    <StageBadge stage={sub.stage} />
-                    <SourceBadge
-                      source={sub.source}
-                      vendorName={sub.organizations?.name}
-                    />
+        <div>
+          <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+            {data.data.map((sub) => (
+              <div key={sub.id} className="py-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-[14px] font-medium text-[var(--text-primary)]">
+                        {sub.candidates?.full_name || 'Candidate'}
+                      </span>
+                      <StageBadge stage={sub.stage} />
+                      <SourceBadge
+                        source={sub.source}
+                        vendorName={sub.organizations?.name}
+                      />
+                    </div>
+                    <p className="text-[13px] text-[var(--text-secondary)]">
+                      {sub.candidates?.current_title || '—'} ·{' '}
+                      <span className="font-mono tabular-nums">
+                        {sub.candidates?.total_experience_years ?? '—'} yrs
+                      </span>{' '}
+                      · Requirement:{' '}
+                      <span className="text-[var(--text-primary)] font-medium">
+                        {sub.requirements?.title}
+                      </span>
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {sub.candidates?.current_title || '—'} ·{' '}
-                    {sub.candidates?.total_experience_years ?? '—'} yrs exp · Requirement:{' '}
-                    <strong className="text-slate-800 dark:text-slate-200">
-                      {sub.requirements?.title}
-                    </strong>
-                  </p>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setEvidenceReqId(sub.requirement_id);
-                      setEvidenceCandId(sub.candidate_id);
-                    }}
-                  >
-                    Match Evidence
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      setQualityTarget({
-                        submissionId: sub.id,
-                        candidateName: sub.candidates?.full_name,
-                      })
-                    }
-                  >
-                    <Star className="h-3.5 w-3.5" />
-                    Rate Candidate Quality
-                  </Button>
-                  {(sub.stage === 'client_review' || sub.stage === 'interviewing') && (
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       size="sm"
-                      variant="secondary"
+                      variant="ghost"
+                      onClick={() => {
+                        setEvidenceReqId(sub.requirement_id);
+                        setEvidenceCandId(sub.candidate_id);
+                      }}
+                    >
+                      Match evidence
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() =>
-                        setScheduleTarget({
+                        setQualityTarget({
                           submissionId: sub.id,
-                          reqTitle: sub.requirements?.title,
-                          reqDesc: sub.requirements?.description,
-                          reqSkills: sub.requirements?.skills,
-                          candSkills: sub.candidates?.skills,
-                          candExp: sub.candidates?.total_experience_years,
-                          candTitle: sub.candidates?.current_title,
+                          candidateName: sub.candidates?.full_name,
                         })
                       }
                     >
-                      <Calendar className="h-3.5 w-3.5" />
-                      Schedule Interview
+                      Rate quality
                     </Button>
-                  )}
-                  <Button size="sm" onClick={() => setDrawerSubId(sub.id)}>
-                    Review & Stage Actions
-                  </Button>
+                    {(sub.stage === 'client_review' || sub.stage === 'interviewing') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setScheduleTarget({
+                            submissionId: sub.id,
+                            reqTitle: sub.requirements?.title,
+                            reqDesc: sub.requirements?.description,
+                            reqSkills: sub.requirements?.skills,
+                            candSkills: sub.candidates?.skills,
+                            candExp: sub.candidates?.total_experience_years,
+                            candTitle: sub.candidates?.current_title,
+                          })
+                        }
+                      >
+                        Schedule interview
+                      </Button>
+                    )}
+                    <Button size="sm" onClick={() => setDrawerSubId(sub.id)}>
+                      Review
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {(sub.candidates?.skills || []).map((sk) => (
+                    <span
+                      key={sk}
+                      className="inline-flex items-center rounded-[6px] border border-[var(--border)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]"
+                    >
+                      {sk}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[var(--text-tertiary)]">
+                  <span>Contact details are managed by HireNest</span>
+                  <span>Resume available on request from HireNest</span>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* Skills & Governed Contact/Resume Notices */}
-              <div className="flex flex-wrap gap-1.5">
-                {(sub.candidates?.skills || []).map((sk) => (
-                  <Badge key={sk} tone="slate">
-                    {sk}
-                  </Badge>
-                ))}
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                <span>Contact details are managed by HireNest</span>
-                <span>Resume available on request from HireNest</span>
-              </div>
-            </Card>
-          ))}
-
-          <Card>
-            <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-          </Card>
+          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
         </div>
       )}
 
-      {/* Match Evidence Dialog */}
       <Dialog
         open={Boolean(evidenceReqId && evidenceCandId)}
         onClose={() => {
           setEvidenceReqId(null);
           setEvidenceCandId(null);
         }}
-        title="Deterministic Match Evidence"
-        maxWidth="max-w-xl"
+        title="Match evidence"
       >
         {activeEvidenceMatch ? (
           <MatchEvidencePanel match={activeEvidenceMatch} />
         ) : (
-          <p className="text-xs text-slate-500">
+          <p className="text-[13px] text-[var(--text-secondary)]">
             Match score record is being calculated or not available for this pair.
           </p>
         )}
@@ -775,27 +819,35 @@ export const ClientInterviewsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="Client Interviews & Structured Feedback"
-        description="Manage interview rounds and complete mandatory post-round evaluations."
+        title="Interviews"
+        description="Manage interview rounds and complete post-round evaluations."
       />
 
       {pendingFeedback.length > 0 && (
-        <Card className="p-5 border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/20 space-y-3">
-          <h3 className="text-xs font-semibold text-red-800 dark:text-red-200">
-            Feedback Pending ({pendingFeedback.length}) — Mandatory after each completed round
-          </h3>
-          <div className="divide-y divide-red-200/60 dark:divide-red-900/40 text-xs">
+        <div className="mb-6 space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[13px] font-medium text-[var(--text-primary)]">
+              Pending feedback ({pendingFeedback.length})
+            </h3>
+          </div>
+          <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
             {pendingFeedback.map((pf) => (
               <div
                 key={pf.interview_id}
-                className="py-2 flex items-center justify-between"
+                className="flex h-10 items-center justify-between px-2"
               >
-                <span>
-                  <strong>{pf.candidate_name}</strong> · {pf.requirement_title} (Round #
-                  {pf.round_number}: {ROUND_LABELS[pf.round_type]})
-                </span>
+                <div className="flex items-center gap-2 text-[13px]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger)]" />
+                  <span className="font-medium text-[var(--text-primary)]">
+                    {pf.candidate_name}
+                  </span>
+                  <span className="text-[var(--text-secondary)]">
+                    · {pf.requirement_title} (Round {pf.round_number}:{' '}
+                    {ROUND_LABELS[pf.round_type]})
+                  </span>
+                </div>
                 <Button
                   size="sm"
                   onClick={() =>
@@ -807,15 +859,15 @@ export const ClientInterviewsPage: React.FC = () => {
                     })
                   }
                 >
-                  Submit Feedback
+                  Submit feedback
                 </Button>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       )}
 
-      <div className="max-w-xs">
+      <div className="mb-4 max-w-xs">
         <Select
           value={status}
           onChange={(e) => {
@@ -823,10 +875,10 @@ export const ClientInterviewsPage: React.FC = () => {
             setPage(1);
           }}
           options={[
-            { value: '', label: 'All Statuses' },
+            { value: '', label: 'All statuses' },
             { value: 'scheduled', label: 'Scheduled' },
             { value: 'completed', label: 'Completed' },
-            { value: 'no_show', label: 'No-Show' },
+            { value: 'no_show', label: 'No-show' },
             { value: 'cancelled', label: 'Cancelled' },
           ]}
         />
@@ -839,98 +891,100 @@ export const ClientInterviewsPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No interviews scheduled yet"
-          description="Schedule an interview round from Candidates for Review."
+          description="Schedule an interview round from Candidates for review."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                <th className="py-3 px-4">Candidate & Requirement</th>
-                <th className="py-3 px-4">Round</th>
-                <th className="py-3 px-4">Scheduled At</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.data.map((iv) => (
-                <tr key={iv.id}>
-                  <td className="py-3 px-4">
-                    <div className="font-semibold">
-                      {iv.submissions?.candidates?.full_name || 'Candidate'}
-                    </div>
-                    <div className="text-[11px] text-slate-500">
-                      {iv.submissions?.requirements?.title || 'Requirement'}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    Round #{iv.round_number} · {ROUND_LABELS[iv.round_type]}
-                  </td>
-                  <td className="py-3 px-4 font-mono tabular-nums">
-                    {formatLocalDateTime(iv.scheduled_at)}
-                  </td>
-                  <td className="py-3 px-4">
-                    <Badge
-                      tone={
-                        iv.status === 'completed'
-                          ? 'emerald'
-                          : iv.status === 'scheduled'
-                            ? 'indigo'
-                            : 'red'
-                      }
-                    >
-                      {iv.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4 text-right space-x-1.5">
-                    {iv.status === 'scheduled' && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleStatusChange(iv.id, 'completed')}
-                        >
-                          Complete
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleStatusChange(iv.id, 'no_show')}
-                        >
-                          No-Show
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleStatusChange(iv.id, 'cancelled')}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                    {iv.status === 'completed' && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          setFeedbackModalTarget({
-                            interviewId: iv.id,
-                            submissionId: iv.submission_id,
-                            roundType: iv.round_type,
-                            candidateName: iv.submissions?.candidates?.full_name,
-                          })
+        <div>
+          <div className="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidate & requirement</th>
+                  <th>Round</th>
+                  <th>Scheduled</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.data.map((iv) => (
+                  <tr key={iv.id}>
+                    <td>
+                      <div className="font-medium text-[var(--text-primary)]">
+                        {iv.submissions?.candidates?.full_name || 'Candidate'}
+                      </div>
+                      <div className="text-[12px] text-[var(--text-secondary)]">
+                        {iv.submissions?.requirements?.title || 'Requirement'}
+                      </div>
+                    </td>
+                    <td className="text-[var(--text-secondary)]">
+                      Round {iv.round_number} · {ROUND_LABELS[iv.round_type]}
+                    </td>
+                    <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                      {formatLocalDateTime(iv.scheduled_at)}
+                    </td>
+                    <td>
+                      <Badge
+                        tone={
+                          iv.status === 'completed'
+                            ? 'success'
+                            : iv.status === 'scheduled'
+                              ? 'neutral'
+                              : 'danger'
                         }
                       >
-                        Submit Feedback
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        {iv.status}
+                      </Badge>
+                    </td>
+                    <td className="text-right space-x-1.5">
+                      {iv.status === 'scheduled' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStatusChange(iv.id, 'completed')}
+                          >
+                            Complete
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStatusChange(iv.id, 'no_show')}
+                          >
+                            No-show
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStatusChange(iv.id, 'cancelled')}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      )}
+                      {iv.status === 'completed' && (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            setFeedbackModalTarget({
+                              interviewId: iv.id,
+                              submissionId: iv.submission_id,
+                              roundType: iv.round_type,
+                              candidateName: iv.submissions?.candidates?.full_name,
+                            })
+                          }
+                        >
+                          Submit feedback
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       {feedbackModalTarget && (
@@ -951,7 +1005,7 @@ export const ClientInterviewsPage: React.FC = () => {
   );
 };
 
-// 6. Client Vendor Summary Page (only if share_vendor_summary_with_clients is true)
+// 6. Client Vendor Summary Page
 export const ClientVendorSummaryPage: React.FC = () => {
   const { data: settings, isLoading: loadingSettings } = useQuery({
     queryKey: ['platform_settings'],
@@ -991,17 +1045,17 @@ export const ClientVendorSummaryPage: React.FC = () => {
   if (!settings?.share_vendor_summary_with_clients) {
     return (
       <EmptyState
-        title="Vendor Summary Not Enabled"
+        title="Vendor summary not enabled"
         description="HireNest HQ has not enabled vendor performance summary sharing for client workspaces."
       />
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="Partner Vendor Summary"
-        description="Overall standing of vendor agencies contributing candidates to your requirements."
+        title="Partner vendor summary"
+        description="Composite standing of vendor agencies contributing candidates to your requirements."
       />
 
       {uniqueVendors.length === 0 ? (
@@ -1010,7 +1064,7 @@ export const ClientVendorSummaryPage: React.FC = () => {
           description="Vendor summaries appear once vendor submissions are shared with your organization."
         />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex flex-wrap gap-2">
             {uniqueVendors.map((v) => (
               <Button

@@ -57,7 +57,6 @@ export const CandidateFormModal: React.FC<{
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Duplicate ownership dialog state
   const [dupOpen, setDupOpen] = useState(false);
   const [dupMatchType, setDupMatchType] = useState<string | null>(null);
 
@@ -101,14 +100,13 @@ export const CandidateFormModal: React.FC<{
 
   const onSubmit = async (values: CandidateFormValues) => {
     if (skills.length === 0) {
-      setSkillsError('Enter at least one skill chip.');
+      setSkillsError('Enter at least one skill.');
       return;
     }
     setSkillsError(null);
     setSubmitting(true);
 
     try {
-      // Step 1: check_candidate_duplicate(email, phone, hash)
       const dupCheck = await checkCandidateDuplicate({
         p_email: values.email || null,
         p_phone: values.phone || null,
@@ -122,7 +120,6 @@ export const CandidateFormModal: React.FC<{
         return;
       }
 
-      // Step 2: create_candidate(...) RPC
       const result = await createCandidateRpc({
         p_full_name: values.full_name,
         p_email: values.email || null,
@@ -143,7 +140,6 @@ export const CandidateFormModal: React.FC<{
         return;
       }
 
-      // Step 3: Upload resume to resumes/<candidate_id>/<ts>-<name> and update candidates.resume_path
       if (resumeFile && resumeHash) {
         await uploadCandidateResume(result.candidate_id, resumeFile, resumeHash);
       }
@@ -171,20 +167,20 @@ export const CandidateFormModal: React.FC<{
       <Dialog
         open={open}
         onClose={onClose}
-        title={isSelfOnboarding ? 'Create My Candidate Profile' : 'Add Candidate to Pool'}
-        description="Computes SHA-256 resume digest in browser and checks ownership deduplication before creation."
-        maxWidth="max-w-2xl"
+        title={isSelfOnboarding ? 'Create candidate profile' : 'Add candidate'}
+        description="Computes SHA-256 resume digest and verifies ownership deduplication."
+        maxWidth="max-w-[640px]"
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Resume Upload + SHA-256 Hash */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3.5 bg-slate-50/50 dark:bg-slate-950/40 space-y-2">
-            <label className="block text-xs font-semibold text-slate-800 dark:text-slate-200">
-              Resume Upload (PDF, DOC, DOCX · Max 10 MB)
+          <div>
+            <label className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)] mb-1">
+              Resume (PDF, DOC, DOCX · Max 10 MB)
             </label>
             <div className="flex items-center gap-3">
-              <label className="inline-flex items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
-                <Upload className="h-3.5 w-3.5 text-indigo-600" />
-                <span>{resumeFile ? resumeFile.name : 'Choose Resume File'}</span>
+              <label className="inline-flex items-center gap-1.5 h-8 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] leading-[20px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)]">
+                <Upload strokeWidth={1.5} className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+                <span>{resumeFile ? resumeFile.name : 'Choose file'}</span>
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx"
@@ -193,27 +189,31 @@ export const CandidateFormModal: React.FC<{
                 />
               </label>
               {resumeHash && (
-                <span className="text-[11px] font-mono tabular-nums text-slate-500 truncate max-w-xs">
-                  SHA-256: {resumeHash.slice(0, 16)}…
+                <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)] truncate max-w-xs">
+                  SHA-256 · {resumeHash.slice(0, 16)}…
                 </span>
               )}
             </div>
-            {fileError && <p className="text-xs text-red-600">{fileError}</p>}
+            {fileError && (
+              <p className="mt-1 text-[12px] leading-[16px] text-[var(--status-danger)]">
+                {fileError}
+              </p>
+            )}
           </div>
 
           <Phase2ComingSoonCard
-            title="AI Resume Parsing (Phase 2)"
-            description="Skills and experience are entered manually in the MVP. Automated resume parsing via Ollama is Phase 2."
+            title="Resume parsing"
+            description="Skills and experience are entered manually in v1."
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
-              label="Full Name"
+              label="Full name"
               {...register('full_name')}
               error={errors.full_name?.message}
             />
             <Input
-              label="Current Title"
+              label="Current title"
               placeholder="e.g. Staff Frontend Engineer"
               {...register('current_title')}
               error={errors.current_title?.message}
@@ -234,7 +234,7 @@ export const CandidateFormModal: React.FC<{
               error={errors.phone?.message}
             />
             <Input
-              label="LinkedIn URL (Optional)"
+              label="LinkedIn URL"
               placeholder="https://linkedin.com/in/..."
               {...register('linkedin_url')}
             />
@@ -248,7 +248,7 @@ export const CandidateFormModal: React.FC<{
               error={errors.location?.message}
             />
             <Input
-              label="Total Experience (Years)"
+              label="Total experience (years)"
               type="number"
               step="0.5"
               {...register('total_experience_years')}
@@ -257,7 +257,7 @@ export const CandidateFormModal: React.FC<{
           </div>
 
           <SkillsChipInput
-            label="Skills (Manual Chip Entry — AI parsing: Phase 2)"
+            label="Skills"
             skills={skills}
             onChange={(next) => {
               setSkills(next);
@@ -267,18 +267,18 @@ export const CandidateFormModal: React.FC<{
           />
 
           <Textarea
-            label="Professional Summary"
+            label="Professional summary"
             rows={3}
-            placeholder="Key domain expertise, notable systems built, availability..."
+            placeholder="Domain expertise, systems built, availability..."
             {...register('summary')}
           />
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" loading={submitting}>
-              {isSelfOnboarding ? 'Complete Profile' : 'Create Candidate'}
+              {isSelfOnboarding ? 'Complete profile' : 'Create candidate'}
             </Button>
           </div>
         </form>

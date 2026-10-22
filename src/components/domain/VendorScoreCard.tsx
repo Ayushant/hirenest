@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Badge } from '../ui/kit';
+import { Badge } from '../ui/kit';
 import { NotEnoughData, ScoreBar } from './DomainBadges';
 import type { VendorPerformanceResult } from '../../types/db';
 
@@ -7,12 +7,12 @@ const QUALITY_DIMENSION_LABELS: Record<
   keyof VendorPerformanceResult['quality']['dimensions'],
   string
 > = {
-  jd_skill_alignment: 'JD Skill Alignment',
-  relevant_experience: 'Relevant Experience',
-  resume_accuracy: 'Resume Accuracy & Completeness',
-  communication: 'Communication & Professionalism',
-  interview_readiness: 'Interview Readiness',
-  overall_suitability: 'Overall Candidate Suitability',
+  jd_skill_alignment: 'JD skill alignment',
+  relevant_experience: 'Relevant experience',
+  resume_accuracy: 'Resume accuracy & completeness',
+  communication: 'Communication & professionalism',
+  interview_readiness: 'Interview readiness',
+  overall_suitability: 'Overall candidate suitability',
 };
 
 export const VendorPerformancePanel: React.FC<{
@@ -24,216 +24,230 @@ export const VendorPerformancePanel: React.FC<{
 
   if (clientSummaryOnly) {
     return (
-      <Card className="p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Overall Vendor Standing
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Governed composite score across timing, quality, and process compliance.
-            </p>
-          </div>
-          <div>
-            {overall.status === 'weights_not_approved' ? (
-              <Badge tone="amber">Pending approval</Badge>
-            ) : overall.status === 'not_enough_data' || overall.score === null ? (
-              <NotEnoughData />
-            ) : (
-              <ScoreBar score={overall.score} />
-            )}
-          </div>
+      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-5 flex items-center justify-between">
+        <div>
+          <h3 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">
+            Overall vendor standing
+          </h3>
+          <p className="text-[13px] leading-[20px] text-[var(--text-secondary)] mt-0.5">
+            Composite score across timing, quality, and process compliance.
+          </p>
         </div>
-      </Card>
+        <div>
+          {overall.status === 'weights_not_approved' ? (
+            <Badge tone="warning">Pending approval</Badge>
+          ) : overall.status === 'not_enough_data' || overall.score === null ? (
+            <NotEnoughData />
+          ) : (
+            <ScoreBar score={overall.score} />
+          )}
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Timing Score Card */}
-        <Card className="p-4 space-y-3">
+    <div className="space-y-6">
+      {/* Three equal columns (Timing #1F4CC4, Quality #4F95DB, Compliance #2A9D8F) + Overall composite */}
+      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-[var(--border)]">
+        {/* 1. Timing */}
+        <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Submission Timing (SLA)
+            <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+              <span className="h-2 w-2 rounded-full bg-[#1F4CC4] shrink-0" />
+              <span>Timing</span>
             </span>
-            <Badge tone={timing.status === 'ok' ? 'emerald' : 'slate'}>
-              {timing.status === 'ok' ? 'Active' : 'Insufficient Sample'}
-            </Badge>
+            <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)]">
+              {timing.evaluable_shares} of {minSample} samples
+            </span>
           </div>
           <div>
             {timing.status === 'not_enough_data' || timing.score === null ? (
-              <NotEnoughData
-                sampleCount={timing.evaluable_shares}
-                minSampleSize={minSample}
-              />
+              <div className="text-[14px] leading-[20px] text-[var(--text-secondary)] py-1">
+                Not enough data
+              </div>
             ) : (
-              <ScoreBar score={timing.score} />
+              <div className="text-[28px] leading-[36px] font-semibold tracking-[-0.01em] font-mono tabular-nums text-[var(--text-primary)]">
+                {Math.round(timing.score)}
+              </div>
             )}
           </div>
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 text-xs">
+          <div className="pt-3 border-t border-[var(--border)] space-y-1.5 text-[13px] leading-[20px]">
             <div className="flex justify-between">
-              <span className="text-slate-500">SLA Met / Evaluable:</span>
-              <span className="font-mono tabular-nums">
+              <span className="text-[var(--text-secondary)]">SLA met / evaluable</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
                 {timing.sla_met} / {timing.evaluable_shares}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">90d SLA Compliance:</span>
-              <span className="font-mono tabular-nums">
+              <span className="text-[var(--text-secondary)]">90d SLA compliance</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
                 {timing.sla_compliance_90d_pct !== null
                   ? `${timing.sla_compliance_90d_pct}%`
                   : 'Not enough data'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Avg Response Speed:</span>
-              <span className="font-mono tabular-nums">
+              <span className="text-[var(--text-secondary)]">Avg response speed</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
                 {timing.avg_response_hours !== null
                   ? `${timing.avg_response_hours}h`
                   : 'Not enough data'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Avg Turnaround:</span>
-              <span className="font-mono tabular-nums">
+              <span className="text-[var(--text-secondary)]">Avg turnaround</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
                 {timing.avg_turnaround_hours !== null
                   ? `${timing.avg_turnaround_hours}h`
                   : 'Not enough data'}
               </span>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* 2. Candidate Quality Card */}
-        <Card className="p-4 space-y-3">
+        {/* 2. Quality */}
+        <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Candidate Quality
+            <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+              <span className="h-2 w-2 rounded-full bg-[#4F95DB] shrink-0" />
+              <span>Quality</span>
             </span>
-            <Badge tone={quality.status === 'ok' ? 'indigo' : 'slate'}>
-              {quality.status === 'ok' ? 'Active' : 'Insufficient Sample'}
-            </Badge>
+            <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)]">
+              {quality.rated_submissions} of {minSample} samples
+            </span>
           </div>
           <div>
             {quality.status === 'not_enough_data' || quality.score === null ? (
-              <NotEnoughData
-                sampleCount={quality.rated_submissions}
-                minSampleSize={minSample}
-              />
+              <div className="text-[14px] leading-[20px] text-[var(--text-secondary)] py-1">
+                Not enough data
+              </div>
             ) : (
-              <ScoreBar score={quality.score} />
+              <div className="text-[28px] leading-[36px] font-semibold tracking-[-0.01em] font-mono tabular-nums text-[var(--text-primary)]">
+                {Math.round(quality.score)}
+              </div>
             )}
           </div>
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 text-xs">
+          <div className="pt-3 border-t border-[var(--border)] space-y-1.5 text-[13px] leading-[20px]">
             <div className="flex justify-between">
-              <span className="text-slate-500">Rated Submissions:</span>
-              <span className="font-mono tabular-nums">
-                {quality.rated_submissions} (min {minSample})
+              <span className="text-[var(--text-secondary)]">Rated submissions</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
+                {quality.rated_submissions}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Avg Quality (1–5):</span>
-              <span className="font-mono tabular-nums">
+              <span className="text-[var(--text-secondary)]">Avg quality (1–5)</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
                 {quality.avg_rating_1_to_5 !== null
                   ? `${quality.avg_rating_1_to_5} / 5`
                   : 'Not enough data'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Avg Interview (1–5):</span>
-              <span className="font-mono tabular-nums">
+              <span className="text-[var(--text-secondary)]">Avg interview (1–5)</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
                 {quality.avg_interview_overall_1_to_5 !== null
                   ? `${quality.avg_interview_overall_1_to_5} / 5`
                   : 'Not enough data'}
               </span>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* 3. Process Compliance Card */}
-        <Card className="p-4 space-y-3">
+        {/* 3. Compliance */}
+        <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Process Compliance
+            <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+              <span className="h-2 w-2 rounded-full bg-[#2A9D8F] shrink-0" />
+              <span>Compliance</span>
             </span>
-            <Badge tone={compliance.status === 'ok' ? 'emerald' : 'slate'}>
-              {compliance.status === 'ok' ? 'Active' : 'Insufficient Sample'}
-            </Badge>
+            <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)]">
+              {compliance.submissions} of {minSample} samples
+            </span>
           </div>
           <div>
             {compliance.status === 'not_enough_data' || compliance.score === null ? (
-              <NotEnoughData
-                sampleCount={compliance.submissions}
-                minSampleSize={minSample}
-              />
+              <div className="text-[14px] leading-[20px] text-[var(--text-secondary)] py-1">
+                Not enough data
+              </div>
             ) : (
-              <ScoreBar score={compliance.score} />
+              <div className="text-[28px] leading-[36px] font-semibold tracking-[-0.01em] font-mono tabular-nums text-[var(--text-primary)]">
+                {Math.round(compliance.score)}
+              </div>
             )}
           </div>
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 text-xs">
+          <div className="pt-3 border-t border-[var(--border)] space-y-1.5 text-[13px] leading-[20px]">
             <div className="flex justify-between">
-              <span className="text-slate-500">Compliant Submissions:</span>
-              <span className="font-mono tabular-nums">
+              <span className="text-[var(--text-secondary)]">Compliant submissions</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
                 {compliance.compliant} / {compliance.submissions}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Min Sample Size:</span>
-              <span className="font-mono tabular-nums">{minSample}</span>
+              <span className="text-[var(--text-secondary)]">Min sample threshold</span>
+              <span className="font-mono tabular-nums text-[var(--text-primary)]">
+                {minSample}
+              </span>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* 4. Overall Score Card */}
-        <Card className="p-4 space-y-3">
+        {/* 4. Composite */}
+        <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Overall Composite
+            <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+              <span className="h-2 w-2 rounded-full bg-[#384959] shrink-0" />
+              <span>Overall composite</span>
             </span>
             {overall.status === 'weights_not_approved' ? (
-              <Badge tone="amber">Pending approval</Badge>
+              <Badge tone="warning">Pending approval</Badge>
             ) : overall.status === 'not_enough_data' ? (
-              <Badge tone="slate">Not enough data</Badge>
+              <Badge tone="neutral">Not enough data</Badge>
             ) : (
-              <Badge tone="emerald">Approved</Badge>
+              <Badge tone="success">Approved</Badge>
             )}
           </div>
           <div>
             {overall.status === 'weights_not_approved' ? (
-              <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
-                Pending approval (Platform weights not yet approved by HQ Admin)
-              </p>
+              <div className="text-[13px] leading-[20px] text-[var(--text-secondary)] py-1">
+                Platform weights pending admin approval
+              </div>
             ) : overall.status === 'not_enough_data' || overall.score === null ? (
-              <NotEnoughData />
+              <div className="text-[14px] leading-[20px] text-[var(--text-secondary)] py-1">
+                Not enough data
+              </div>
             ) : (
-              <ScoreBar score={overall.score} />
+              <div className="text-[28px] leading-[36px] font-semibold tracking-[-0.01em] font-mono tabular-nums text-[var(--text-primary)]">
+                {Math.round(overall.score)}
+              </div>
             )}
           </div>
           {overall.weights && (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 text-xs">
+            <div className="pt-3 border-t border-[var(--border)] space-y-1.5 text-[13px] leading-[20px]">
               <div className="flex justify-between">
-                <span className="text-slate-500">Weights (T / Q / C):</span>
-                <span className="font-mono tabular-nums">
+                <span className="text-[var(--text-secondary)]">Weights (T / Q / C)</span>
+                <span className="font-mono tabular-nums text-[var(--text-primary)]">
                   {overall.weights.timing}% / {overall.weights.quality}% /{' '}
                   {overall.weights.compliance}%
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Weights Status:</span>
-                <span>{overall.weights.approved ? 'Approved' : 'Unapproved'}</span>
+                <span className="text-[var(--text-secondary)]">Weights status</span>
+                <span className="text-[var(--text-primary)]">
+                  {overall.weights.approved ? 'Approved' : 'Unapproved'}
+                </span>
               </div>
             </div>
           )}
-        </Card>
+        </div>
       </div>
 
-      {/* Six Quality Dimensions Breakdown Bars */}
-      <Card className="p-5">
-        <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-3">
-          Candidate Quality Dimensions (1–5 Scale)
+      {/* Six Quality Dimensions Breakdown */}
+      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-5">
+        <h4 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)] mb-4">
+          Quality dimensions (1–5 scale)
         </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3">
           {(
             Object.keys(QUALITY_DIMENSION_LABELS) as Array<
               keyof VendorPerformanceResult['quality']['dimensions']
@@ -244,29 +258,35 @@ export const VendorPerformancePanel: React.FC<{
             return (
               <div
                 key={key}
-                className="rounded border border-slate-200 dark:border-slate-800 p-3 space-y-1.5"
+                className="flex items-center justify-between gap-4 py-1.5 border-b border-[var(--border)]"
               >
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600 dark:text-slate-300 font-medium">
-                    {QUALITY_DIMENSION_LABELS[key]}
-                  </span>
-                  <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100">
-                    {val !== null && val !== undefined ? `${val} / 5` : 'Not enough data'}
-                  </span>
+                <span className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                  {QUALITY_DIMENSION_LABELS[key]}
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {val !== null && val !== undefined ? (
+                    <>
+                      <span className="font-mono tabular-nums text-[13px] leading-[20px] font-medium text-[var(--text-primary)]">
+                        {val} / 5
+                      </span>
+                      <div className="w-14 h-1 rounded-[2px] bg-[var(--track)] overflow-hidden">
+                        <div
+                          className="h-full bg-[#2F63DE]"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                      Not enough data
+                    </span>
+                  )}
                 </div>
-                {pct !== null && (
-                  <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-indigo-600 dark:bg-indigo-500"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

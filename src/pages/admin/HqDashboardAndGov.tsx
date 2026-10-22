@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, UserCheck, Building2, Link2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import {
   PageHeader,
-  StatCard,
-  Card,
+  MetricStrip,
   Button,
   Input,
   Select,
@@ -34,7 +33,12 @@ import { fetchSubmissions } from '../../api/submissions';
 import { getVendorPerformanceRpc } from '../../api/interviews';
 import { useAuth } from '../../auth/AuthProvider';
 import { mapSupabaseError } from '../../lib/errors';
-import { ROLE_LABELS, STAGE_LABELS, REQUIREMENT_STATUS_LABELS, formatLocalDate } from '../../lib/format';
+import {
+  ROLE_LABELS,
+  STAGE_LABELS,
+  REQUIREMENT_STATUS_LABELS,
+  formatLocalDate,
+} from '../../lib/format';
 import { useToast } from '../../components/ui/Toast';
 import type {
   AppRole,
@@ -45,11 +49,12 @@ import type {
   SlaTier,
 } from '../../types/db';
 
-// 1. HQ Dashboard (Admin & Recruiter)
+// 1. HQ Dashboard: Starts with "Needs attention" list -> 4-metric vertical-divider strip -> Breakdown lists
 export const HqDashboardPage: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const prefix = profile?.role === 'admin' ? '/admin' : '/recruiter';
+  const isAdmin = profile?.role === 'admin';
+  const prefix = isAdmin ? '/admin' : '/recruiter';
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin_dashboard_summary'],
@@ -59,10 +64,7 @@ export const HqDashboardPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader
-          title="HQ Operations Dashboard"
-          description="Real-time governance overview across clients, vendors, requirements, and pipelines."
-        />
+        <h1 className="type-greeting text-[var(--text-primary)]">Overview</h1>
         <TableSkeleton rows={4} cols={4} />
       </div>
     );
@@ -77,120 +79,165 @@ export const HqDashboardPage: React.FC = () => {
   const reqByStatus = summary.requirements_by_status || {};
   const subByStage = summary.submissions_by_stage || {};
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="HQ Operations Dashboard"
-        description="Governed overview of organizations, active requirements, candidate sources, and SLA queues."
-      />
+  const attentionItems = [
+    ...(isAdmin
+      ? [
+          {
+            label: 'Pending user approvals',
+            count: summary.pending_users ?? 0,
+            to: '/admin/approvals',
+            tone: (summary.pending_users ?? 0) > 0 ? ('amber' as const) : ('slate' as const),
+          },
+        ]
+      : []),
+    {
+      label: 'Completed interviews awaiting structured feedback',
+      count: summary.interviews_pending_feedback ?? 0,
+      to: `${prefix}/interviews`,
+      tone:
+        (summary.interviews_pending_feedback ?? 0) > 0 ? ('red' as const) : ('slate' as const),
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: 'Open vendor rating disputes',
+            count: summary.open_disputes ?? 0,
+            to: '/admin/disputes',
+            tone: (summary.open_disputes ?? 0) > 0 ? ('amber' as const) : ('slate' as const),
+          },
+        ]
+      : []),
+    {
+      label: 'Open duplicate & ownership flags',
+      count: summary.open_duplicate_flags ?? 0,
+      to: `${prefix}/duplicates`,
+      tone: (summary.open_duplicate_flags ?? 0) > 0 ? ('amber' as const) : ('slate' as const),
+    },
+  ];
 
-      {/* Top Row StatCards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Client Organizations"
-          value={summary.clients ?? 0}
-          sublabel="Active & pending clients"
-          onClick={() =>
-            navigate(profile?.role === 'admin' ? '/admin/organizations?type=client' : `${prefix}/requirements`)
-          }
-        />
-        <StatCard
-          label="Vendor Agencies"
-          value={summary.vendors ?? 0}
-          sublabel="Partner staffing agencies"
-          onClick={() =>
-            navigate(
-              profile?.role === 'admin'
-                ? '/admin/organizations?type=vendor'
-                : `${prefix}/vendor-performance`
-            )
-          }
-        />
-        {profile?.role === 'admin' && (
-          <StatCard
-            label="Pending User Approvals"
-            value={summary.pending_users ?? 0}
-            tone={(summary.pending_users ?? 0) > 0 ? 'amber' : 'default'}
-            sublabel="Awaiting org & role assignment"
-            onClick={() => navigate('/admin/approvals')}
-          />
-        )}
-        <StatCard
-          label="Open Duplicate Flags"
-          value={summary.open_duplicate_flags ?? 0}
-          tone={(summary.open_duplicate_flags ?? 0) > 0 ? 'amber' : 'default'}
-          sublabel="Require ownership review"
-          onClick={() => navigate(`${prefix}/duplicates`)}
-        />
-        {profile?.role === 'admin' && (
-          <StatCard
-            label="Open Rating Disputes"
-            value={summary.open_disputes ?? 0}
-            tone={(summary.open_disputes ?? 0) > 0 ? 'red' : 'default'}
-            sublabel="Vendor rating disputes"
-            onClick={() => navigate('/admin/disputes')}
-          />
-        )}
-        <StatCard
-          label="Interviews Pending Feedback"
-          value={summary.interviews_pending_feedback ?? 0}
-          tone={(summary.interviews_pending_feedback ?? 0) > 0 ? 'red' : 'default'}
-          sublabel="Completed rounds awaiting ratings"
-          onClick={() => navigate(`${prefix}/interviews`)}
-        />
+  return (
+    <div className="space-y-8">
+      {/* Workspace Dashboard Header Band (Sky 50 + 24px storm-blue dot grid at 8% opacity) */}
+      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5">
+        <h1 className="type-greeting text-[var(--text-primary)]">
+          {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}` : 'Operations'}
+        </h1>
+        <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          Governed overview across client requisitions, vendor SLAs, and pipeline stages.
+        </p>
       </div>
 
-      {/* Breakdown Grids */}
+      {/* 1. Needs attention */}
+      <section className="space-y-2.5">
+        <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Needs attention
+        </h2>
+        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+          {attentionItems.map((item) => (
+            <div
+              key={item.label}
+              onClick={() => navigate(item.to)}
+              className="h-11 px-4 flex items-center justify-between text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <Badge tone={item.tone}>{item.label}</Badge>
+              <div className="flex items-center gap-4">
+                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                  {item.count}
+                </span>
+                <span className="text-[12px] leading-[16px] text-[var(--accent)] font-medium">
+                  Review →
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 2. Single row of 4 plain metrics separated by vertical dividers */}
+      <MetricStrip
+        items={[
+          {
+            label: 'Client organizations',
+            value: summary.clients ?? 0,
+            onClick: () =>
+              navigate(isAdmin ? '/admin/organizations' : `${prefix}/requirements`),
+          },
+          {
+            label: 'Vendor agencies',
+            value: summary.vendors ?? 0,
+            onClick: () =>
+              navigate(isAdmin ? '/admin/organizations' : `${prefix}/vendor-performance`),
+          },
+          {
+            label: 'Open requirements',
+            value: reqByStatus.open ?? 0,
+            onClick: () => navigate(`${prefix}/requirements?status=open`),
+          },
+          {
+            label: 'Active interviews',
+            value: subByStage.interviewing ?? 0,
+            onClick: () => navigate(`${prefix}/submissions?stage=interviewing`),
+          },
+        ]}
+      />
+
+      {/* 3. Breakdown tables */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="p-5 space-y-3">
-          <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-            Candidates by Source
+        <div className="space-y-2.5">
+          <h3 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Candidates by source
           </h3>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
             {(['vendor', 'direct', 'internal'] as const).map((src) => (
               <div
                 key={src}
                 onClick={() => navigate(`${prefix}/candidates?source=${src}`)}
-                className="py-2.5 flex items-center justify-between cursor-pointer hover:text-indigo-600"
+                className="h-11 px-4 flex items-center justify-between text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)]"
               >
-                <span className="capitalize">
-                  {src === 'internal' ? 'HireNest Sourced' : src === 'direct' ? 'Direct Applicant' : 'Vendor Sourced'}
+                <span className="text-[var(--text-primary)]">
+                  {src === 'internal'
+                    ? 'HireNest'
+                    : src === 'direct'
+                      ? 'Direct'
+                      : 'Vendor'}
                 </span>
-                <span className="font-mono tabular-nums font-semibold">
+                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
                   {candBySource[src] ?? 0}
                 </span>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
 
-        <Card className="p-5 space-y-3">
-          <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-            Requirements by Status
+        <div className="space-y-2.5">
+          <h3 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Requirements by status
           </h3>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
             {(
-              ['draft', 'pending_approval', 'open', 'on_hold', 'closed', 'filled'] as const
+              ['open', 'pending_approval', 'draft', 'on_hold', 'filled', 'closed'] as const
             ).map((st) => (
               <div
                 key={st}
                 onClick={() => navigate(`${prefix}/requirements?status=${st}`)}
-                className="py-2 flex items-center justify-between cursor-pointer hover:text-indigo-600"
+                className="h-11 px-4 flex items-center justify-between text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)]"
               >
-                <span>{REQUIREMENT_STATUS_LABELS[st]}</span>
-                <span className="font-mono tabular-nums font-semibold">
+                <span className="text-[var(--text-primary)]">
+                  {REQUIREMENT_STATUS_LABELS[st]}
+                </span>
+                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
                   {reqByStatus[st] ?? 0}
                 </span>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
 
-        <Card className="p-5 space-y-3">
-          <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-            Submissions by Pipeline Stage
+        <div className="space-y-2.5">
+          <h3 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Submissions by stage
           </h3>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs max-h-60 overflow-y-auto">
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
             {(
               [
                 'applied',
@@ -198,31 +245,28 @@ export const HqDashboardPage: React.FC = () => {
                 'client_review',
                 'interviewing',
                 'offered',
-                'offer_accepted',
                 'onboarded',
-                'rejected',
-                'withdrawn',
               ] as const
             ).map((stage) => (
               <div
                 key={stage}
                 onClick={() => navigate(`${prefix}/submissions?stage=${stage}`)}
-                className="py-2 flex items-center justify-between cursor-pointer hover:text-indigo-600"
+                className="h-11 px-4 flex items-center justify-between text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)]"
               >
-                <span>{STAGE_LABELS[stage]}</span>
-                <span className="font-mono tabular-nums font-semibold">
+                <span className="text-[var(--text-primary)]">{STAGE_LABELS[stage]}</span>
+                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
                   {subByStage[stage] ?? 0}
                 </span>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
 };
 
-// 2. Admin Approvals Page (pending profiles -> Approve dialog: pick or create org, pick role -> admin_assign_user)
+// 2. Admin Approvals Page
 export const AdminApprovalsPage: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -286,7 +330,7 @@ export const AdminApprovalsPage: React.FC = () => {
       });
 
       toast({
-        title: 'User approved and activated',
+        title: 'User approved',
         description: `${selectedUser.full_name} assigned as ${ROLE_LABELS[assignRole]}.`,
         tone: 'success',
       });
@@ -314,7 +358,7 @@ export const AdminApprovalsPage: React.FC = () => {
         p_status: 'suspended',
       });
       toast({
-        title: 'Account rejected and suspended',
+        title: 'Account suspended',
         description: u.email,
         tone: 'info',
       });
@@ -332,8 +376,8 @@ export const AdminApprovalsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Pending User Approvals"
-        description="Verify company sign-ups, provision or assign organizations, and activate role access."
+        title="Approvals"
+        description="Verify company sign-ups, assign organizations, and activate role access."
       />
 
       {isLoading ? (
@@ -343,39 +387,40 @@ export const AdminApprovalsPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No pending sign-ups"
-          description="All vendor agency and hiring client registrations have been processed."
+          description="New vendor agency and hiring client registrations will appear here for verification."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Full Name</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Requested Intent</th>
-                  <th className="py-3 px-4">Requested Company</th>
-                  <th className="py-3 px-4">Registered</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Intent</th>
+                  <th>Requested company</th>
+                  <th>Registered</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <tbody>
                 {data.data.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">
-                      {u.full_name}
+                  <tr key={u.id}>
+                    <td className="font-medium">{u.full_name}</td>
+                    <td className="font-mono text-[12px] text-[var(--text-secondary)]">
+                      {u.email}
                     </td>
-                    <td className="py-3 px-4 font-mono">{u.email}</td>
-                    <td className="py-3 px-4 capitalize">
+                    <td>
                       <Badge tone="amber">{u.requested_role || 'pending'}</Badge>
                     </td>
-                    <td className="py-3 px-4">{u.requested_company || '—'}</td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
+                    <td className="text-[var(--text-secondary)]">
+                      {u.requested_company || '—'}
+                    </td>
+                    <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                       {formatLocalDate(u.created_at)}
                     </td>
-                    <td className="py-3 px-4 text-right space-x-2">
+                    <td className="text-right space-x-1.5">
                       <Button size="sm" onClick={() => handleOpenApprove(u)}>
-                        <UserCheck className="h-3.5 w-3.5" />
                         Approve
                       </Button>
                       <Button
@@ -391,38 +436,32 @@ export const AdminApprovalsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-          <Pagination
-            page={page}
-            totalCount={data.count}
-            onPageChange={setPage}
-          />
-        </Card>
+          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
+        </div>
       )}
 
       {/* Approve User Modal */}
       <Dialog
         open={Boolean(selectedUser)}
         onClose={() => setSelectedUser(null)}
-        title="Approve & Assign User"
+        title="Approve & assign user"
         description={
-          selectedUser
-            ? `${selectedUser.full_name} (${selectedUser.email})`
-            : ''
+          selectedUser ? `${selectedUser.full_name} · ${selectedUser.email}` : ''
         }
       >
         <div className="space-y-4">
           <Select
-            label="Assign Role"
+            label="Role"
             value={assignRole}
             onChange={(e) => setAssignRole(e.target.value as AppRole)}
             options={[
-              { value: 'client_manager', label: 'Client Hiring Manager' },
-              { value: 'client_member', label: 'Client Interview Panel' },
-              { value: 'vendor_admin', label: 'Vendor Agency Admin' },
-              { value: 'vendor_recruiter', label: 'Vendor Recruiter' },
-              { value: 'recruiter', label: 'HireNest Internal Recruiter' },
-              { value: 'admin', label: 'HireNest Admin' },
-              { value: 'candidate', label: 'Direct Candidate' },
+              { value: 'client_manager', label: 'Client hiring manager' },
+              { value: 'client_member', label: 'Client interview panel' },
+              { value: 'vendor_admin', label: 'Vendor agency admin' },
+              { value: 'vendor_recruiter', label: 'Vendor recruiter' },
+              { value: 'recruiter', label: 'HireNest recruiter' },
+              { value: 'admin', label: 'HireNest admin' },
+              { value: 'candidate', label: 'Direct candidate' },
             ]}
           />
 
@@ -433,7 +472,7 @@ export const AdminApprovalsPage: React.FC = () => {
               variant={orgMode === 'existing' ? 'primary' : 'outline'}
               onClick={() => setOrgMode('existing')}
             >
-              Pick Existing Organization
+              Existing organization
             </Button>
             <Button
               type="button"
@@ -441,7 +480,7 @@ export const AdminApprovalsPage: React.FC = () => {
               variant={orgMode === 'new' ? 'primary' : 'outline'}
               onClick={() => setOrgMode('new')}
             >
-              Create New Organization
+              New organization
             </Button>
           </div>
 
@@ -459,21 +498,21 @@ export const AdminApprovalsPage: React.FC = () => {
               ]}
             />
           ) : (
-            <div className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+            <div className="space-y-3 rounded-[6px] border border-[var(--border)] p-3 bg-[var(--bg-subtle)]">
               <Input
-                label="New Organization Name"
+                label="New organization name"
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
-                placeholder="Company legal or brand name"
+                placeholder="Legal or brand name"
               />
               <Select
-                label="Organization Type"
+                label="Organization type"
                 value={newOrgType}
                 onChange={(e) => setNewOrgType(e.target.value as OrgType)}
                 options={[
-                  { value: 'client', label: 'Hiring Client' },
-                  { value: 'vendor', label: 'Vendor Agency' },
-                  { value: 'internal', label: 'HireNest Internal' },
+                  { value: 'client', label: 'Hiring client' },
+                  { value: 'vendor', label: 'Vendor agency' },
+                  { value: 'internal', label: 'HireNest internal' },
                 ]}
               />
             </div>
@@ -484,7 +523,7 @@ export const AdminApprovalsPage: React.FC = () => {
               Cancel
             </Button>
             <Button onClick={handleApproveConfirm} loading={submitting}>
-              Activate Account
+              Activate account
             </Button>
           </div>
         </div>
@@ -596,11 +635,11 @@ export const AdminOrganizationsPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Organizations"
-        description="Manage Hiring Clients, Vendor Agencies, and Internal HQ entities, SLA tiers, and approval statuses."
+        description="Manage hiring clients, vendor agencies, SLA tiers, and approval statuses."
         actions={
           <Button onClick={() => openModal()}>
-            <Plus className="h-4 w-4" />
-            New Organization
+            <Plus className="h-3.5 w-3.5" />
+            New organization
           </Button>
         }
       />
@@ -618,16 +657,17 @@ export const AdminOrganizationsPage: React.FC = () => {
         }}
       />
 
-      <div className="flex items-center gap-3">
-        <Input
-          placeholder="Filter by organization name..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          className="max-w-xs"
-        />
+      <div className="flex items-center gap-2">
+        <div className="w-64">
+          <Input
+            placeholder="Filter by name..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
         {search && (
           <Button size="sm" variant="ghost" onClick={() => setSearch('')}>
             Clear filters
@@ -642,35 +682,33 @@ export const AdminOrganizationsPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No organizations found"
-          description="Create a new organization to begin assigning users and requirements."
-          actionLabel="New Organization"
+          description="Create an organization to assign users and requirements."
+          actionLabel="New organization"
           onAction={() => openModal()}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Organization</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">SLA Tier</th>
-                  <th className="py-3 px-4">Industry / Domain</th>
-                  <th className="py-3 px-4">Primary Contact</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr>
+                  <th>Organization</th>
+                  <th>Status</th>
+                  <th>SLA tier</th>
+                  <th>Industry & domain</th>
+                  <th>Primary contact</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <tbody>
                 {data.data.map((org) => (
                   <tr
                     key={org.id}
                     onClick={() => navigate(`/admin/organizations/${org.id}`)}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
+                    className="cursor-pointer"
                   >
-                    <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">
-                      {org.name}
-                    </td>
-                    <td className="py-3 px-4">
+                    <td className="font-medium">{org.name}</td>
+                    <td>
                       <Badge
                         tone={
                           org.status === 'approved'
@@ -680,24 +718,24 @@ export const AdminOrganizationsPage: React.FC = () => {
                               : 'red'
                         }
                       >
-                        {org.status}
+                        {org.status.replace('_', ' ')}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 uppercase font-mono text-[11px]">
+                    <td className="font-mono text-[12px] text-[var(--text-secondary)]">
                       {org.sla_tier}
                     </td>
-                    <td className="py-3 px-4 text-slate-500">
+                    <td className="text-[var(--text-secondary)]">
                       {org.industry || '—'} {org.domain ? `· ${org.domain}` : ''}
                     </td>
-                    <td className="py-3 px-4 text-slate-500">
+                    <td className="text-[var(--text-secondary)]">
                       {org.contact_name || '—'}{' '}
                       {org.contact_email ? `(${org.contact_email})` : ''}
                     </td>
                     <td
-                      className="py-3 px-4 text-right"
+                      className="text-right"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Button size="sm" variant="outline" onClick={() => openModal(org)}>
+                      <Button size="sm" variant="ghost" onClick={() => openModal(org)}>
                         Edit
                       </Button>
                     </td>
@@ -707,18 +745,18 @@ export const AdminOrganizationsPage: React.FC = () => {
             </table>
           </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       <Dialog
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingOrg ? 'Edit Organization' : 'Create Organization'}
-        maxWidth="max-w-xl"
+        title={editingOrg ? 'Edit organization' : 'New organization'}
+        maxWidth="max-w-[640px]"
       >
-        <form onSubmit={handleSave} className="space-y-3.5">
+        <form onSubmit={handleSave} className="space-y-4">
           <Input
-            label="Organization Name"
+            label="Organization name"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -740,13 +778,13 @@ export const AdminOrganizationsPage: React.FC = () => {
               onChange={(e) => setStatus(e.target.value as OrgStatus)}
               options={[
                 { value: 'approved', label: 'Approved' },
-                { value: 'pending_review', label: 'Pending Review' },
+                { value: 'pending_review', label: 'Pending review' },
                 { value: 'suspended', label: 'Suspended' },
                 { value: 'rejected', label: 'Rejected' },
               ]}
             />
             <Select
-              label="SLA Tier"
+              label="SLA tier"
               value={slaTier}
               onChange={(e) => setSlaTier(e.target.value as SlaTier)}
               options={[
@@ -769,35 +807,35 @@ export const AdminOrganizationsPage: React.FC = () => {
               placeholder="company.com"
             />
             <Input
-              label="GST Number"
+              label="GST number"
               value={gstNumber}
               onChange={(e) => setGstNumber(e.target.value)}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
-              label="Contact Name"
+              label="Contact name"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
             />
             <Input
-              label="Contact Email"
+              label="Contact email"
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
             />
             <Input
-              label="Contact Phone"
+              label="Contact phone"
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
             />
           </div>
-          <div className="flex justify-end gap-2 pt-3">
+          <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" loading={saving}>
-              Save Organization
+              Save organization
             </Button>
           </div>
         </form>
@@ -806,7 +844,7 @@ export const AdminOrganizationsPage: React.FC = () => {
   );
 };
 
-// 4. Admin Organization Detail Page (Users, Requirements or Candidates/Submissions, Vendor Performance Card)
+// 4. Admin Organization Detail Page
 export const AdminOrganizationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
@@ -851,123 +889,171 @@ export const AdminOrganizationDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title={org.name}
-        description={`${org.type.toUpperCase()} Organization · Status: ${org.status} · SLA Tier: ${org.sla_tier}`}
+        description={`${org.type} organization · Status: ${org.status.replace('_', ' ')} · SLA tier: ${org.sla_tier}`}
       />
 
       {org.type === 'vendor' && vendorPerf && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Vendor Performance Scorecard
-          </h3>
+        <section className="space-y-3">
+          <h2 className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Vendor performance
+          </h2>
           <VendorPerformancePanel performance={vendorPerf} />
-        </div>
+        </section>
       )}
 
       {/* Users in Organization */}
-      <Card className="p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-slate-400" />
-          Organization Users ({usersData?.count || 0})
+      <section className="space-y-2">
+        <h3 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+          Users ({usersData?.count || 0})
         </h3>
         {!usersData?.data.length ? (
-          <p className="text-xs text-slate-500">No users assigned to this organization.</p>
+          <p className="text-[13px] leading-[20px] text-[var(--text-secondary)] py-3 border-y border-[var(--border)]">
+            No users assigned to this organization.
+          </p>
         ) : (
-          <div className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-            {usersData.data.map((u) => (
-              <div key={u.id} className="py-2.5 flex items-center justify-between">
-                <div>
-                  <span className="font-semibold">{u.full_name}</span>
-                  <span className="ml-2 font-mono text-slate-500">{u.email}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge tone="indigo">{ROLE_LABELS[u.role]}</Badge>
-                  <Badge tone={u.status === 'active' ? 'emerald' : 'red'}>{u.status}</Badge>
-                </div>
-              </div>
-            ))}
+          <div className="border-t border-[var(--border)]">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usersData.data.map((u) => (
+                  <tr key={u.id}>
+                    <td className="font-medium">{u.full_name}</td>
+                    <td className="font-mono text-[12px] text-[var(--text-secondary)]">
+                      {u.email}
+                    </td>
+                    <td>{ROLE_LABELS[u.role]}</td>
+                    <td>
+                      <Badge tone={u.status === 'active' ? 'emerald' : 'red'}>
+                        {u.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </Card>
+      </section>
 
       {org.type === 'client' && (
-        <Card className="p-5 space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Client Requirements ({reqsData?.count || 0})
+        <section className="space-y-2">
+          <h3 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+            Client requirements ({reqsData?.count || 0})
           </h3>
           {!reqsData?.data.length ? (
-            <p className="text-xs text-slate-500">No requirements created yet.</p>
+            <p className="text-[13px] leading-[20px] text-[var(--text-secondary)] py-3 border-y border-[var(--border)]">
+              No requirements created yet.
+            </p>
           ) : (
-            <div className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-              {reqsData.data.map((r) => (
-                <div key={r.id} className="py-2.5 flex items-center justify-between">
-                  <Link
-                    to={`/admin/requirements/${r.id}`}
-                    className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                  >
-                    {r.title}
-                  </Link>
-                  <Badge tone="slate">{REQUIREMENT_STATUS_LABELS[r.status]}</Badge>
-                </div>
-              ))}
+            <div className="border-t border-[var(--border)]">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Location</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reqsData.data.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <Link
+                          to={`/admin/requirements/${r.id}`}
+                          className="font-medium text-[var(--text-primary)] hover:text-[var(--accent)]"
+                        >
+                          {r.title}
+                        </Link>
+                      </td>
+                      <td>
+                        <Badge tone={r.status === 'open' ? 'emerald' : 'slate'}>
+                          {REQUIREMENT_STATUS_LABELS[r.status]}
+                        </Badge>
+                      </td>
+                      <td className="text-[var(--text-secondary)]">{r.location}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </Card>
+        </section>
       )}
 
       {org.type === 'vendor' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Owned Candidates ({vendorCandidates?.count || 0})
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <section className="space-y-2">
+            <h3 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+              Vendor candidates ({vendorCandidates?.count || 0})
             </h3>
             {!vendorCandidates?.data.length ? (
-              <p className="text-xs text-slate-500">No candidates in pool.</p>
+              <p className="text-[13px] leading-[20px] text-[var(--text-secondary)] py-3 border-y border-[var(--border)]">
+                No candidates in pool.
+              </p>
             ) : (
-              <div className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <div className="border-y border-[var(--border)] divide-y divide-[var(--border)]">
                 {vendorCandidates.data.map((c) => (
-                  <div key={c.id} className="py-2 flex items-center justify-between">
+                  <div
+                    key={c.id}
+                    className="h-10 px-3 flex items-center justify-between text-[13px] leading-[20px]"
+                  >
                     <Link
                       to={`/admin/candidates/${c.id}`}
-                      className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                      className="font-medium text-[var(--text-primary)] hover:text-[var(--accent)]"
                     >
                       {c.full_name}
                     </Link>
-                    <span className="text-slate-500">{c.current_title || '—'}</span>
+                    <span className="text-[var(--text-secondary)]">
+                      {c.current_title || '—'}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
-          </Card>
+          </section>
 
-          <Card className="p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Vendor Submissions ({vendorSubmissions?.count || 0})
+          <section className="space-y-2">
+            <h3 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+              Vendor submissions ({vendorSubmissions?.count || 0})
             </h3>
             {!vendorSubmissions?.data.length ? (
-              <p className="text-xs text-slate-500">No submissions recorded.</p>
+              <p className="text-[13px] leading-[20px] text-[var(--text-secondary)] py-3 border-y border-[var(--border)]">
+                No submissions recorded.
+              </p>
             ) : (
-              <div className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <div className="border-y border-[var(--border)] divide-y divide-[var(--border)]">
                 {vendorSubmissions.data.map((s) => (
-                  <div key={s.id} className="py-2 flex items-center justify-between">
-                    <span>
-                      {s.candidates?.full_name || 'Candidate'} → {s.requirements?.title || 'Req'}
+                  <div
+                    key={s.id}
+                    className="h-10 px-3 flex items-center justify-between text-[13px] leading-[20px]"
+                  >
+                    <span className="truncate">
+                      {s.candidates?.full_name || 'Candidate'} →{' '}
+                      {s.requirements?.title || 'Requirement'}
                     </span>
-                    <Badge tone="indigo">{STAGE_LABELS[s.stage]}</Badge>
+                    <Badge tone="slate">{STAGE_LABELS[s.stage]}</Badge>
                   </div>
                 ))}
               </div>
             )}
-          </Card>
+          </section>
         </div>
       )}
     </div>
   );
 };
 
-// 5. Admin Users Page (list with role & org filters, admin_assign_user, admin_link_candidate_account)
+// 5. Admin Users Page
 export const AdminUsersPage: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -984,7 +1070,6 @@ export const AdminUsersPage: React.FC = () => {
   );
   const [saving, setSaving] = useState(false);
 
-  // Link candidate account modal (admin_link_candidate_account)
   const [linkModalUser, setLinkModalUser] = useState<Profile | null>(null);
   const [linkCandidateId, setLinkCandidateId] = useState('');
   const [linking, setLinking] = useState(false);
@@ -1015,7 +1100,7 @@ export const AdminUsersPage: React.FC = () => {
         p_org_id: nextOrgId || null,
         p_status: nextStatus,
       });
-      toast({ title: 'User role & status updated', tone: 'success' });
+      toast({ title: 'User updated', tone: 'success' });
       setEditingUser(null);
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
     } catch (err) {
@@ -1038,7 +1123,7 @@ export const AdminUsersPage: React.FC = () => {
         p_user_id: linkModalUser.id,
       });
       toast({
-        title: 'Candidate profile linked to user account',
+        title: 'Candidate profile linked',
         tone: 'success',
       });
       setLinkModalUser(null);
@@ -1057,51 +1142,58 @@ export const AdminUsersPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Users & Role Governance"
+        title="Users"
         description="Assign workspace roles, organization memberships, account statuses, and candidate profile links."
       />
 
       {/* Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <Input
-          placeholder="Search by full name..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Select
-          value={roleFilter}
-          onChange={(e) => {
-            setRoleFilter(e.target.value as AppRole | '');
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Roles' },
-            { value: 'admin', label: 'HQ Admin' },
-            { value: 'recruiter', label: 'HQ Recruiter' },
-            { value: 'client_manager', label: 'Client Hiring Manager' },
-            { value: 'client_member', label: 'Client Member' },
-            { value: 'vendor_admin', label: 'Vendor Admin' },
-            { value: 'vendor_recruiter', label: 'Vendor Recruiter' },
-            { value: 'candidate', label: 'Direct Candidate' },
-            { value: 'pending', label: 'Pending' },
-          ]}
-        />
-        <Select
-          value={orgFilter}
-          onChange={(e) => {
-            setOrgFilter(e.target.value);
-            setPage(1);
-          }}
-          options={[
-            { value: '', label: 'All Organizations' },
-            ...(orgsData?.data || []).map((o) => ({ value: o.id, label: o.name })),
-          ]}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-56">
+          <Input
+            placeholder="Search by full name..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="w-48">
+          <Select
+            value={roleFilter}
+            onChange={(e) => {
+              setRoleFilter(e.target.value as AppRole | '');
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All roles' },
+              { value: 'admin', label: 'HQ admin' },
+              { value: 'recruiter', label: 'HQ recruiter' },
+              { value: 'client_manager', label: 'Client hiring manager' },
+              { value: 'client_member', label: 'Client member' },
+              { value: 'vendor_admin', label: 'Vendor admin' },
+              { value: 'vendor_recruiter', label: 'Vendor recruiter' },
+              { value: 'candidate', label: 'Direct candidate' },
+              { value: 'pending', label: 'Pending' },
+            ]}
+          />
+        </div>
+        <div className="w-52">
+          <Select
+            value={orgFilter}
+            onChange={(e) => {
+              setOrgFilter(e.target.value);
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All organizations' },
+              ...(orgsData?.data || []).map((o) => ({ value: o.id, label: o.name })),
+            ]}
+          />
+        </div>
         {(roleFilter || orgFilter || search) && (
           <Button
+            size="sm"
             variant="ghost"
             onClick={() => {
               setRoleFilter('');
@@ -1122,36 +1214,34 @@ export const AdminUsersPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No matching users"
-          description="Try clearing your role or organization filters."
+          description="Clear your role or organization filters to view all users."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4">Full Name</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Role</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Organization</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Organization</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <tbody>
                 {data.data.map((u) => {
                   const orgName =
                     orgsData?.data.find((o) => o.id === u.org_id)?.name || '—';
                   return (
-                    <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                      <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">
-                        {u.full_name}
+                    <tr key={u.id}>
+                      <td className="font-medium">{u.full_name}</td>
+                      <td className="font-mono text-[12px] text-[var(--text-secondary)]">
+                        {u.email}
                       </td>
-                      <td className="py-3 px-4 font-mono">{u.email}</td>
-                      <td className="py-3 px-4">
-                        <Badge tone="indigo">{ROLE_LABELS[u.role]}</Badge>
-                      </td>
-                      <td className="py-3 px-4">
+                      <td className="text-[var(--text-secondary)]">{ROLE_LABELS[u.role]}</td>
+                      <td>
                         <Badge
                           tone={
                             u.status === 'active'
@@ -1161,27 +1251,26 @@ export const AdminUsersPage: React.FC = () => {
                                 : 'red'
                           }
                         >
-                          {u.status}
+                          {u.status.replace('_', ' ')}
                         </Badge>
                       </td>
-                      <td className="py-3 px-4 text-slate-500">{orgName}</td>
-                      <td className="py-3 px-4 text-right space-x-2">
+                      <td className="text-[var(--text-secondary)]">{orgName}</td>
+                      <td className="text-right space-x-1.5">
                         {u.role === 'candidate' && (
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => {
                               setLinkModalUser(u);
                               setLinkCandidateId('');
                             }}
                           >
-                            <Link2 className="h-3.5 w-3.5" />
-                            Link Profile
+                            Link profile
                           </Button>
                         )}
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
                           onClick={() => {
                             setEditingUser(u);
                             setNextRole(u.role);
@@ -1199,15 +1288,15 @@ export const AdminUsersPage: React.FC = () => {
             </table>
           </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       {/* Manage User Role / Org / Status Modal */}
       <Dialog
         open={Boolean(editingUser)}
         onClose={() => setEditingUser(null)}
-        title="Manage User Role & Status"
-        description={editingUser ? `${editingUser.full_name} (${editingUser.email})` : ''}
+        title="Manage user role & status"
+        description={editingUser ? `${editingUser.full_name} · ${editingUser.email}` : ''}
       >
         <div className="space-y-4">
           <Select
@@ -1215,13 +1304,13 @@ export const AdminUsersPage: React.FC = () => {
             value={nextRole}
             onChange={(e) => setNextRole(e.target.value as AppRole)}
             options={[
-              { value: 'admin', label: 'HQ Admin' },
-              { value: 'recruiter', label: 'HQ Recruiter' },
-              { value: 'client_manager', label: 'Client Hiring Manager' },
-              { value: 'client_member', label: 'Client Member' },
-              { value: 'vendor_admin', label: 'Vendor Admin' },
-              { value: 'vendor_recruiter', label: 'Vendor Recruiter' },
-              { value: 'candidate', label: 'Direct Candidate' },
+              { value: 'admin', label: 'HQ admin' },
+              { value: 'recruiter', label: 'HQ recruiter' },
+              { value: 'client_manager', label: 'Client hiring manager' },
+              { value: 'client_member', label: 'Client member' },
+              { value: 'vendor_admin', label: 'Vendor admin' },
+              { value: 'vendor_recruiter', label: 'Vendor recruiter' },
+              { value: 'candidate', label: 'Direct candidate' },
               { value: 'pending', label: 'Pending' },
             ]}
           />
@@ -1238,14 +1327,14 @@ export const AdminUsersPage: React.FC = () => {
             ]}
           />
           <Select
-            label="Account Status"
+            label="Status"
             value={nextStatus}
             onChange={(e) =>
               setNextStatus(e.target.value as 'active' | 'pending_approval' | 'suspended')
             }
             options={[
               { value: 'active', label: 'Active' },
-              { value: 'pending_approval', label: 'Pending Approval' },
+              { value: 'pending_approval', label: 'Pending approval' },
               { value: 'suspended', label: 'Suspended' },
             ]}
           />
@@ -1254,7 +1343,7 @@ export const AdminUsersPage: React.FC = () => {
               Cancel
             </Button>
             <Button onClick={handleSaveUser} loading={saving}>
-              Save Changes
+              Save changes
             </Button>
           </div>
         </div>
@@ -1264,8 +1353,8 @@ export const AdminUsersPage: React.FC = () => {
       <Dialog
         open={Boolean(linkModalUser)}
         onClose={() => setLinkModalUser(null)}
-        title="Link Existing Candidate Record"
-        description={`Link a candidate UUID to ${linkModalUser?.full_name} (${linkModalUser?.email}) via admin_link_candidate_account.`}
+        title="Link candidate record"
+        description={`Link a candidate UUID to ${linkModalUser?.full_name} (${linkModalUser?.email}).`}
       >
         <div className="space-y-4">
           <Input
@@ -1283,7 +1372,7 @@ export const AdminUsersPage: React.FC = () => {
               loading={linking}
               disabled={!linkCandidateId.trim()}
             >
-              Link Candidate Account
+              Link account
             </Button>
           </div>
         </div>

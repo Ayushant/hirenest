@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, FileText, Send, Upload } from 'lucide-react';
 import {
   PageHeader,
-  Card,
   Button,
   Input,
   Badge,
@@ -38,7 +36,7 @@ import {
 import { useAuth } from '../../auth/AuthProvider';
 import { mapSupabaseError } from '../../lib/errors';
 import { computeFileSha256, validateResumeFile } from '../../lib/hash';
-import { formatLocalDate, formatLocalDateTime } from '../../lib/format';
+import { formatLocalDate } from '../../lib/format';
 import { useToast } from '../../components/ui/Toast';
 import type { CandidateMatch, Requirement } from '../../types/db';
 
@@ -115,21 +113,21 @@ export const CandidateJobsForMePage: React.FC = () => {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Welcome to HireNestOS Candidate Portal"
+          title="Welcome to HireNestOS"
           description="Complete your candidate profile and upload your resume to discover matched open jobs."
         />
-        <Card className="p-8 text-center space-y-4 max-w-xl mx-auto">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            Create Your Candidate Profile
+        <div className="py-6 border-y border-[var(--border)] space-y-3 max-w-xl">
+          <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Create your candidate profile
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-[13px] text-[var(--text-secondary)]">
             Enter your experience, skills, and upload your resume. If an agency or recruiter
             previously registered your profile, HireNest HQ will link it to your account.
           </p>
           <Button onClick={() => setOnboardingOpen(true)}>
-            Start Profile Wizard
+            Create my profile
           </Button>
-        </Card>
+        </div>
 
         <CandidateFormModal
           open={onboardingOpen}
@@ -150,10 +148,10 @@ export const CandidateJobsForMePage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="Jobs for Me"
-        description="Open public jobs ranked by deterministic skill and experience alignment with your profile."
+        title="Jobs for me"
+        description="Open public jobs ranked by skill and experience alignment with your profile."
       />
 
       {loadingMatches ? (
@@ -161,69 +159,74 @@ export const CandidateJobsForMePage: React.FC = () => {
       ) : !matchesData?.data.length ? (
         <EmptyState
           title="No matched jobs yet"
-          description="Update your skills on My Profile or browse all open jobs."
+          description="Update your skills on My profile or browse all open jobs."
         />
       ) : (
-        <div className="space-y-4">
-          {matchesData.data.map((m) => {
-            const job = m.requirements;
-            const isApplied = appliedReqIds.has(m.requirement_id);
-            return (
-              <Card key={m.id} className="p-5 space-y-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {job?.title || 'Open Job'}
-                      </h3>
+        <div>
+          <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+            {matchesData.data.map((m, idx) => {
+              const job = m.requirements;
+              const isApplied = appliedReqIds.has(m.requirement_id);
+              return (
+                <div key={m.id} className="py-4 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                          #{idx + 1}
+                        </span>
+                        <h3 className="text-[14px] font-medium text-[var(--text-primary)]">
+                          {job?.title || 'Open job'}
+                        </h3>
+                        {isApplied ? (
+                          <Badge tone="success">Applied</Badge>
+                        ) : (
+                          <span className="text-[12px] text-[var(--text-tertiary)]">
+                            Potential match
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[13px] text-[var(--text-secondary)]">
+                        {job?.location || '—'} ({job?.work_mode || '—'}) ·{' '}
+                        <span className="font-mono tabular-nums">
+                          {job?.min_experience ?? 0}–{job?.max_experience ?? 0} yrs
+                        </span>
+                      </p>
+                    </div>
+
+                    <div>
                       {isApplied ? (
-                        <Badge tone="emerald">Applied</Badge>
+                        <Button size="sm" variant="outline" disabled>
+                          Applied
+                        </Button>
                       ) : (
-                        <Badge tone="indigo">Potential match</Badge>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            setApplyTarget({
+                              requirementId: m.requirement_id,
+                              title: job?.title || 'Job',
+                              match: m,
+                            })
+                          }
+                        >
+                          Apply to job
+                        </Button>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {job?.location || '—'} ({job?.work_mode || '—'}) ·{' '}
-                      {job?.min_experience ?? 0}–{job?.max_experience ?? 0} yrs experience
-                    </p>
                   </div>
 
-                  <div>
-                    {isApplied ? (
-                      <Button size="sm" variant="outline" disabled>
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                        Applied
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          setApplyTarget({
-                            requirementId: m.requirement_id,
-                            title: job?.title || 'Job',
-                            match: m,
-                          })
-                        }
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        Apply to Job
-                      </Button>
-                    )}
-                  </div>
+                  <MatchEvidencePanel match={m} isCandidateView />
                 </div>
+              );
+            })}
+          </div>
 
-                <MatchEvidencePanel match={m} isCandidateView />
-              </Card>
-            );
-          })}
-
-          <Card>
-            <Pagination
-              page={page}
-              totalCount={matchesData.count}
-              onPageChange={setPage}
-            />
-          </Card>
+          <Pagination
+            page={page}
+            totalCount={matchesData.count}
+            onPageChange={setPage}
+          />
         </div>
       )}
 
@@ -231,20 +234,20 @@ export const CandidateJobsForMePage: React.FC = () => {
       <Dialog
         open={Boolean(applyTarget)}
         onClose={() => setApplyTarget(null)}
-        title={`Apply to ${applyTarget?.title || 'Job'}`}
+        title={`Apply to ${applyTarget?.title || 'job'}`}
         description="Confirming creates an active application in the HireNestOS recruitment pipeline."
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-600 dark:text-slate-300">
-            Your profile and resume will be submitted directly to HireNest Recruiters as a
-            <strong> Direct applicant</strong>.
+          <p className="text-[13px] text-[var(--text-secondary)]">
+            Your profile and resume will be submitted directly to HireNest Recruiters as a{' '}
+            <strong className="text-[var(--text-primary)]">Direct</strong> applicant.
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setApplyTarget(null)}>
               Cancel
             </Button>
             <Button onClick={handleConfirmApply} loading={applying}>
-              Confirm Application
+              Confirm application
             </Button>
           </div>
         </div>
@@ -332,13 +335,13 @@ export const CandidateBrowseJobsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="Browse All Open Jobs"
+        title="Browse all open jobs"
         description="Explore all public open positions across HireNest partner companies."
       />
 
-      <div className="flex items-center gap-3 max-w-md">
+      <div className="mb-4 flex items-center gap-3 max-w-md">
         <Input
           placeholder="Search job title..."
           value={search}
@@ -364,57 +367,62 @@ export const CandidateBrowseJobsPage: React.FC = () => {
           description="Check back soon or clear your search filter."
         />
       ) : (
-        <div className="space-y-4">
-          {data.data.map((job) => {
-            const isApplied = appliedReqIds.has(job.id);
-            return (
-              <Card key={job.id} className="p-5 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {job.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5 capitalize">
-                      {job.location} · {job.work_mode} · {job.employment_type.replace(/_/g, ' ')} ·{' '}
-                      {job.min_experience}–{job.max_experience} yrs
-                    </p>
+        <div>
+          <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+            {data.data.map((job) => {
+              const isApplied = appliedReqIds.has(job.id);
+              return (
+                <div key={job.id} className="py-4 space-y-2.5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-[14px] font-medium text-[var(--text-primary)]">
+                        {job.title}
+                      </h3>
+                      <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 capitalize">
+                        {job.location} · {job.work_mode} · {job.employment_type.replace(/_/g, ' ')} ·{' '}
+                        <span className="font-mono tabular-nums">
+                          {job.min_experience}–{job.max_experience} yrs
+                        </span>
+                      </p>
+                    </div>
+                    {isApplied ? (
+                      <Badge tone="success">Applied</Badge>
+                    ) : (
+                      <Button size="sm" onClick={() => setSelectedJob(job)}>
+                        Apply now
+                      </Button>
+                    )}
                   </div>
-                  {isApplied ? (
-                    <Badge tone="emerald">Applied</Badge>
-                  ) : (
-                    <Button size="sm" onClick={() => setSelectedJob(job)}>
-                      Apply Now
-                    </Button>
-                  )}
+                  <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-line line-clamp-2">
+                    {job.description}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {job.skills.map((s) => (
+                      <span
+                        key={s}
+                        className="inline-flex items-center rounded-[6px] border border-[var(--border)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line line-clamp-3">
-                  {job.description}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {job.skills.map((s) => (
-                    <Badge key={s} tone="slate">
-                      {s}
-                    </Badge>
-                  ))}
-                </div>
-              </Card>
-            );
-          })}
+              );
+            })}
+          </div>
 
-          <Card>
-            <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-          </Card>
+          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
         </div>
       )}
 
       <Dialog
         open={Boolean(selectedJob)}
         onClose={() => setSelectedJob(null)}
-        title={selectedJob ? `Apply to ${selectedJob.title}` : 'Apply to Job'}
+        title={selectedJob ? `Apply to ${selectedJob.title}` : 'Apply to job'}
       >
         {selectedJob && (
           <div className="space-y-4">
-            <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line max-h-60 overflow-y-auto">
+            <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-line max-h-60 overflow-y-auto">
               {selectedJob.description}
             </p>
             <div className="flex justify-end gap-2">
@@ -422,7 +430,7 @@ export const CandidateBrowseJobsPage: React.FC = () => {
                 Cancel
               </Button>
               <Button onClick={handleApply} loading={applying}>
-                Confirm Application
+                Confirm application
               </Button>
             </div>
           </div>
@@ -452,9 +460,9 @@ export const CandidateApplicationsPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="My Applications"
+        title="My applications"
         description="Track your application stages, view scheduled interviews, or withdraw an application."
       />
 
@@ -465,46 +473,48 @@ export const CandidateApplicationsPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No applications submitted yet"
-          description="Explore Jobs for Me or Browse All Open Jobs to apply."
+          description="Explore Jobs for me or Browse all open jobs to apply."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                <th className="py-3 px-4">Job Title</th>
-                <th className="py-3 px-4">Application Status</th>
-                <th className="py-3 px-4">Applied Date</th>
-                <th className="py-3 px-4 text-right">Timeline & Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.data.map((sub) => (
-                <tr
-                  key={sub.id}
-                  onClick={() => setDrawerSubId(sub.id)}
-                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                >
-                  <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">
-                    {sub.requirements?.title || 'Job'}
-                  </td>
-                  <td className="py-3 px-4">
-                    <StageBadge stage={sub.stage} candidateView />
-                  </td>
-                  <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
-                    {formatLocalDate(sub.created_at)}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <Button size="sm" variant="outline">
-                      View Timeline / Withdraw
-                    </Button>
-                  </td>
+        <div>
+          <div className="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Job title</th>
+                  <th>Status</th>
+                  <th>Applied</th>
+                  <th className="text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.data.map((sub) => (
+                  <tr
+                    key={sub.id}
+                    onClick={() => setDrawerSubId(sub.id)}
+                    className="cursor-pointer"
+                  >
+                    <td className="font-medium text-[var(--text-primary)]">
+                      {sub.requirements?.title || 'Job'}
+                    </td>
+                    <td>
+                      <StageBadge stage={sub.stage} candidateView />
+                    </td>
+                    <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                      {formatLocalDate(sub.created_at)}
+                    </td>
+                    <td className="text-right">
+                      <Button size="sm" variant="ghost">
+                        Timeline
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
-        </Card>
+        </div>
       )}
 
       <SubmissionDetailDrawer
@@ -635,27 +645,25 @@ export const CandidateProfilePage: React.FC = () => {
     return (
       <EmptyState
         title="No candidate profile yet"
-        description="Go to Jobs for Me to run the profile creation wizard."
+        description="Go to Jobs for me to run the profile creation wizard."
       />
     );
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="max-w-2xl">
       <PageHeader
-        title="My Candidate Profile"
+        title="My profile"
         description="Keep your skills, experience, and resume up to date to improve job match accuracy."
         actions={
           <div className="flex items-center gap-2">
             {myCandidate.resume_path && (
               <Button size="sm" variant="outline" onClick={handleOpenResume}>
-                <FileText className="h-3.5 w-3.5" />
-                View Resume
+                View resume
               </Button>
             )}
-            <label className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-slate-50">
-              <Upload className="h-3.5 w-3.5 text-indigo-600" />
-              <span>Replace Resume</span>
+            <label className="inline-flex h-7 items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[12px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)]">
+              <span>Replace resume</span>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
@@ -667,74 +675,72 @@ export const CandidateProfilePage: React.FC = () => {
         }
       />
 
-      <Card className="p-6">
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Full Name"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-            />
-            <Input
-              label="Current Title"
-              value={currentTitle}
-              onChange={(e) => setCurrentTitle(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            />
-            <Input
-              label="Total Experience (Years)"
-              type="number"
-              step="0.5"
-              value={expYears}
-              onChange={(e) => setExpYears(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Input
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <Input
-              label="Phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-            <Input
-              label="LinkedIn URL"
-              value={linkedin}
-              onChange={(e) => setLinkedin(e.target.value)}
-            />
-          </div>
-
-          <SkillsChipInput
-            label="My Skills (Used for job matching)"
-            skills={skills}
-            onChange={setSkills}
+      <form onSubmit={handleSave} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input
+            label="Full name"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
           />
-
-          <Textarea
-            label="Summary"
-            rows={4}
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
+          <Input
+            label="Current title"
+            value={currentTitle}
+            onChange={(e) => setCurrentTitle(e.target.value)}
           />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input
+            label="Location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+          <Input
+            label="Total experience (years)"
+            type="number"
+            step="0.5"
+            value={expYears}
+            onChange={(e) => setExpYears(e.target.value)}
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Input
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input
+            label="Phone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+          <Input
+            label="LinkedIn URL"
+            value={linkedin}
+            onChange={(e) => setLinkedin(e.target.value)}
+          />
+        </div>
 
-          <div className="flex justify-end">
-            <Button type="submit" loading={saving}>
-              Save Profile Changes
-            </Button>
-          </div>
-        </form>
-      </Card>
+        <SkillsChipInput
+          label="My skills (used for job matching)"
+          skills={skills}
+          onChange={setSkills}
+        />
+
+        <Textarea
+          label="Summary"
+          rows={4}
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+        />
+
+        <div className="flex justify-end pt-2">
+          <Button type="submit" loading={saving}>
+            Save profile
+          </Button>
+        </div>
+      </form>
     </div>
   );
 };

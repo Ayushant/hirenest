@@ -1,5 +1,4 @@
 import React from 'react';
-import { ShieldAlert } from 'lucide-react';
 import { Dialog, Button } from '../ui/kit';
 
 export const DuplicateDialog: React.FC<{
@@ -18,40 +17,34 @@ export const DuplicateDialog: React.FC<{
   <Dialog
     open={open}
     onClose={onClose}
-    title="Duplicate Record Detected"
-    description="Ownership governance safeguard triggered"
+    title="Duplicate record detected"
+    description="Ownership governance safeguard"
   >
     <div className="space-y-4">
-      <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 p-4">
-        <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-        <div className="space-y-1 text-xs text-slate-800 dark:text-slate-200">
-          {isCandidateSelfOnboarding ? (
-            <p className="font-medium">
-              We found an existing profile. HireNest will link it to your account.
-            </p>
-          ) : (
-            <p className="font-medium">
-              HireNest has been notified to review ownership. Nothing was merged.
-            </p>
-          )}
-          {matchType && (
-            <p className="text-slate-600 dark:text-slate-400">
-              Matched attribute: <span className="font-mono">{matchType}</span>
-            </p>
-          )}
-          {reason && (
-            <p className="text-slate-600 dark:text-slate-400">Details: {reason}</p>
-          )}
+      <div className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3.5 space-y-1.5 text-[13px] leading-[20px]">
+        <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-warning)] shrink-0" />
+          <span>
+            {isCandidateSelfOnboarding
+              ? 'We found an existing profile. HireNest will link it to your account.'
+              : 'HireNest has been notified to review ownership. Nothing was merged.'}
+          </span>
         </div>
+        {matchType && (
+          <p className="text-[var(--text-secondary)]">
+            Matched attribute: <span className="font-mono">{matchType}</span>
+          </p>
+        )}
+        {reason && <p className="text-[var(--text-secondary)]">Details: {reason}</p>}
       </div>
 
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+      <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
         HireNestOS never auto-merges candidate profiles or overrides source attribution. An
         ownership review flag has been logged for HireNest HQ.
       </p>
 
       <div className="flex justify-end">
-        <Button onClick={onClose}>Understood</Button>
+        <Button onClick={onClose}>Close</Button>
       </div>
     </div>
   </Dialog>

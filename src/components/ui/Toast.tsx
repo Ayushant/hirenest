@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export type ToastTone = 'success' | 'error' | 'info';
 
@@ -33,7 +33,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setItems((prev) => [...prev, { id, title, description, tone }]);
       window.setTimeout(() => {
         setItems((prev) => prev.filter((item) => item.id !== id));
-      }, 4500);
+      }, 4000);
     },
     []
   );
@@ -47,42 +47,51 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       <div
         aria-live="polite"
-        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none px-4 sm:px-0"
+        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"
       >
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="pointer-events-auto flex items-start gap-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-sm transition-all"
-          >
-            {item.tone === 'success' && (
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            )}
-            {item.tone === 'error' && (
-              <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-            )}
-            {item.tone === 'info' && (
-              <Info className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                {item.title}
-              </p>
-              {item.description && (
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 break-words">
-                  {item.description}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => remove(item.id)}
-              aria-label="Close notification"
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+        {items.map((item) => {
+          const barColor =
+            item.tone === 'error'
+              ? 'bg-[var(--status-danger-dot)]'
+              : item.tone === 'success'
+              ? 'bg-[var(--status-success-dot)]'
+              : 'bg-[var(--status-info-dot)]';
+
+          return (
+            <div
+              key={item.id}
+              style={{ boxShadow: 'var(--shadow-floating)' }}
+              className="pointer-events-auto relative flex items-center justify-between gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] pl-4 pr-3.5 py-2.5 text-[13px] leading-[20px] overflow-hidden transition-opacity duration-150"
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
+              {/* 4px semantic colour bar on the left */}
+              <span className={`absolute inset-y-0 left-0 w-1 ${barColor}`} />
+              <div className="min-w-0 truncate">
+                <span
+                  className={
+                    item.tone === 'error'
+                      ? 'font-medium text-[var(--status-danger)]'
+                      : 'font-medium text-[var(--text-primary)]'
+                  }
+                >
+                  {item.title}
+                </span>
+                {item.description && (
+                  <span className="ml-1.5 text-[var(--text-secondary)]">
+                    {item.description}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => remove(item.id)}
+                aria-label="Close notification"
+                className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-0.5 shrink-0 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );
