@@ -3,20 +3,256 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { LogOut } from 'lucide-react';
+import { Check, Copy, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth, getHomeRouteForRole } from '../../auth/AuthProvider';
-import { Button, Input, Select } from '../../components/ui/kit';
+import { Badge, Button, Input, Select } from '../../components/ui/kit';
 import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../../components/ui/Toast';
+import type { AppRole } from '../../types/db';
+
+export const DEMO_PASSWORD = 'Password123!';
+
+export interface DemoAccountPreset {
+  label: string;
+  roleLabel: string;
+  email: string;
+  role: AppRole;
+  orgName: string;
+  signupIntent: 'candidate' | 'vendor' | 'client';
+}
+
+export const DEMO_ACCOUNTS: DemoAccountPreset[] = [
+  {
+    label: 'HQ Admin',
+    roleLabel: 'admin',
+    email: 'admin@hirenest.test',
+    role: 'admin',
+    orgName: 'HireNest Workforce HQ',
+    signupIntent: 'candidate',
+  },
+  {
+    label: 'HQ Recruiter',
+    roleLabel: 'recruiter',
+    email: 'recruiter@hirenest.test',
+    role: 'recruiter',
+    orgName: 'HireNest Workforce HQ',
+    signupIntent: 'candidate',
+  },
+  {
+    label: 'Client Manager',
+    roleLabel: 'client_manager',
+    email: 'client@hirenest.test',
+    role: 'client_manager',
+    orgName: 'FinCore Technologies',
+    signupIntent: 'client',
+  },
+  {
+    label: 'Vendor Admin',
+    roleLabel: 'vendor_admin',
+    email: 'vendor@hirenest.test',
+    role: 'vendor_admin',
+    orgName: 'Apex Talent Partners',
+    signupIntent: 'vendor',
+  },
+  {
+    label: 'Direct Candidate',
+    roleLabel: 'candidate',
+    email: 'candidate@hirenest.test',
+    role: 'candidate',
+    orgName: 'Direct Applicant',
+    signupIntent: 'candidate',
+  },
+];
+
+export const FULL_DEMO_SEED_SQL = `-- Run once in Supabase Dashboard -> SQL Editor to provision all 5 demo roles + sample data
+create extension if not exists pgcrypto;
+
+do $$
+declare
+  v_client_org uuid := '11111111-1111-4111-8111-111111111101';
+  v_vendor_org uuid := '22222222-2222-4222-8222-222222222202';
+  v_admin_id   uuid;
+  v_rec_id     uuid;
+  v_client_id  uuid;
+  v_vendor_id  uuid;
+  v_cand_uid   uuid;
+  v_req_id     uuid := '33333333-3333-4333-8333-333333333301';
+  v_vcand_id   uuid := '44444444-4444-4444-8444-444444444401';
+  v_dcand_id   uuid := '44444444-4444-4444-8444-444444444402';
+  v_sub_id     uuid := '55555555-5555-4555-8555-555555555501';
+  r record;
+begin
+  -- 1. Confirm & promote any existing personal account to HQ Admin
+  update auth.users
+  set email_confirmed_at = coalesce(email_confirmed_at, now())
+  where email in ('theayushant@gmail.com', 'kayushant@gmai.com', 'kayushant@gmail.com');
+
+  update public.profiles
+  set role = 'admin', status = 'active'
+  where email in ('theayushant@gmail.com', 'kayushant@gmai.com', 'kayushant@gmail.com');
+
+  -- 2. Create Demo Client & Vendor Organizations
+  insert into public.organizations (id, name, type, status, industry, domain, contact_name, contact_email, sla_tier)
+  values
+    (v_client_org, 'FinCore Technologies', 'client', 'approved', 'FinTech', 'fincore.test', 'Riya Kapoor', 'client@hirenest.test', 'enterprise'),
+    (v_vendor_org, 'Apex Talent Partners', 'vendor', 'approved', 'Staffing & Recruiting', 'apextalent.test', 'Vikram Rao', 'vendor@hirenest.test', 'premium')
+  on conflict (id) do update
+  set status = 'approved', name = excluded.name;
+
+  -- 3. Upsert the 5 Demo Auth Users (Password: Password123!)
+  for r in (
+    select * from (values
+      ('admin@hirenest.test',     'Aarav Mehta (HQ Admin)',      'admin'::public.app_role,          null::uuid),
+      ('recruiter@hirenest.test', 'Neha Sharma (HQ Recruiter)',  'recruiter'::public.app_role,      null::uuid),
+      ('client@hirenest.test',    'Riya Kapoor (Client Mgr)',    'client_manager'::public.app_role, v_client_org),
+      ('vendor@hirenest.test',    'Vikram Rao (Vendor Admin)',   'vendor_admin'::public.app_role,   v_vendor_org),
+      ('candidate@hirenest.test', 'Rohan Verma (Candidate)',     'candidate'::public.app_role,      null::uuid)
+    ) as t(email, full_name, app_role, org_id)
+  ) loop
+    select id into v_admin_id from auth.users where email = r.email limit 1;
+
+    if v_admin_id is null then
+      v_admin_id := gen_random_uuid();
+      insert into auth.users (
+        instance_id, id, aud, role, email, encrypted_password,
+        email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+        created_at, updated_at, confirmation_token, recovery_token,
+        email_change_token_new, email_change
+      ) values (
+        '00000000-0000-0000-0000-000000000000',
+        v_admin_id,
+        'authenticated',
+        'authenticated',
+        r.email,
+        extensions.crypt('Password123!', extensions.gen_salt('bf')),
+        now(),
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        jsonb_build_object('full_name', r.full_name, 'signup_intent', 'candidate'),
+        now(),
+        now(),
+        '', '', '', ''
+      );
+
+      insert into auth.identities (
+        id, user_id, provider_id, identity_data, provider,
+        last_sign_in_at, created_at, updated_at
+      ) values (
+        gen_random_uuid(),
+        v_admin_id,
+        v_admin_id::text,
+        jsonb_build_object('sub', v_admin_id::text, 'email', r.email, 'email_verified', true),
+        'email',
+        now(),
+        now(),
+        now()
+      );
+    else
+      update auth.users
+      set encrypted_password = extensions.crypt('Password123!', extensions.gen_salt('bf')),
+          email_confirmed_at = coalesce(email_confirmed_at, now()),
+          confirmation_token = coalesce(confirmation_token, ''),
+          recovery_token = coalesce(recovery_token, ''),
+          email_change_token_new = coalesce(email_change_token_new, ''),
+          email_change = coalesce(email_change, '')
+      where id = v_admin_id;
+    end if;
+
+    insert into public.profiles (id, email, full_name, role, status, org_id)
+    values (v_admin_id, r.email, r.full_name, r.app_role, 'active', r.org_id)
+    on conflict (id) do update
+    set role = excluded.role,
+        status = 'active',
+        org_id = excluded.org_id,
+        full_name = excluded.full_name;
+  end loop;
+
+  select id into v_admin_id  from public.profiles where email = 'admin@hirenest.test' limit 1;
+  select id into v_rec_id    from public.profiles where email = 'recruiter@hirenest.test' limit 1;
+  select id into v_client_id from public.profiles where email = 'client@hirenest.test' limit 1;
+  select id into v_vendor_id from public.profiles where email = 'vendor@hirenest.test' limit 1;
+  select id into v_cand_uid  from public.profiles where email = 'candidate@hirenest.test' limit 1;
+
+  -- 4. Approve Platform Rating Weights
+  update public.platform_settings
+  set timing_weight = 30,
+      quality_weight = 50,
+      compliance_weight = 20,
+      weights_approved = true,
+      weights_approved_by = v_admin_id,
+      share_vendor_summary_with_clients = true
+  where id = 1;
+
+  -- 5. Seed an Open Public Requirement + Vendor Share
+  insert into public.requirements (
+    id, client_org_id, title, description, skills,
+    min_experience, max_experience, location, work_mode, employment_type,
+    openings, vendor_visible_budget, currency, status, is_public,
+    submission_sla_hours, created_by, opened_at
+  ) values (
+    v_req_id,
+    v_client_org,
+    'Senior Distributed Systems Engineer',
+    'Architect and scale low-latency payment ledger services using TypeScript, Node.js, PostgreSQL, and Kubernetes.',
+    array['TypeScript', 'PostgreSQL', 'Node.js', 'Kubernetes'],
+    4, 8, 'Bengaluru', 'hybrid', 'full_time',
+    2, 3200000, 'INR', 'open', true,
+    48, v_admin_id, now()
+  ) on conflict (id) do update
+  set status = 'open', is_public = true;
+
+  insert into public.requirement_vendor_shares (
+    requirement_id, vendor_org_id, shared_by, shared_at, due_at
+  ) values (
+    v_req_id, v_vendor_org, v_admin_id, now(), now() + interval '48 hours'
+  ) on conflict (requirement_id, vendor_org_id) do nothing;
+
+  -- 6. Seed Vendor Candidate + Direct Candidate
+  insert into public.candidates (
+    id, user_id, full_name, current_title, location, total_experience_years,
+    skills, summary, original_source, source_vendor_org_id, owner_vendor_org_id, created_by
+  ) values
+    (
+      v_vcand_id, null, 'Siddharth Nair', 'Staff Backend Engineer', 'Bengaluru', 6,
+      array['TypeScript', 'PostgreSQL', 'Node.js', 'Kubernetes', 'Redis'],
+      '6 years building distributed payment APIs and high-throughput PostgreSQL clusters.',
+      'vendor', v_vendor_org, v_vendor_org, v_vendor_id
+    ),
+    (
+      v_dcand_id, v_cand_uid, 'Rohan Verma', 'Senior Full-Stack Engineer', 'Mumbai', 5,
+      array['TypeScript', 'PostgreSQL', 'Node.js', 'React'],
+      'Direct applicant specializing in TypeScript, Node.js, and PostgreSQL microservices.',
+      'direct', null, null, v_cand_uid
+    )
+  on conflict (id) do update
+  set user_id = excluded.user_id, skills = excluded.skills;
+
+  insert into public.candidate_contacts (candidate_id, email, phone, linkedin_url)
+  values
+    (v_vcand_id, 'siddharth.nair@talent.test', '+919876543210', 'https://linkedin.com/in/siddharth-nair'),
+    (v_dcand_id, 'candidate@hirenest.test', '+919876543211', 'https://linkedin.com/in/rohan-verma')
+  on conflict (candidate_id) do nothing;
+
+  -- 7. Seed a Pipeline Submission in client_review
+  insert into public.submissions (
+    id, requirement_id, candidate_id, source, vendor_org_id,
+    submitted_by, stage, stage_changed_at, shared_with_client_at, notes
+  ) values (
+    v_sub_id, v_req_id, v_vcand_id, 'vendor', v_vendor_org,
+    v_vendor_id, 'client_review', now(), now(),
+    'Strong distributed systems background; verified production Kubernetes + PostgreSQL ownership.'
+  ) on conflict (id) do nothing;
+
+  perform public.recompute_matches(v_req_id);
+end $$;`;
 
 // Shared Two-Column Split Layout for Auth Pages:
 // Left 42% in deep storm-slate #1E2A36 with a subtle sky radial wash at the top, wordmark, and a concise 3-line product statement in #D6E1EC;
-// Right 58% on Storm 50 with a 400px white form card (10px radius, 1px border).
+// Right 58% on Storm 50 with a white form card (10px radius, 1px border).
 const AuthSplitLayout: React.FC<{
   children: React.ReactNode;
   maxWidthClass?: string;
-}> = ({ children, maxWidthClass = 'max-w-[400px]' }) => (
+}> = ({ children, maxWidthClass = 'max-w-[420px]' }) => (
   <div className="min-h-screen flex flex-col lg:flex-row bg-[var(--app-bg)] text-[var(--text-primary)]">
     {/* Left 42% Storm-Slate Panel */}
     <div
@@ -35,7 +271,7 @@ const AuthSplitLayout: React.FC<{
         </span>
       </div>
 
-      <div className="my-12 lg:my-0 max-w-md space-y-3">
+      <div className="my-10 lg:my-0 max-w-md space-y-3">
         <div className="h-[3px] w-4 rounded-full bg-[#88BDF2]" />
         <p className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-white">
           Governed enterprise staffing for HQ, hiring companies, vendor agencies, and candidates.
@@ -50,10 +286,10 @@ const AuthSplitLayout: React.FC<{
       </div>
     </div>
 
-    {/* Right 58% Storm 50 Canvas with 400px White Form Card */}
-    <div className="flex-1 lg:w-[58%] flex items-center justify-center p-6 sm:p-12 bg-[var(--app-bg)]">
+    {/* Right 58% Storm 50 Canvas with White Form Card */}
+    <div className="flex-1 lg:w-[58%] flex items-center justify-center p-6 sm:p-10 bg-[var(--app-bg)]">
       <div
-        className={`w-full ${maxWidthClass} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7 space-y-6 text-left`}
+        className={`w-full ${maxWidthClass} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7 space-y-5 text-left`}
       >
         {children}
       </div>
@@ -102,7 +338,7 @@ GEMINI_API_KEY="<optional-server-only-gemini-key>"`}
   </AuthSplitLayout>
 );
 
-// 2. Sign In Page
+// 2. Sign In Page (with 1-click Demo Role Switcher & SQL Seeder)
 const signInSchema = z.object({
   email: z.string().email('Enter a valid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -115,13 +351,15 @@ export const SignInPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [demoLoadingRole, setDemoLoadingRole] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [showBootstrapHelp, setShowBootstrapHelp] = useState(false);
+  const [showDemoSql, setShowDemoSql] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   const {
     register,
     handleSubmit,
-    watch,
+    setValue,
     formState: { errors },
   } = useForm<SignInValues>({
     resolver: zodResolver(signInSchema) as never,
@@ -131,7 +369,20 @@ export const SignInPage: React.FC = () => {
     },
   });
 
-  const typedEmail = watch('email') || 'your-email@example.com';
+  const completeSignInRedirect = async (userId: string) => {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const returnTo = searchParams.get('returnTo');
+    if (returnTo && returnTo.startsWith('/') && returnTo !== '/signin') {
+      navigate(returnTo, { replace: true });
+    } else {
+      navigate(getHomeRouteForRole(prof?.role, prof?.status), { replace: true });
+    }
+  };
 
   const onSubmit = async (values: SignInValues) => {
     setLoading(true);
@@ -144,18 +395,7 @@ export const SignInPage: React.FC = () => {
       if (error) throw error;
 
       if (data.user) {
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('role, status')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        const returnTo = searchParams.get('returnTo');
-        if (returnTo && returnTo.startsWith('/') && returnTo !== '/signin') {
-          navigate(returnTo, { replace: true });
-        } else {
-          navigate(getHomeRouteForRole(prof?.role, prof?.status), { replace: true });
-        }
+        await completeSignInRedirect(data.user.id);
       }
     } catch (err) {
       const msg = mapSupabaseError(err);
@@ -164,11 +404,92 @@ export const SignInPage: React.FC = () => {
         msg.toLowerCase().includes('confirm') ||
         msg.toLowerCase().includes('invalid login')
       ) {
-        setShowBootstrapHelp(true);
+        setShowDemoSql(true);
       }
       toast({ title: 'Sign in failed', description: msg, tone: 'error' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDemoRoleLogin = async (preset: DemoAccountPreset) => {
+    setValue('email', preset.email, { shouldValidate: true });
+    setValue('password', DEMO_PASSWORD, { shouldValidate: true });
+    setDemoLoadingRole(preset.role);
+    setAuthError(null);
+
+    try {
+      // 1. Try signing in directly with the demo account
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: preset.email,
+        password: DEMO_PASSWORD,
+      });
+
+      if (!error && data.user) {
+        toast({
+          title: `Signed in as ${preset.label}`,
+          description: preset.email,
+          tone: 'success',
+        });
+        await completeSignInRedirect(data.user.id);
+        return;
+      }
+
+      // 2. If not yet seeded, try creating via signUp (works if Confirm Email is disabled)
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: preset.email,
+        password: DEMO_PASSWORD,
+        options: {
+          data: {
+            full_name: preset.label,
+            signup_intent: preset.signupIntent,
+            company_name:
+              preset.signupIntent === 'candidate' ? null : preset.orgName,
+          },
+        },
+      });
+
+      if (!signUpErr && signUpData.session && signUpData.user) {
+        toast({
+          title: `Created & signed in as ${preset.label}`,
+          description:
+            preset.role === 'candidate'
+              ? 'Direct candidate workspace ready.'
+              : 'Run the 1-Click Demo Seed SQL to activate elevated roles & orgs.',
+          tone: 'info',
+        });
+        await completeSignInRedirect(signUpData.user.id);
+        return;
+      }
+
+      // 3. Otherwise show the 1-Click SQL Seed box so all 5 roles are provisioned without email rate limits
+      setShowDemoSql(true);
+      setAuthError(
+        `Demo accounts are not yet seeded in your Supabase project. Copy & run the 1-Click Demo Seed SQL below in Supabase SQL Editor, then click "${preset.label}" again.`
+      );
+    } catch (err) {
+      setShowDemoSql(true);
+      setAuthError(mapSupabaseError(err));
+    } finally {
+      setDemoLoadingRole(null);
+    }
+  };
+
+  const handleCopyDemoSql = async () => {
+    try {
+      await navigator.clipboard.writeText(FULL_DEMO_SEED_SQL);
+      setCopiedSql(true);
+      toast({
+        title: 'Demo Seed SQL copied',
+        description: 'Paste into Supabase Dashboard → SQL Editor and click Run.',
+        tone: 'success',
+      });
+      window.setTimeout(() => setCopiedSql(false), 2500);
+    } catch {
+      toast({
+        title: 'Select and copy the SQL block below',
+        tone: 'info',
+      });
     }
   };
 
@@ -179,9 +500,81 @@ export const SignInPage: React.FC = () => {
           Sign in
         </h1>
         <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-          Enter your credentials to access your workspace.
+          Enter your credentials or select a demo role below to test workspaces.
         </p>
       </div>
+
+      {/* Demo Role Quick-Login Strip */}
+      <div className="rounded-[10px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[12px] leading-[16px] font-medium text-[var(--text-primary)]">
+            Instant demo login (all 5 roles)
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowDemoSql((v) => !v)}
+            className="text-[12px] leading-[16px] font-medium text-[var(--accent)] hover:underline cursor-pointer"
+          >
+            {showDemoSql ? 'Hide seed SQL' : '1-click seed SQL'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+          {DEMO_ACCOUNTS.map((preset) => (
+            <Button
+              key={preset.role}
+              type="button"
+              size="sm"
+              variant="secondary"
+              loading={demoLoadingRole === preset.role}
+              disabled={Boolean(demoLoadingRole) || loading}
+              onClick={() => handleDemoRoleLogin(preset)}
+              className="justify-start text-left"
+            >
+              <span className="truncate">{preset.label}</span>
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between text-[11px] leading-[16px] text-[var(--text-secondary)] font-mono tabular-nums">
+          <span>Password: {DEMO_PASSWORD}</span>
+          <span>*@hirenest.test</span>
+        </div>
+      </div>
+
+      {showDemoSql && (
+        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3.5 space-y-2.5 text-[12px] leading-[16px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium text-[var(--text-primary)]">
+              Seed all 5 roles + sample data (Supabase SQL Editor)
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              onClick={handleCopyDemoSql}
+            >
+              {copiedSql ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy SQL
+                </>
+              )}
+            </Button>
+          </div>
+          <p className="text-[var(--text-secondary)]">
+            Bypasses Supabase SMTP email limits and creates <span className="font-mono">admin</span>, <span className="font-mono">recruiter</span>, <span className="font-mono">client</span>, <span className="font-mono">vendor</span>, and <span className="font-mono">candidate</span> `@hirenest.test` accounts + sample orgs & requirement.
+          </p>
+          <pre className="max-h-40 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] p-2.5 font-mono text-[11px] overflow-auto select-all">
+            {FULL_DEMO_SEED_SQL}
+          </pre>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
@@ -207,22 +600,11 @@ export const SignInPage: React.FC = () => {
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)] shrink-0" />
               <span>{authError}</span>
             </div>
-            {authError.toLowerCase().includes('confirm') && (
-              <p className="text-[var(--text-secondary)]">
-                Confirm email is enabled on your Supabase project. Check your inbox or run the SQL snippet below in the Supabase SQL Editor.
-              </p>
-            )}
           </div>
         )}
 
         <div className="flex items-center justify-between text-[12px] leading-[16px]">
-          <button
-            type="button"
-            onClick={() => setShowBootstrapHelp((v) => !v)}
-            className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] underline cursor-pointer"
-          >
-            {showBootstrapHelp ? 'Hide admin SQL' : 'Admin SQL setup'}
-          </button>
+          <Badge tone="neutral">Real Supabase Auth</Badge>
           <Link
             to="/forgot-password"
             className="text-[var(--accent)] hover:underline"
@@ -230,23 +612,6 @@ export const SignInPage: React.FC = () => {
             Forgot password?
           </Link>
         </div>
-
-        {showBootstrapHelp && (
-          <div className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 space-y-2 text-[12px] leading-[16px]">
-            <p className="font-medium text-[var(--text-primary)]">
-              Confirm email & activate HQ Admin (Supabase SQL Editor):
-            </p>
-            <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] p-2.5 font-mono text-[11px] overflow-x-auto select-all">
-{`update auth.users
-set email_confirmed_at = coalesce(email_confirmed_at, now())
-where email = '${typedEmail.trim()}';
-
-update public.profiles
-set role = 'admin', status = 'active'
-where email = '${typedEmail.trim()}';`}
-            </pre>
-          </div>
-        )}
 
         <Button type="submit" className="w-full" loading={loading}>
           Sign in
@@ -526,7 +891,7 @@ where email = '${awaitingEmailConfirm.email}';`}
               {signUpError.toLowerCase().includes('rate limit') && (
                 <div className="space-y-2 text-[var(--text-secondary)]">
                   <p>
-                    Supabase free-tier SMTP limits confirmation emails to ~2/hour. Disable Confirm email in Authentication → Providers → Email, or create the user in Authentication → Users and run:
+                    Supabase free-tier SMTP limits confirmation emails to ~2/hour. Go back to Sign in and click "1-click seed SQL" to provision all 5 roles directly in SQL Editor, or run:
                   </p>
                   <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] p-2 font-mono text-[11px] overflow-x-auto select-all">
 {`update public.profiles
@@ -758,7 +1123,7 @@ export const PendingApprovalPage: React.FC = () => {
 
       <div className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 space-y-1.5 text-[12px] leading-[16px]">
         <p className="font-medium text-[var(--text-primary)]">
-          First HQ Admin? Run in Supabase SQL Editor:
+          Activate as HQ Admin in Supabase SQL Editor:
         </p>
         <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] p-2 font-mono text-[11px] overflow-x-auto select-all">
 {`update public.profiles
