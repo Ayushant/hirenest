@@ -74,21 +74,29 @@ export const SignInPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showBootstrapHelp, setShowBootstrapHelp] = useState(false);
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<SignInValues>({
     resolver: zodResolver(signInSchema) as never,
+    defaultValues: {
+      email: '',
+      password: '',
+    },
   });
+
+  const typedEmail = watch('email') || 'your-email@example.com';
 
   const onSubmit = async (values: SignInValues) => {
     setLoading(true);
     setAuthError(null);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: values.email,
+        email: values.email.trim(),
         password: values.password,
       });
       if (error) throw error;
@@ -101,7 +109,7 @@ export const SignInPage: React.FC = () => {
           .maybeSingle();
 
         const returnTo = searchParams.get('returnTo');
-        if (returnTo && returnTo.startsWith('/')) {
+        if (returnTo && returnTo.startsWith('/') && returnTo !== '/signin') {
           navigate(returnTo, { replace: true });
         } else {
           navigate(getHomeRouteForRole(prof?.role, prof?.status), { replace: true });
@@ -110,6 +118,12 @@ export const SignInPage: React.FC = () => {
     } catch (err) {
       const msg = mapSupabaseError(err);
       setAuthError(msg);
+      if (
+        msg.toLowerCase().includes('confirm') ||
+        msg.toLowerCase().includes('invalid login')
+      ) {
+        setShowBootstrapHelp(true);
+      }
       toast({ title: 'Sign in failed', description: msg, tone: 'error' });
     } finally {
       setLoading(false);
@@ -150,10 +164,26 @@ export const SignInPage: React.FC = () => {
           />
 
           {authError && (
-            <p className="text-xs text-red-600 dark:text-red-400">{authError}</p>
+            <div className="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300 space-y-1.5">
+              <p className="font-semibold">{authError}</p>
+              {authError.toLowerCase().includes('confirm') && (
+                <p>
+                  Your Supabase project has <strong>Confirm email</strong> enabled. Check your
+                  inbox for the verification link, or run the SQL snippet below in your
+                  Supabase SQL Editor to confirm and activate immediately.
+                </p>
+              )}
+            </div>
           )}
 
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowBootstrapHelp((v) => !v)}
+              className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline cursor-pointer"
+            >
+              {showBootstrapHelp ? 'Hide Admin SQL setup' : 'First-time Admin SQL setup'}
+            </button>
             <Link
               to="/forgot-password"
               className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
@@ -161,6 +191,25 @@ export const SignInPage: React.FC = () => {
               Forgot password?
             </Link>
           </div>
+
+          {showBootstrapHelp && (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900 p-3 space-y-2 text-xs">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
+                Confirm Email & Activate as HQ Admin (Supabase SQL Editor):
+              </p>
+              <pre className="rounded bg-slate-950 text-slate-100 p-2.5 font-mono text-[11px] overflow-x-auto select-all">
+{`-- 1. Confirm email in Supabase Auth
+update auth.users
+set email_confirmed_at = coalesce(email_confirmed_at, now())
+where email = '${typedEmail.trim()}';
+
+-- 2. Activate as HQ Admin in public.profiles
+update public.profiles
+set role = 'admin', status = 'active'
+where email = '${typedEmail.trim()}';`}
+              </pre>
+            </div>
+          )}
 
           <Button type="submit" className="w-full" loading={loading}>
             Sign In
@@ -209,6 +258,12 @@ export const SignUpPage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [signUpError, setSignUpError] = useState<string | null>(null);
+  const [awaitingEmailConfirm, setAwaitingEmailConfirm] = useState<{
+    email: string;
+    password: string;
+    intent: 'candidate' | 'vendor' | 'client';
+  } | null>(null);
 
   const {
     register,
@@ -227,12 +282,15 @@ export const SignUpPage: React.FC = () => {
   });
 
   const intent = watch('signup_intent');
+  const currentEmail = watch('email') || 'your-email@example.com';
 
   const onSubmit = async (values: SignUpValues) => {
     setLoading(true);
+    setSignUpError(null);
     try {
-      const { error } = await supabase.auth.signUp({
-        email: values.email,
+      const cleanEmail = values.email.trim();
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
         password: values.password,
         options: {
           data: {
@@ -248,6 +306,34 @@ export const SignUpPage: React.FC = () => {
 
       if (error) throw error;
 
+      // Supabase returns empty identities array when email is already registered
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setSignUpError(
+          'An account with this email already exists. Please Sign In or confirm your email in Supabase.'
+        );
+        setAwaitingEmailConfirm({
+          email: cleanEmail,
+          password: values.password,
+          intent: values.signup_intent,
+        });
+        return;
+      }
+
+      // If Supabase has "Confirm email" enabled (mailer_autoconfirm: false), data.session is null
+      if (data.user && !data.session) {
+        setAwaitingEmailConfirm({
+          email: cleanEmail,
+          password: values.password,
+          intent: values.signup_intent,
+        });
+        toast({
+          title: 'Account created — confirmation needed',
+          description: 'Confirm your email or run the SQL snippet shown to sign in right away.',
+          tone: 'info',
+        });
+        return;
+      }
+
       toast({
         title: 'Account registered',
         description:
@@ -261,11 +347,38 @@ export const SignUpPage: React.FC = () => {
         replace: true,
       });
     } catch (err) {
+      const msg = mapSupabaseError(err);
+      setSignUpError(msg);
       toast({
         title: 'Registration failed',
-        description: mapSupabaseError(err),
+        description: msg,
         tone: 'error',
       });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignInAfterConfirm = async () => {
+    if (!awaitingEmailConfirm) return;
+    setLoading(true);
+    setSignUpError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: awaitingEmailConfirm.email,
+        password: awaitingEmailConfirm.password,
+      });
+      if (error) throw error;
+      if (data.user) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('role, status')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        navigate(getHomeRouteForRole(prof?.role, prof?.status), { replace: true });
+      }
+    } catch (err) {
+      setSignUpError(mapSupabaseError(err));
     } finally {
       setLoading(false);
     }
@@ -286,56 +399,140 @@ export const SignUpPage: React.FC = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Input
-            label="Full Name"
-            placeholder="Aarav Mehta"
-            {...register('full_name')}
-            error={errors.full_name?.message}
-          />
-          <Input
-            label="Email Address"
-            type="email"
-            placeholder="name@company.com"
-            {...register('email')}
-            error={errors.email?.message}
-          />
-          <Input
-            label="Password"
-            type="password"
-            placeholder="Minimum 8 characters"
-            {...register('password')}
-            error={errors.password?.message}
-          />
+        {awaitingEmailConfirm ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 p-3.5 text-xs text-emerald-900 dark:text-emerald-200 space-y-1.5">
+              <p className="font-semibold">
+                Account registered for <span className="font-mono">{awaitingEmailConfirm.email}</span>
+              </p>
+              <p>
+                Your Supabase project requires email confirmation before issuing a session.
+                Either click the link sent to your email, <strong>or</strong> run the SQL below
+                in your <strong>Supabase Dashboard → SQL Editor</strong> to confirm and activate
+                immediately:
+              </p>
+            </div>
 
-          <Select
-            label="I am a…"
-            {...register('signup_intent')}
-            error={errors.signup_intent?.message}
-            options={[
-              { value: 'candidate', label: 'Candidate (Direct applicant)' },
-              { value: 'vendor', label: 'Vendor agency' },
-              { value: 'client', label: 'Hiring company' },
-            ]}
-          />
+            <pre className="rounded-lg bg-slate-950 text-slate-100 p-3 font-mono text-[11px] overflow-x-auto select-all">
+{`-- Run in Supabase SQL Editor to confirm email & make HQ Admin:
+update auth.users
+set email_confirmed_at = coalesce(email_confirmed_at, now())
+where email = '${awaitingEmailConfirm.email}';
 
-          {(intent === 'vendor' || intent === 'client') && (
+update public.profiles
+set role = 'admin', status = 'active'
+where email = '${awaitingEmailConfirm.email}';`}
+            </pre>
+
+            {signUpError && (
+              <div className="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300">
+                {signUpError}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                className="w-full"
+                loading={loading}
+                onClick={handleSignInAfterConfirm}
+              >
+                I&apos;ve Confirmed / Ran SQL — Sign In Now
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => setAwaitingEmailConfirm(null)}
+              >
+                Back to Registration Form
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Input
-              label="Company Name"
-              placeholder={
-                intent === 'vendor'
-                  ? 'e.g. Apex Talent Partners'
-                  : 'e.g. FinCore Technologies Pvt Ltd'
-              }
-              {...register('company_name')}
-              error={errors.company_name?.message}
+              label="Full Name"
+              placeholder="Aarav Mehta"
+              {...register('full_name')}
+              error={errors.full_name?.message}
             />
-          )}
+            <Input
+              label="Email Address"
+              type="email"
+              placeholder="name@company.com"
+              {...register('email')}
+              error={errors.email?.message}
+            />
+            <Input
+              label="Password"
+              type="password"
+              placeholder="Minimum 8 characters"
+              {...register('password')}
+              error={errors.password?.message}
+            />
 
-          <Button type="submit" className="w-full" loading={loading}>
-            Create Account
-          </Button>
-        </form>
+            <Select
+              label="I am a…"
+              {...register('signup_intent')}
+              error={errors.signup_intent?.message}
+              options={[
+                { value: 'candidate', label: 'Candidate (Direct applicant)' },
+                { value: 'vendor', label: 'Vendor agency' },
+                { value: 'client', label: 'Hiring company' },
+              ]}
+            />
+
+            {(intent === 'vendor' || intent === 'client') && (
+              <Input
+                label="Company Name"
+                placeholder={
+                  intent === 'vendor'
+                    ? 'e.g. Apex Talent Partners'
+                    : 'e.g. FinCore Technologies Pvt Ltd'
+                }
+                {...register('company_name')}
+                error={errors.company_name?.message}
+              />
+            )}
+
+            {signUpError && (
+              <div className="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300 space-y-2">
+                <p className="font-semibold">{signUpError}</p>
+                {signUpError.toLowerCase().includes('rate limit') && (
+                  <div className="space-y-2 text-slate-700 dark:text-slate-300">
+                    <p>
+                      Supabase blocked the signup because its free-tier SMTP only sends ~2
+                      confirmation emails per hour. Fix it in 10 seconds using either method:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>
+                        <strong>Turn off Confirm Email (Recommended):</strong> In{' '}
+                        <strong>Supabase Dashboard → Authentication → Providers → Email</strong>,
+                        toggle <strong>Confirm email</strong> OFF and click <strong>Save</strong>.
+                        Then click <strong>Create Account</strong> again.
+                      </li>
+                      <li>
+                        <strong>Or create user in Supabase Dashboard:</strong> Go to{' '}
+                        <strong>Authentication → Users → Add user → Create new user</strong>{' '}
+                        (keep <em>Auto Confirm User</em> checked), then run in SQL Editor:
+                      </li>
+                    </ol>
+                    <pre className="rounded bg-slate-950 text-slate-100 p-2 font-mono text-[11px] overflow-x-auto select-all">
+{`update public.profiles
+set role = 'admin', status = 'active'
+where email = '${currentEmail.trim()}';`}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" loading={loading}>
+              Create Account
+            </Button>
+          </form>
+        )}
 
         <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
           Already registered?{' '}
@@ -498,7 +695,25 @@ export const UpdatePasswordPage: React.FC = () => {
 
 // 6. Pending Approval Page (Section 4.2)
 export const PendingApprovalPage: React.FC = () => {
-  const { profile, signOut, refreshProfile } = useAuth();
+  const { profile, signOut, refreshProfile, homeRoute } = useAuth();
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(false);
+
+  React.useEffect(() => {
+    if (profile && profile.role !== 'pending' && profile.status === 'active') {
+      navigate(homeRoute, { replace: true });
+    }
+  }, [profile, homeRoute, navigate]);
+
+  const handleCheckStatus = async () => {
+    setChecking(true);
+    try {
+      await refreshProfile();
+    } finally {
+      setChecking(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
       <Card className="max-w-lg w-full p-8 text-center space-y-5">
@@ -537,8 +752,20 @@ export const PendingApprovalPage: React.FC = () => {
             )}
           </div>
         )}
+
+        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900 p-3 text-left space-y-1.5 text-xs">
+          <p className="font-semibold text-slate-800 dark:text-slate-200">
+            Setting up your first HQ Admin? Run in Supabase SQL Editor:
+          </p>
+          <pre className="rounded bg-slate-950 text-slate-100 p-2.5 font-mono text-[11px] overflow-x-auto select-all">
+{`update public.profiles
+set role = 'admin', status = 'active'
+where email = '${profile?.email || 'your-email@example.com'}';`}
+          </pre>
+        </div>
+
         <div className="flex items-center justify-center gap-3 pt-2">
-          <Button variant="outline" size="sm" onClick={() => refreshProfile()}>
+          <Button variant="primary" size="sm" loading={checking} onClick={handleCheckStatus}>
             Check Status Again
           </Button>
           <Button variant="ghost" size="sm" onClick={() => signOut()}>

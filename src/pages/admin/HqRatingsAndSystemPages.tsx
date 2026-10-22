@@ -655,10 +655,11 @@ export const AdminDisputesPage: React.FC = () => {
   );
 };
 
-// 4. Admin Settings & Score Weights Page (platform_settings id = 1)
+// 4. Admin Settings & Score Weights Page (platform_settings id = 1) + Architecture & PRD Governance Audit
 export const AdminSettingsPage: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'weights' | 'governance'>('weights');
 
   const { data: settings, isLoading, error, refetch } = useQuery({
     queryKey: ['platform_settings'],
@@ -733,140 +734,263 @@ export const AdminSettingsPage: React.FC = () => {
   if (error) return <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <PageHeader
-        title="Platform Settings & Score Weights"
-        description="Configure composite vendor scoring weights, minimum sample thresholds, default SLAs, and Phase 2 AI controls."
+        title="Platform Settings & Architecture Governance"
+        description="Configure composite vendor scoring weights, SLA thresholds, and inspect the PRD Architecture Decision Log & AI Call-Site Inventory."
       />
 
-      <form onSubmit={handleSave} className="space-y-6">
-        <Card className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Scale className="h-4 w-4 text-indigo-600" />
-              Composite Vendor Score Weights (Must Sum to 100)
-            </h3>
-            <Badge tone={sumValid ? 'emerald' : 'red'}>
-              Sum: {weightSum} / 100
-            </Badge>
-          </div>
+      <Tabs
+        tabs={[
+          { id: 'weights', label: 'Score Weights & SLA Thresholds' },
+          { id: 'governance', label: 'Architecture Decision Log & AI Inventory (PRD Sec 7 & 12)' },
+        ]}
+        activeTab={activeTab}
+        onChange={(t) => setActiveTab(t as 'weights' | 'governance')}
+      />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Input
-              label="Timing Weight (%)"
-              type="number"
-              min={0}
-              max={100}
-              value={timingWeight}
-              onChange={(e) => setTimingWeight(Number(e.target.value))}
-            />
-            <Input
-              label="Quality Weight (%)"
-              type="number"
-              min={0}
-              max={100}
-              value={qualityWeight}
-              onChange={(e) => setQualityWeight(Number(e.target.value))}
-            />
-            <Input
-              label="Compliance Weight (%)"
-              type="number"
-              min={0}
-              max={100}
-              value={complianceWeight}
-              onChange={(e) => setComplianceWeight(Number(e.target.value))}
-            />
-          </div>
+      {activeTab === 'weights' ? (
+        <form onSubmit={handleSave} className="space-y-6 max-w-3xl">
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Scale className="h-4 w-4 text-indigo-600" />
+                Composite Vendor Score Weights (Must Sum to 100)
+              </h3>
+              <Badge tone={sumValid ? 'emerald' : 'red'}>
+                Sum: {weightSum} / 100
+              </Badge>
+            </div>
 
-          {!sumValid && (
-            <p className="text-xs text-red-600 dark:text-red-400">
-              Weights currently sum to {weightSum}. Adjust them to equal 100 before saving.
-            </p>
-          )}
-
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={weightsApproved}
-                onChange={(e) => setWeightsApproved(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Input
+                label="Timing Weight (%)"
+                type="number"
+                min={0}
+                max={100}
+                value={timingWeight}
+                onChange={(e) => setTimingWeight(Number(e.target.value))}
               />
-              <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                Approve Composite Score Weights
-              </span>
-            </label>
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              Warning: Overall vendor scores stay hidden until weights are approved.
-            </p>
-          </div>
-        </Card>
-
-        <Card className="p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            SLA & Sampling Thresholds
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Minimum Sample Size (min_sample_size)"
-              type="number"
-              min={1}
-              value={minSampleSize}
-              onChange={(e) => setMinSampleSize(Number(e.target.value))}
-              hint="Minimum evaluable shares/submissions before a score is displayed"
-            />
-            <Input
-              label="Default Submission SLA (Hours)"
-              type="number"
-              min={1}
-              value={defaultSlaHours}
-              onChange={(e) => setDefaultSlaHours(Number(e.target.value))}
-            />
-          </div>
-
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={shareVendorSummary}
-                onChange={(e) => setShareVendorSummary(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+              <Input
+                label="Quality Weight (%)"
+                type="number"
+                min={0}
+                max={100}
+                value={qualityWeight}
+                onChange={(e) => setQualityWeight(Number(e.target.value))}
               />
-              <span className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                Share Vendor Summary with Clients (share_vendor_summary_with_clients)
-              </span>
-            </label>
-
-            {/* Disabled switch with "Requires Ollama service, Phase 2" tooltip */}
-            <div
-              title="Requires Ollama service, Phase 2"
-              className="flex items-center justify-between rounded border border-dashed border-slate-300 dark:border-slate-700 p-3 opacity-75"
-            >
-              <div>
-                <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                  Autonomous AI Screening Interviews (ai_screening_enabled)
-                </div>
-                <div className="text-[11px] text-slate-500">
-                  Provider: {settings?.ai_provider || 'ollama'} · Requires Ollama service, Phase 2
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                disabled
-                checked={Boolean(settings?.ai_screening_enabled)}
-                title="Requires Ollama service, Phase 2"
-                className="h-4 w-4 cursor-not-allowed"
+              <Input
+                label="Compliance Weight (%)"
+                type="number"
+                min={0}
+                max={100}
+                value={complianceWeight}
+                onChange={(e) => setComplianceWeight(Number(e.target.value))}
               />
             </div>
-          </div>
-        </Card>
 
-        <div className="flex justify-end">
-          <Button type="submit" loading={saving} disabled={!sumValid}>
-            Save Platform Settings
-          </Button>
+            {!sumValid && (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                Weights currently sum to {weightSum}. Adjust them to equal 100 before saving.
+              </p>
+            )}
+
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={weightsApproved}
+                  onChange={(e) => setWeightsApproved(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  Approve Composite Score Weights
+                </span>
+              </label>
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Warning: Overall vendor scores stay hidden until weights are approved.
+              </p>
+            </div>
+          </Card>
+
+          <Card className="p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              SLA & Sampling Thresholds
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Minimum Sample Size (min_sample_size)"
+                type="number"
+                min={1}
+                value={minSampleSize}
+                onChange={(e) => setMinSampleSize(Number(e.target.value))}
+                hint="Minimum evaluable shares/submissions before a score is displayed"
+              />
+              <Input
+                label="Default Submission SLA (Hours)"
+                type="number"
+                min={1}
+                value={defaultSlaHours}
+                onChange={(e) => setDefaultSlaHours(Number(e.target.value))}
+              />
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={shareVendorSummary}
+                  onChange={(e) => setShareVendorSummary(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                  Share Vendor Summary with Clients (share_vendor_summary_with_clients)
+                </span>
+              </label>
+
+              {/* Disabled switch with "Requires Ollama service, Phase 2" tooltip */}
+              <div
+                title="Requires Ollama service, Phase 2"
+                className="flex items-center justify-between rounded border border-dashed border-slate-300 dark:border-slate-700 p-3 opacity-75"
+              >
+                <div>
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    Autonomous AI Screening Interviews (ai_screening_enabled)
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Provider: {settings?.ai_provider || 'ollama'} · Structured screening runner active via interviews + interview_feedback
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled
+                  checked={Boolean(settings?.ai_screening_enabled)}
+                  title="Requires Ollama service, Phase 2"
+                  className="h-4 w-4 cursor-not-allowed"
+                />
+              </div>
+            </div>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button type="submit" loading={saving} disabled={!sumValid}>
+              Save Platform Settings
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <div className="space-y-6">
+          {/* Section 7 Decision Log */}
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50">
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                PRD Section 7 — Resolved Architecture Decisions &amp; Conflict Matrix
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
+                    <th className="py-2.5 px-4">Decision / Conflict</th>
+                    <th className="py-2.5 px-4">Governed Resolution in HireNestOS</th>
+                    <th className="py-2.5 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                  <tr>
+                    <td className="py-3 px-4 font-semibold">1. AI Provider Policy</td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                      Matching &amp; vendor scoring are 100% deterministic in PostgreSQL (<code className="font-mono">candidate_matches</code>). Optional AI suggestions are isolated to 5 guarded server-side routes (<code className="font-mono">/api/gemini/suggest</code>) with JWT + active non-candidate profile verification, PII stripping, 20 req/hr limit, and graceful offline fallback when unavailable.
+                    </td>
+                    <td className="py-3 px-4"><Badge tone="emerald">Enforced</Badge></td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-semibold">2. Direct-Candidate Schema</td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                      Direct candidates are created with <code className="font-mono">original_source = &apos;direct&apos;</code>, <code className="font-mono">source_vendor_org_id = null</code>, <code className="font-mono">owner_vendor_org_id = null</code>, and <code className="font-mono">submissions.vendor_org_id = null</code> via <code className="font-mono">apply_to_requirement</code>. Zero fake vendor IDs are ever fabricated.
+                    </td>
+                    <td className="py-3 px-4"><Badge tone="emerald">Enforced</Badge></td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-semibold">3. Match Data Canonical Source</td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                      Single canonical <code className="font-mono">public.candidate_matches</code> table backs both <code className="font-mono">Requirement → Candidates</code> and <code className="font-mono">Candidate → Requirements</code> with <code className="font-mono">recompute_matches</code> and <code className="font-mono">override_match</code> (recruiter override wins).
+                    </td>
+                    <td className="py-3 px-4"><Badge tone="emerald">Enforced</Badge></td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-semibold">4. AI Interview Capability</td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                      First-Round Screening Runner (<code className="font-mono">ScreeningInterviewRunnerModal</code>) captures real responses in declared modality (<code className="font-mono">ai_text | video | phone | in_person</code>), explicitly disclaims speech prosody when <code className="font-mono">ai_text</code> is used, separates JD/role-skill vs communication ratings, and persists into <code className="font-mono">interviews</code> + <code className="font-mono">interview_feedback</code>.
+                    </td>
+                    <td className="py-3 px-4"><Badge tone="emerald">Enforced</Badge></td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-semibold">5. Status Vocabulary</td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                      Canonical <code className="font-mono">submission_stage</code> enum preserved unchanged. UI explicitly badges unsubmitted matches as <code className="font-mono">Potential Match (Not Applied)</code>, direct applications as <code className="font-mono">Direct Applied</code>, and agency submissions as <code className="font-mono">Vendor Submitted</code>.
+                    </td>
+                    <td className="py-3 px-4"><Badge tone="emerald">Enforced</Badge></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* AI Call-Site Inventory */}
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50">
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                Verified AI Call-Site Inventory (All Routed via Server-Side /api/gemini/suggest)
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
+                    <th className="py-2.5 px-4">Task Identifier</th>
+                    <th className="py-2.5 px-4">UI Component Call Site</th>
+                    <th className="py-2.5 px-4">Allowed Structured Payload</th>
+                    <th className="py-2.5 px-4">DB Write Policy</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono">suggest_skills</td>
+                    <td className="py-2.5 px-4">RequirementFormModal.tsx</td>
+                    <td className="py-2.5 px-4">Requirement title + JD text (PII scrubbed)</td>
+                    <td className="py-2.5 px-4">Advisory only; human clicks Add</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono">improve_jd</td>
+                    <td className="py-2.5 px-4">RequirementFormModal.tsx</td>
+                    <td className="py-2.5 px-4">Requirement title + JD text + skills[]</td>
+                    <td className="py-2.5 px-4">Advisory only; human clicks Apply</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono">suggest_interview_questions</td>
+                    <td className="py-2.5 px-4">InterviewModals.tsx (Schedule &amp; Screening Runner)</td>
+                    <td className="py-2.5 px-4">JD title/skills + candidate skills[], exp_years, current_title</td>
+                    <td className="py-2.5 px-4">Advisory only; never scores candidate</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono">tidy_feedback_notes</td>
+                    <td className="py-2.5 px-4">InterviewModals.tsx (InterviewFeedbackModal)</td>
+                    <td className="py-2.5 px-4">User-typed draft notes only (no DB records)</td>
+                    <td className="py-2.5 px-4">Advisory only; human clicks Use Text</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono">general_chat</td>
+                    <td className="py-2.5 px-4">AiAssistantDrawer.tsx (Non-candidate roles only)</td>
+                    <td className="py-2.5 px-4">User question text only (zero candidate records)</td>
+                    <td className="py-2.5 px-4">Read-only help drawer</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </div>
-      </form>
+      )}
     </div>
   );
 };

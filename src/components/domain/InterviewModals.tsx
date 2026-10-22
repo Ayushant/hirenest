@@ -14,6 +14,7 @@ import {
 import { AiSuggestionBanner } from './DomainBadges';
 import {
   scheduleInterviewRpc,
+  updateInterviewStatusRpc,
   createInterviewFeedback,
   createCandidateQualityFeedback,
 } from '../../api/interviews';
@@ -30,10 +31,16 @@ import type {
 
 // 1. Schedule Interview Modal (includes "Suggest interview questions" from JD + candidate skills)
 const scheduleSchema = z.object({
-  round_type: z.enum(['initial_screening', 'technical', 'managerial', 'final']),
+  round_type: z.enum([
+    'initial_screening',
+    'technical',
+    'managerial',
+    'final',
+    'ai_screening',
+  ]),
   scheduled_at: z.string().min(1, 'Date and time are required'),
   duration_minutes: z.coerce.number().int().min(15).max(240),
-  mode: z.enum(['video', 'phone', 'in_person']),
+  mode: z.enum(['video', 'phone', 'in_person', 'ai_text']),
   meeting_link: z.string().optional(),
 });
 
@@ -157,6 +164,7 @@ export const ScheduleInterviewModal: React.FC<{
             error={errors.round_type?.message}
             options={[
               { value: 'initial_screening', label: 'Initial Screening' },
+              { value: 'ai_screening', label: 'First-Round Screening (Structured Q&A)' },
               { value: 'technical', label: 'Technical Round' },
               { value: 'managerial', label: 'Managerial Round' },
               { value: 'final', label: 'Final Round' },
@@ -170,6 +178,7 @@ export const ScheduleInterviewModal: React.FC<{
               { value: 'video', label: 'Video Call' },
               { value: 'phone', label: 'Phone Call' },
               { value: 'in_person', label: 'In Person' },
+              { value: 'ai_text', label: 'Structured Text Capture (ai_text)' },
             ]}
           />
         </div>
@@ -686,3 +695,369 @@ export const CandidateQualityModal: React.FC<{
     </Dialog>
   );
 };
+
+// 4. First-Round Screening Session Runner Modal (PRD Section 4.13 & Flow E)
+// Captures real structured Q&A responses in declared modality, separates JD/role-skill vs communication ratings,
+// records strengths, gaps, and follow-ups into interview_feedback without claiming speech evaluation on text.
+export const ScreeningInterviewRunnerModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  interviewId: string;
+  submissionId: string;
+  mode: InterviewMode;
+  candidateName?: string;
+  requirementTitle?: string;
+  requirementDescription?: string;
+  requirementSkills?: string[];
+  candidateSkills?: string[];
+  candidateExperienceYears?: number | null;
+  candidateCurrentTitle?: string | null;
+  onCompleted: () => void;
+}> = ({
+  open,
+  onClose,
+  interviewId,
+  mode,
+  candidateName = 'Candidate',
+  requirementTitle = 'Requirement',
+  requirementDescription = '',
+  requirementSkills = [],
+  candidateSkills = [],
+  candidateExperienceYears = null,
+  candidateCurrentTitle = null,
+  onCompleted,
+}) => {
+  const { toast } = useToast();
+
+  // Build deterministic baseline questions from requirement + candidate skills
+  const buildBaselineQuestions = () => {
+    const primarySkills =
+      requirementSkills.length > 0
+        ? requirementSkills.slice(0, 3)
+        : candidateSkills.slice(0, 3);
+    const items = primarySkills.map((sk) => ({
+      topic: `Core Skill: ${sk}`,
+      question: `Describe a production system or project where you applied ${sk}, including architecture decisions and measurable outcomes.`,
+      whatToLookFor: `Concrete hands-on ownership, trade-offs, and debugging depth in ${sk}.`,
+      response: '',
+    }));
+    items.push({
+      topic: 'Role Alignment & Problem Solving',
+      question: `For ${requirementTitle}, walk through how you approach ambiguous requirements, stakeholder communication, and delivery under tight SLAs.`,
+      whatToLookFor: 'Structured communication, prioritization, and realistic risk management.',
+      response: '',
+    });
+    return items;
+  };
+
+  const [consentVerified, setConsentVerified] = useState(false);
+  const [qaList, setQaList] = useState<
+    Array<{ topic: string; question: string; whatToLookFor: string; response: string }>
+  >(buildBaselineQuestions);
+
+  const [strengths, setStrengths] = useState('');
+  const [gaps, setGaps] = useState('');
+  const [followUps, setFollowUps] = useState('');
+  const [summaryNotes, setSummaryNotes] = useState('');
+
+  // Separate JD/role-skill rating vs communication rating (PRD Section 4.13)
+  const [skillRating, setSkillRating] = useState(0);
+  const [commRating, setCommRating] = useState(0);
+  const [overallRating, setOverallRating] = useState(0);
+  const [decision, setDecision] = useState<InterviewDecision>('advance');
+
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiLabel, setAiLabel] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const handleLoadSuggestedQuestions = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await suggestInterviewQuestions({
+        requirement_title: requirementTitle,
+        requirement_description: requirementDescription,
+        requirement_skills: requirementSkills,
+        candidate_skills: candidateSkills,
+        total_experience_years: candidateExperienceYears,
+        current_title: candidateCurrentTitle,
+        round_type: 'initial_screening',
+      });
+      setAiLabel(res.label);
+      if (res.questions.length > 0) {
+        setQaList(
+          res.questions.map((q) => ({
+            topic: q.topic,
+            question: q.question,
+            whatToLookFor: q.whatToLookFor,
+            response: '',
+          }))
+        );
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'AI assistant unavailable right now');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleCompleteScreening = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!consentVerified) {
+      setFormError('Please confirm candidate consent and modality verification before saving.');
+      return;
+    }
+    const answeredCount = qaList.filter((q) => q.response.trim().length > 0).length;
+    if (answeredCount === 0) {
+      setFormError('Capture at least one real candidate response before completing the screening.');
+      return;
+    }
+    if (!skillRating || !commRating || !overallRating) {
+      setFormError(
+        'Provide separate ratings (1–5) for JD/Role-Skill Evidence, Written/Verbal Communication, and Overall Standing.'
+      );
+      return;
+    }
+    if (summaryNotes.trim().length < 10) {
+      setFormError('Screening evaluation summary must be at least 10 characters.');
+      return;
+    }
+
+    setFormError(null);
+    setSaving(true);
+    try {
+      // Build structured evidence report (Modality declaration + Q&A responses + Strengths + Gaps + Follow-ups)
+      const modalityNote =
+        mode === 'ai_text'
+          ? 'MODALITY: ai_text (Structured Text Capture — Written communication evaluated; speech/voice prosody not claimed).'
+          : `MODALITY: ${mode} (Live Screening Capture).`;
+
+      const qaTranscript = qaList
+        .map(
+          (q, idx) =>
+            `Q${idx + 1} [${q.topic}]: ${q.question}\nCaptured Response: ${
+              q.response.trim() || '(Not answered)'
+            }`
+        )
+        .join('\n\n');
+
+      const compiledEvidence = [
+        modalityNote,
+        `STRENGTHS: ${strengths.trim() || 'None noted'}`,
+        `UNPROVEN / GAPS: ${gaps.trim() || 'None noted'}`,
+        `RECOMMENDED FOLLOW-UPS: ${followUps.trim() || 'None noted'}`,
+        '--- CAPTURED Q&A TRANSCRIPT ---',
+        qaTranscript,
+      ].join('\n');
+
+      // 1. Mark interview completed via canonical RPC
+      await updateInterviewStatusRpc({
+        p_interview_id: interviewId,
+        p_status: 'completed',
+      });
+
+      // 2. Persist evaluation report in interview_feedback
+      await createInterviewFeedback({
+        interview_id: interviewId,
+        skill_rating: skillRating,
+        communication_rating: commRating,
+        overall_rating: overallRating,
+        decision,
+        feedback: summaryNotes.trim(),
+        evidence: compiledEvidence,
+      });
+
+      toast({
+        title: 'First-round screening completed & recorded',
+        description: 'Structured Q&A responses, separate skill/communication scores, and evidence saved.',
+        tone: 'success',
+      });
+      onCompleted();
+      onClose();
+    } catch (err) {
+      setFormError(mapSupabaseError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={`First-Round Screening Session · ${candidateName}`}
+      description={`Requirement: ${requirementTitle} · Declared Modality: ${mode}`}
+      maxWidth="max-w-3xl"
+    >
+      <form onSubmit={handleCompleteScreening} className="space-y-4">
+        {/* Modality & Consent Gate (Flow E & Section 4.13) */}
+        <div className="rounded-lg border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/60 dark:bg-indigo-950/30 p-3.5 text-xs space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-semibold text-indigo-950 dark:text-indigo-200">
+              Modality & Governance Notice ({mode === 'ai_text' ? 'Structured Text Capture' : mode})
+            </span>
+            <span className="font-mono text-[11px] text-indigo-700 dark:text-indigo-300">
+              Advisory Evaluation · Human Decision Final
+            </span>
+          </div>
+          <p className="text-slate-600 dark:text-slate-300">
+            {mode === 'ai_text'
+              ? 'This session captures structured text responses. Communication rating assesses written clarity and structure only; speech or audio prosody is never claimed when text is captured.'
+              : `This session captures live ${mode} responses. Communication and JD/role-skill evidence are evaluated on separate axes.`}
+          </p>
+          <label className="flex items-center gap-2 pt-1 cursor-pointer font-medium text-slate-900 dark:text-slate-100">
+            <input
+              type="checkbox"
+              checked={consentVerified}
+              onChange={(e) => setConsentVerified(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+            />
+            <span>
+              Candidate consent and capture modality ({mode}) verified for this screening round
+            </span>
+          </label>
+        </div>
+
+        {/* Questions & Real Response Capture */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+              JD & Profile-Grounded Screening Questions ({qaList.length})
+            </h4>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              loading={aiLoading}
+              onClick={handleLoadSuggestedQuestions}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+              Suggest interview questions
+            </Button>
+          </div>
+
+          {aiError && (
+            <p className="text-xs text-amber-700 dark:text-amber-300">{aiError}</p>
+          )}
+          {aiLabel && (
+            <AiSuggestionBanner label={aiLabel} onDismiss={() => setAiLabel(null)} />
+          )}
+
+          <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+            {qaList.map((item, idx) => (
+              <div
+                key={idx}
+                className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 space-y-2 bg-slate-50/50 dark:bg-slate-950/40 text-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-indigo-700 dark:text-indigo-300">
+                    Q{idx + 1}. {item.topic}
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Rubric focus: {item.whatToLookFor}
+                  </span>
+                </div>
+                <p className="font-medium text-slate-900 dark:text-slate-100">{item.question}</p>
+                <Textarea
+                  label="Captured Candidate Response"
+                  rows={2}
+                  value={item.response}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setQaList((prev) =>
+                      prev.map((q, i) => (i === idx ? { ...q, response: val } : q))
+                    );
+                  }}
+                  placeholder="Record the candidate's actual response and technical specifics..."
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Evidence Breakdown: Strengths, Gaps, Follow-ups */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Textarea
+            label="Observed Strengths"
+            rows={2}
+            value={strengths}
+            onChange={(e) => setStrengths(e.target.value)}
+            placeholder="Proven JD skills & project depth..."
+          />
+          <Textarea
+            label="Gaps / Unproven Areas"
+            rows={2}
+            value={gaps}
+            onChange={(e) => setGaps(e.target.value)}
+            placeholder="Skills needing deeper verification..."
+          />
+          <Textarea
+            label="Recommended Follow-Ups"
+            rows={2}
+            value={followUps}
+            onChange={(e) => setFollowUps(e.target.value)}
+            placeholder="Probes for next technical round..."
+          />
+        </div>
+
+        {/* Separate Assessment Axes: JD/Role-Skill vs Communication */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <RatingInput
+            label="JD / Role-Skill Answers (1–5)"
+            value={skillRating}
+            onChange={setSkillRating}
+          />
+          <RatingInput
+            label={
+              mode === 'ai_text'
+                ? 'Written Communication (1–5)'
+                : 'Communication Clarity (1–5)'
+            }
+            value={commRating}
+            onChange={setCommRating}
+          />
+          <RatingInput
+            label="Overall Screening Score (1–5)"
+            value={overallRating}
+            onChange={setOverallRating}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Select
+            label="Human Reviewer Recommendation"
+            value={decision}
+            onChange={(e) => setDecision(e.target.value as InterviewDecision)}
+            options={[
+              { value: 'advance', label: 'Advance to Next Round' },
+              { value: 'hold', label: 'Hold' },
+              { value: 'additional_assessment', label: 'Needs Additional Assessment' },
+              { value: 'reject', label: 'Reject' },
+            ]}
+          />
+          <Textarea
+            label="Evaluation Summary (Min 10 characters)"
+            rows={2}
+            value={summaryNotes}
+            onChange={(e) => setSummaryNotes(e.target.value)}
+            placeholder="Concise screening recommendation for hiring team..."
+          />
+        </div>
+
+        {formError && <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>}
+
+        <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving}>
+            Complete Screening & Save Report
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+};
+

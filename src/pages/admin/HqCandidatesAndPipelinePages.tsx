@@ -8,6 +8,10 @@ import {
   Send,
   Sliders,
   CheckCircle2,
+  Edit3,
+  Upload,
+  Link2,
+  Eye,
 } from 'lucide-react';
 import {
   PageHeader,
@@ -23,6 +27,7 @@ import {
   Pagination,
   Dialog,
   Textarea,
+  SkillsChipInput,
 } from '../../components/ui/kit';
 import {
   SourceBadge,
@@ -41,6 +46,9 @@ import {
   getResumeSignedUrl,
   fetchMatchesForCandidate,
   overrideMatchScore,
+  updateCandidateProfile,
+  updateCandidateContacts,
+  uploadCandidateResume,
 } from '../../api/candidates';
 import {
   fetchSubmissions,
@@ -56,11 +64,14 @@ import {
   fetchDuplicateFlags,
   resolveDuplicateFlag,
   fetchAuditLogs,
+  adminLinkCandidateAccount,
 } from '../../api/admin';
 import { useAuth } from '../../auth/AuthProvider';
 import { mapSupabaseError } from '../../lib/errors';
+import { computeFileSha256, validateResumeFile } from '../../lib/hash';
 import {
   ROUND_LABELS,
+  STAGE_LABELS,
   formatLocalDate,
   formatLocalDateTime,
   maskEmail,
@@ -311,7 +322,8 @@ export const HqCandidateDetailPage: React.FC = () => {
   const [matchesPage, setMatchesPage] = useState(1);
   const [drawerSubmissionId, setDrawerSubmissionId] = useState<string | null>(null);
 
-  // Override & Submit modals for Candidate -> Requirements
+  // Override, Evidence & Submit modals for Candidate -> Requirements
+  const [evidenceTarget, setEvidenceTarget] = useState<CandidateMatch | null>(null);
   const [overrideTarget, setOverrideTarget] = useState<CandidateMatch | null>(null);
   const [overrideScoreInput, setOverrideScoreInput] = useState('');
   const [overrideReasonInput, setOverrideReasonInput] = useState('');
@@ -321,6 +333,23 @@ export const HqCandidateDetailPage: React.FC = () => {
   const [submitNotes, setSubmitNotes] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [dupReason, setDupReason] = useState<string | null>(null);
+
+  // HQ Candidate 360 Edit & Link User Account states
+  const [editOpen, setEditOpen] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [currentTitle, setCurrentTitle] = useState('');
+  const [location, setLocation] = useState('');
+  const [expYears, setExpYears] = useState('0');
+  const [skills, setSkills] = useState<string[]>([]);
+  const [summary, setSummary] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [linkUserOpen, setLinkUserOpen] = useState(false);
+  const [linkUserIdInput, setLinkUserIdInput] = useState('');
+  const [linkingUser, setLinkingUser] = useState(false);
 
   const { data: cand, isLoading } = useQuery({
     queryKey: ['candidate_detail', id],
@@ -421,6 +450,104 @@ export const HqCandidateDetailPage: React.FC = () => {
     }
   };
 
+  const startEditCandidate = () => {
+    if (!cand) return;
+    setFullName(cand.full_name);
+    setCurrentTitle(cand.current_title || '');
+    setLocation(cand.location || '');
+    setExpYears(String(cand.total_experience_years ?? 0));
+    setSkills(cand.skills || []);
+    setSummary(cand.summary || '');
+    setEmail(contacts?.email || '');
+    setPhone(contacts?.phone || '');
+    setLinkedin(contacts?.linkedin_url || '');
+    setEditOpen(true);
+  };
+
+  const handleSaveCandidateEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cand) return;
+    setSavingEdit(true);
+    try {
+      await updateCandidateProfile(cand.id, {
+        full_name: fullName.trim(),
+        current_title: currentTitle.trim() || null,
+        location: location.trim() || null,
+        total_experience_years: Number(expYears),
+        skills,
+        summary: summary.trim() || null,
+      });
+      await updateCandidateContacts(cand.id, {
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        linkedin_url: linkedin.trim() || null,
+      });
+      toast({ title: 'Candidate 360 profile updated', tone: 'success' });
+      setEditOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['candidate_detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['candidate_contacts', id] });
+      queryClient.invalidateQueries({ queryKey: ['candidate_matches', id] });
+    } catch (err) {
+      toast({
+        title: 'Update failed',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleReplaceResume = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !cand) return;
+    const err = validateResumeFile(file);
+    if (err) {
+      toast({ title: 'Invalid resume file', description: err, tone: 'error' });
+      return;
+    }
+    try {
+      const hash = await computeFileSha256(file);
+      await uploadCandidateResume(cand.id, file, hash);
+      toast({ title: 'Resume uploaded & SHA-256 hash recorded', tone: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['candidate_detail', id] });
+    } catch (uploadErr) {
+      toast({
+        title: 'Resume upload failed',
+        description: mapSupabaseError(uploadErr),
+        tone: 'error',
+      });
+    }
+  };
+
+  const handleLinkUserAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cand || !linkUserIdInput.trim()) return;
+    setLinkingUser(true);
+    try {
+      await adminLinkCandidateAccount({
+        p_candidate_id: cand.id,
+        p_user_id: linkUserIdInput.trim(),
+      });
+      toast({
+        title: 'Candidate account linked',
+        description: 'Linked candidate profile to authenticated user UUID.',
+        tone: 'success',
+      });
+      setLinkUserOpen(false);
+      setLinkUserIdInput('');
+      queryClient.invalidateQueries({ queryKey: ['candidate_detail', id] });
+    } catch (err) {
+      toast({
+        title: 'Could not link account',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setLinkingUser(false);
+    }
+  };
+
   if (isLoading || !cand) {
     return <TableSkeleton rows={6} cols={4} />;
   }
@@ -435,38 +562,73 @@ export const HqCandidateDetailPage: React.FC = () => {
           cand.total_experience_years ?? 0
         } years experience`}
         actions={
-          cand.resume_path ? (
-            <Button size="sm" variant="outline" onClick={handleOpenResume}>
-              <FileText className="h-3.5 w-3.5" />
-              View / Download Resume (5m Signed URL)
+          <div className="flex flex-wrap items-center gap-2">
+            {cand.resume_path ? (
+              <Button size="sm" variant="outline" onClick={handleOpenResume}>
+                <FileText className="h-3.5 w-3.5" />
+                View Resume (5m Signed URL)
+              </Button>
+            ) : (
+              <Badge tone="slate">No resume uploaded</Badge>
+            )}
+            <label className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
+              <Upload className="h-3.5 w-3.5 text-indigo-600" />
+              <span>{cand.resume_path ? 'Replace Resume' : 'Upload Resume'}</span>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={handleReplaceResume}
+                className="hidden"
+              />
+            </label>
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setLinkUserIdInput(cand.user_id || '');
+                  setLinkUserOpen(true);
+                }}
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                {cand.user_id ? 'Relink User Account' : 'Link User Account'}
+              </Button>
+            )}
+            <Button size="sm" onClick={startEditCandidate}>
+              <Edit3 className="h-3.5 w-3.5" />
+              Edit Candidate 360
             </Button>
-          ) : (
-            <Badge tone="slate">No resume uploaded</Badge>
-          )
+          </div>
         }
       />
 
       {/* Candidate 360 Header & Three-Way Attribution */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 p-5 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
             <div>
-              <span className="text-slate-500 block mb-1">Original Source</span>
+              <span className="text-slate-500 block mb-1">1. Original Source</span>
               <SourceBadge
                 source={cand.original_source}
                 vendorName={cand.source_vendor?.name}
               />
             </div>
             <div>
-              <span className="text-slate-500 block mb-1">Current Vendor Association</span>
+              <span className="text-slate-500 block mb-1">2. Current Vendor Association</span>
               <span className="font-semibold text-slate-900 dark:text-slate-100">
                 {cand.owner_vendor?.name || 'None (Direct / Internal)'}
               </span>
             </div>
             <div>
-              <span className="text-slate-500 block mb-1">Created By (User ID)</span>
+              <span className="text-slate-500 block mb-1">Linked Auth User</span>
               <span className="font-mono text-[11px] text-slate-600 dark:text-slate-400">
-                {cand.created_by || 'System'}
+                {cand.user_id ? cand.user_id.slice(0, 12) + '…' : 'Unlinked'}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block mb-1">Resume SHA-256</span>
+              <span className="font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                {cand.resume_hash ? cand.resume_hash.slice(0, 12) + '…' : '—'}
               </span>
             </div>
           </div>
@@ -555,6 +717,11 @@ export const HqCandidateDetailPage: React.FC = () => {
 
       {activeTab === 'matches' && (
         <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Bidirectional matching (<code className="font-mono">Candidate → Requirements</code>). A{' '}
+            <strong>Potential Match</strong> is advisory only and does not create an application or
+            vendor submission until explicitly submitted.
+          </p>
           {!matchesData?.data.length ? (
             <EmptyState
               title="No matching open requirements"
@@ -562,84 +729,126 @@ export const HqCandidateDetailPage: React.FC = () => {
             />
           ) : (
             <Card className="overflow-hidden">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
-                    <th className="py-3 px-4">Requirement</th>
-                    <th className="py-3 px-4">Client</th>
-                    <th className="py-3 px-4">Final Score</th>
-                    <th className="py-3 px-4">Matched / Unproven Skills</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {matchesData.data.map((m) => {
-                    const alreadySubmitted = submissions.some(
-                      (s) => s.requirement_id === m.requirement_id
-                    );
-                    return (
-                      <tr key={m.id}>
-                        <td className="py-3 px-4">
-                          <Link
-                            to={`${prefix}/requirements/${m.requirement_id}`}
-                            className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                          >
-                            {m.requirements?.title || m.requirement_id}
-                          </Link>
-                        </td>
-                        <td className="py-3 px-4">
-                          {m.requirements?.organizations?.name || '—'}
-                        </td>
-                        <td className="py-3 px-4">
-                          <ScoreBar
-                            score={m.final_score}
-                            isOverridden={m.override_score !== null}
-                          />
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-                            {m.matched_skills?.length || 0} matched
-                          </span>{' '}
-                          ·{' '}
-                          <span className="text-slate-500">
-                            {m.unproven_skills?.length || 0} unproven
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setOverrideTarget(m);
-                              setOverrideScoreInput(
-                                m.override_score !== null ? String(m.override_score) : ''
-                              );
-                              setOverrideReasonInput(m.override_reason || '');
-                            }}
-                          >
-                            <Sliders className="h-3.5 w-3.5" />
-                            Override
-                          </Button>
-                          {alreadySubmitted ? (
-                            <Badge tone="emerald">Submitted</Badge>
-                          ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
+                      <th className="py-3 px-4">Requirement</th>
+                      <th className="py-3 px-4">Client</th>
+                      <th className="py-3 px-4">Pipeline / Attribution Status</th>
+                      <th className="py-3 px-4">Final Score</th>
+                      <th className="py-3 px-4">Matched / Unproven Skills</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {matchesData.data.map((m) => {
+                      const existingSub = submissions.find(
+                        (s) => s.requirement_id === m.requirement_id
+                      );
+                      return (
+                        <tr key={m.id}>
+                          <td className="py-3 px-4">
+                            <Link
+                              to={`${prefix}/requirements/${m.requirement_id}`}
+                              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                              {m.requirements?.title || m.requirement_id}
+                            </Link>
+                          </td>
+                          <td className="py-3 px-4">
+                            {m.requirements?.organizations?.name || '—'}
+                          </td>
+                          <td className="py-3 px-4">
+                            {!existingSub ? (
+                              <Badge tone="amber">Potential Match (Not Applied)</Badge>
+                            ) : existingSub.source === 'direct' ? (
+                              <Badge tone="emerald">
+                                Direct Applied · {STAGE_LABELS[existingSub.stage]}
+                              </Badge>
+                            ) : existingSub.source === 'vendor' ? (
+                              <Badge tone="indigo">
+                                Vendor Submitted · {STAGE_LABELS[existingSub.stage]}
+                              </Badge>
+                            ) : (
+                              <Badge tone="slate">
+                                HQ Submitted · {STAGE_LABELS[existingSub.stage]}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <ScoreBar
+                              score={m.final_score}
+                              isOverridden={m.override_score !== null}
+                            />
+                            {m.override_score !== null && (
+                              <div className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-0.5">
+                                Overridden: {m.override_reason}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                              {m.matched_skills?.length || 0} matched
+                            </span>{' '}
+                            ·{' '}
+                            <span
+                              className="text-slate-500"
+                              title="Missing evidence is not proof of missing skill"
+                            >
+                              {m.unproven_skills?.length || 0} unproven
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right space-x-1.5">
                             <Button
                               size="sm"
+                              variant="ghost"
+                              onClick={() => setEvidenceTarget(m)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              Evidence
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => {
-                                setSubmitMatchTarget(m);
-                                setSubmitNotes('');
+                                setOverrideTarget(m);
+                                setOverrideScoreInput(
+                                  m.override_score !== null ? String(m.override_score) : ''
+                                );
+                                setOverrideReasonInput(m.override_reason || '');
                               }}
                             >
-                              <Send className="h-3.5 w-3.5" />
-                              Submit
+                              <Sliders className="h-3.5 w-3.5" />
+                              Override
                             </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            {existingSub ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDrawerSubmissionId(existingSub.id)}
+                              >
+                                View Pipeline
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSubmitMatchTarget(m);
+                                  setSubmitNotes('');
+                                }}
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                Submit
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
               <Pagination
                 page={matchesPage}
                 totalCount={matchesData.count}
@@ -795,6 +1004,123 @@ export const HqCandidateDetailPage: React.FC = () => {
         onClose={() => setDupReason(null)}
         reason={dupReason}
       />
+
+      {/* Explainable Match Evidence Inspection Modal */}
+      <Dialog
+        open={Boolean(evidenceTarget)}
+        onClose={() => setEvidenceTarget(null)}
+        title="Explainable Match Evidence Breakdown"
+        description="Deterministic score, matched vs unproven skills, experience alignment, and recruiter override."
+        maxWidth="max-w-xl"
+      >
+        {evidenceTarget && (
+          <div className="space-y-4">
+            <MatchEvidencePanel match={evidenceTarget} />
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setEvidenceTarget(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* HQ Edit Candidate 360 Modal */}
+      <Dialog
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Edit Candidate 360 Profile & Contacts"
+        maxWidth="max-w-xl"
+      >
+        <form onSubmit={handleSaveCandidateEdit} className="space-y-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Full Name"
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+            <Input
+              label="Current Title"
+              value={currentTitle}
+              onChange={(e) => setCurrentTitle(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+            <Input
+              label="Total Experience (Years)"
+              type="number"
+              step="0.5"
+              value={expYears}
+              onChange={(e) => setExpYears(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Input
+              label="Phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            <Input
+              label="LinkedIn URL"
+              value={linkedin}
+              onChange={(e) => setLinkedin(e.target.value)}
+            />
+          </div>
+          <SkillsChipInput skills={skills} onChange={setSkills} />
+          <Textarea
+            label="Summary"
+            rows={3}
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={savingEdit}>
+              Save Candidate 360
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* Admin Link Candidate User Account Modal (admin_link_candidate_account) */}
+      <Dialog
+        open={linkUserOpen}
+        onClose={() => setLinkUserOpen(false)}
+        title="Link Candidate Profile to User Account"
+        description="Calls admin_link_candidate_account(p_candidate_id, p_user_id) to associate this candidate record with an authenticated user."
+      >
+        <form onSubmit={handleLinkUserAccount} className="space-y-4">
+          <Input
+            label="Authenticated User UUID (profiles.id)"
+            required
+            placeholder="00000000-0000-0000-0000-000000000000"
+            value={linkUserIdInput}
+            onChange={(e) => setLinkUserIdInput(e.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setLinkUserOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={linkingUser} disabled={!linkUserIdInput.trim()}>
+              Confirm Link
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 };

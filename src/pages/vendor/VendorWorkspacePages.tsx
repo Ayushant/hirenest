@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
@@ -8,6 +8,7 @@ import {
   Upload,
   AlertTriangle,
   FileText,
+  Eye,
 } from 'lucide-react';
 import {
   PageHeader,
@@ -27,6 +28,7 @@ import {
   SkillsChipInput,
 } from '../../components/ui/kit';
 import {
+  SourceBadge,
   StageBadge,
   SlaBadge,
   ScoreBar,
@@ -51,6 +53,7 @@ import {
   uploadCandidateResume,
   getResumeSignedUrl,
   fetchMatchesForRequirement,
+  fetchMatchesForCandidate,
 } from '../../api/candidates';
 import {
   fetchSubmissions,
@@ -67,6 +70,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { mapSupabaseError } from '../../lib/errors';
 import { computeFileSha256, validateResumeFile } from '../../lib/hash';
 import {
+  STAGE_LABELS,
   formatCurrency,
   formatLocalDate,
   formatLocalDateTime,
@@ -748,11 +752,21 @@ export const VendorCandidatePoolPage: React.FC = () => {
   );
 };
 
-// 5. Vendor Candidate Detail & Edit Page
+// 5. Vendor Candidate Detail & Edit Page (with Two-Way Discovery: Candidate -> Requirements)
 export const VendorCandidateDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { profile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const [activeTab, setActiveTab] = useState<'matches' | 'submissions' | 'profile'>('matches');
+  const [matchesPage, setMatchesPage] = useState(1);
+  const [evidenceTarget, setEvidenceTarget] = useState<CandidateMatch | null>(null);
+  const [submitTarget, setSubmitTarget] = useState<CandidateMatch | null>(null);
+  const [submitNotes, setSubmitNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [dupReason, setDupReason] = useState<string | null>(null);
+  const [drawerSubId, setDrawerSubId] = useState<string | null>(null);
 
   const { data: cand, isLoading } = useQuery({
     queryKey: ['vendor_candidate_detail', id],
@@ -764,6 +778,23 @@ export const VendorCandidateDetailPage: React.FC = () => {
     queryKey: ['vendor_candidate_contacts', id],
     queryFn: () => fetchCandidateContacts(id!),
     enabled: Boolean(id),
+  });
+
+  const { data: matchesData } = useQuery({
+    queryKey: ['vendor_candidate_matches', id, matchesPage],
+    queryFn: () => fetchMatchesForCandidate({ candidateId: id!, page: matchesPage }),
+    enabled: Boolean(id),
+  });
+
+  const { data: submissionsData } = useQuery({
+    queryKey: ['vendor_candidate_submissions', id, profile?.org_id],
+    queryFn: () =>
+      fetchSubmissions({
+        candidateId: id!,
+        vendorOrgId: profile?.org_id || undefined,
+        pageSize: 50,
+      }),
+    enabled: Boolean(id && profile?.org_id),
   });
 
   const [editing, setEditing] = useState(false);
@@ -814,6 +845,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ['vendor_candidate_detail', id] });
       queryClient.invalidateQueries({ queryKey: ['vendor_candidate_contacts', id] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_candidate_matches', id] });
     } catch (err) {
       toast({
         title: 'Update failed',
@@ -861,7 +893,41 @@ export const VendorCandidateDetailPage: React.FC = () => {
     }
   };
 
+  const handleSubmitToRequirement = async () => {
+    if (!submitTarget || !cand) return;
+    setSubmitting(true);
+    try {
+      const res = await submitCandidateRpc({
+        p_requirement_id: submitTarget.requirement_id,
+        p_candidate_id: cand.id,
+        p_notes: submitNotes.trim() || null,
+      });
+      if (res.status === 'duplicate') {
+        setDupReason(res.reason);
+        setSubmitTarget(null);
+        return;
+      }
+      toast({
+        title: 'Candidate submitted to requirement',
+        tone: 'success',
+      });
+      setSubmitTarget(null);
+      setSubmitNotes('');
+      queryClient.invalidateQueries({ queryKey: ['vendor_candidate_submissions', id] });
+    } catch (err) {
+      toast({
+        title: 'Submission failed',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (isLoading || !cand) return <TableSkeleton rows={4} cols={4} />;
+
+  const mySubmissions = submissionsData?.data || [];
 
   return (
     <div className="space-y-6">
@@ -871,16 +937,16 @@ export const VendorCandidateDetailPage: React.FC = () => {
           cand.total_experience_years ?? 0
         } yrs experience`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {cand.resume_path && (
               <Button size="sm" variant="outline" onClick={handleViewResume}>
                 <FileText className="h-3.5 w-3.5" />
-                View Resume
+                View Resume (5m Signed URL)
               </Button>
             )}
-            <label className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-slate-50">
+            <label className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
               <Upload className="h-3.5 w-3.5 text-indigo-600" />
-              <span>Replace Resume</span>
+              <span>{cand.resume_path ? 'Replace Resume' : 'Upload Resume'}</span>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
@@ -895,8 +961,31 @@ export const VendorCandidateDetailPage: React.FC = () => {
         }
       />
 
+      {/* Candidate 360 Header & Source Attribution */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 p-5 space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <span className="text-slate-500 block mb-1">Original Source</span>
+              <SourceBadge
+                source={cand.original_source}
+                vendorName={cand.source_vendor?.name}
+              />
+            </div>
+            <div>
+              <span className="text-slate-500 block mb-1">Owner Vendor Association</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                {cand.owner_vendor?.name || 'My Agency'}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block mb-1">Resume SHA-256</span>
+              <span className="font-mono text-[11px] text-slate-500">
+                {cand.resume_hash ? cand.resume_hash.slice(0, 12) + '…' : '—'}
+              </span>
+            </div>
+          </div>
+
           <div>
             <span className="font-semibold block mb-1">Summary</span>
             <p className="text-slate-600 dark:text-slate-300 whitespace-pre-line">
@@ -904,7 +993,9 @@ export const VendorCandidateDetailPage: React.FC = () => {
             </p>
           </div>
           <div>
-            <span className="font-semibold block mb-2">Skills</span>
+            <span className="font-semibold block mb-2">
+              Verified Profile Skills ({cand.skills?.length || 0})
+            </span>
             <div className="flex flex-wrap gap-1.5">
               {(cand.skills || []).map((sk) => (
                 <Badge key={sk} tone="indigo">
@@ -931,6 +1022,238 @@ export const VendorCandidateDetailPage: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* Bidirectional Discovery Tabs: Candidate -> Shared Requirements & Submissions */}
+      <Tabs
+        tabs={[
+          {
+            id: 'matches',
+            label: 'Matching Shared Requirements (Candidate → Requirements)',
+            count: matchesData?.count || 0,
+          },
+          {
+            id: 'submissions',
+            label: 'My Submissions for this Candidate',
+            count: mySubmissions.length,
+          },
+        ]}
+        activeTab={activeTab === 'profile' ? 'matches' : activeTab}
+        onChange={(t) => setActiveTab(t as 'matches' | 'submissions')}
+      />
+
+      {activeTab !== 'submissions' ? (
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Bidirectional discovery (<code className="font-mono">Candidate → Requirements</code>)
+            filtered to requirements shared with your vendor agency. A{' '}
+            <strong>Potential Match</strong> does not create a submission until you explicitly
+            click Review &amp; Submit.
+          </p>
+          {!matchesData?.data.length ? (
+            <EmptyState
+              title="No matching shared requirements yet"
+              description="When HireNest HQ shares open requirements matching this candidate's skills, they will appear here."
+            />
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
+                      <th className="py-3 px-4">Requirement</th>
+                      <th className="py-3 px-4">Pipeline Status</th>
+                      <th className="py-3 px-4">Advisory Match Score</th>
+                      <th className="py-3 px-4">Matched / Unproven Skills</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {matchesData.data.map((m) => {
+                      const existingSub = mySubmissions.find(
+                        (s) => s.requirement_id === m.requirement_id
+                      );
+                      return (
+                        <tr key={m.id}>
+                          <td className="py-3 px-4">
+                            <Link
+                              to={`/vendor/requirements/${m.requirement_id}`}
+                              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                              {m.requirements?.title || m.requirement_id}
+                            </Link>
+                            <div className="text-[11px] text-slate-500">
+                              {m.requirements?.location || '—'} ({m.requirements?.work_mode || '—'})
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            {existingSub ? (
+                              <Badge tone="indigo">
+                                Vendor Submitted · {STAGE_LABELS[existingSub.stage]}
+                              </Badge>
+                            ) : (
+                              <Badge tone="amber">Potential Match (Not Submitted)</Badge>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <ScoreBar
+                              score={m.final_score}
+                              isOverridden={m.override_score !== null}
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                              {m.matched_skills?.length || 0} matched
+                            </span>{' '}
+                            ·{' '}
+                            <span
+                              className="text-slate-500"
+                              title="Missing evidence is not proof of missing skill"
+                            >
+                              {m.unproven_skills?.length || 0} unproven
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right space-x-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEvidenceTarget(m)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              Evidence
+                            </Button>
+                            {existingSub ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDrawerSubId(existingSub.id)}
+                              >
+                                View Pipeline
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSubmitTarget(m);
+                                  setSubmitNotes('');
+                                }}
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                Review &amp; Submit
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={matchesPage}
+                totalCount={matchesData.count}
+                onPageChange={setMatchesPage}
+              />
+            </Card>
+          )}
+        </div>
+      ) : !mySubmissions.length ? (
+        <EmptyState
+          title="No submissions for this candidate yet"
+          description="Select a requirement from Matching Shared Requirements to submit this candidate."
+        />
+      ) : (
+        <Card className="overflow-hidden">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 font-semibold text-slate-600 dark:text-slate-400">
+                <th className="py-3 px-4">Requirement</th>
+                <th className="py-3 px-4">Stage</th>
+                <th className="py-3 px-4">Submitted At</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              {mySubmissions.map((sub) => (
+                <tr
+                  key={sub.id}
+                  onClick={() => setDrawerSubId(sub.id)}
+                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
+                >
+                  <td className="py-3 px-4 font-semibold">
+                    {sub.requirements?.title || sub.requirement_id}
+                  </td>
+                  <td className="py-3 px-4">
+                    <StageBadge stage={sub.stage} />
+                  </td>
+                  <td className="py-3 px-4 font-mono tabular-nums text-slate-500">
+                    {formatLocalDateTime(sub.created_at)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      {/* Inspect Match Evidence Modal */}
+      <Dialog
+        open={Boolean(evidenceTarget)}
+        onClose={() => setEvidenceTarget(null)}
+        title="Explainable Match Evidence Breakdown"
+        maxWidth="max-w-xl"
+      >
+        {evidenceTarget && (
+          <div className="space-y-4">
+            <MatchEvidencePanel match={evidenceTarget} />
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setEvidenceTarget(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Submit Candidate to Requirement Modal */}
+      <Dialog
+        open={Boolean(submitTarget)}
+        onClose={() => setSubmitTarget(null)}
+        title="Submit Candidate to Requirement"
+        description="Verify match evidence and add submission notes before submitting."
+        maxWidth="max-w-xl"
+      >
+        {submitTarget && (
+          <div className="space-y-4">
+            <MatchEvidencePanel match={submitTarget} />
+            <Textarea
+              label="Vendor Submission Notes"
+              rows={3}
+              value={submitNotes}
+              onChange={(e) => setSubmitNotes(e.target.value)}
+              placeholder="Notice period, availability for interviews, rate confirmation..."
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setSubmitTarget(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmitToRequirement} loading={submitting}>
+                Confirm Submission
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      <SubmissionDetailDrawer
+        submissionId={drawerSubId}
+        onClose={() => setDrawerSubId(null)}
+        role={profile?.role || 'vendor_recruiter'}
+      />
+
+      <DuplicateDialog
+        open={Boolean(dupReason)}
+        onClose={() => setDupReason(null)}
+        reason={dupReason}
+      />
 
       <Dialog
         open={editing}

@@ -10,6 +10,7 @@ import {
   Edit3,
   Globe,
   Send,
+  Eye,
 } from 'lucide-react';
 import {
   PageHeader,
@@ -303,7 +304,8 @@ export const HqRequirementDetailPage: React.FC = () => {
   const [shareSlaHours, setShareSlaHours] = useState<number>(48);
   const [sharingLoading, setSharingLoading] = useState(false);
 
-  // Match Override modal (HQ only)
+  // Match Evidence & Override modal (HQ only)
+  const [evidenceTarget, setEvidenceTarget] = useState<CandidateMatch | null>(null);
   const [overrideTarget, setOverrideTarget] = useState<CandidateMatch | null>(null);
   const [overrideScoreInput, setOverrideScoreInput] = useState<string>('');
   const [overrideReasonInput, setOverrideReasonInput] = useState('');
@@ -874,6 +876,7 @@ export const HqRequirementDetailPage: React.FC = () => {
                       <th className="py-3 px-4">Candidate</th>
                       <th className="py-3 px-4">Original Source</th>
                       <th className="py-3 px-4">Owner Vendor</th>
+                      <th className="py-3 px-4">Pipeline / Attribution Status</th>
                       <th className="py-3 px-4">Final Score</th>
                       <th className="py-3 px-4">Matched / Unproven Skills</th>
                       <th className="py-3 px-4">Experience Note & Engine</th>
@@ -883,7 +886,7 @@ export const HqRequirementDetailPage: React.FC = () => {
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
                     {matchesData.data.map((m) => {
                       const cand = m.candidates;
-                      const alreadySubmitted = submissions.some(
+                      const existingSub = submissions.find(
                         (s) => s.candidate_id === m.candidate_id
                       );
                       return (
@@ -909,7 +912,24 @@ export const HqRequirementDetailPage: React.FC = () => {
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
-                            {cand?.owner_vendor?.name || '—'}
+                            {cand?.owner_vendor?.name || 'None (Direct / Internal)'}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {!existingSub ? (
+                              <Badge tone="amber">Potential Match (Not Applied)</Badge>
+                            ) : existingSub.source === 'direct' ? (
+                              <Badge tone="emerald">
+                                Direct Applied · {STAGE_LABELS[existingSub.stage]}
+                              </Badge>
+                            ) : existingSub.source === 'vendor' ? (
+                              <Badge tone="indigo">
+                                Vendor Submitted · {STAGE_LABELS[existingSub.stage]}
+                              </Badge>
+                            ) : (
+                              <Badge tone="slate">
+                                HQ Submitted · {STAGE_LABELS[existingSub.stage]}
+                              </Badge>
+                            )}
                           </td>
                           <td className="py-3.5 px-4">
                             <ScoreBar
@@ -954,6 +974,14 @@ export const HqRequirementDetailPage: React.FC = () => {
                           <td className="py-3.5 px-4 text-right space-x-1.5">
                             <Button
                               size="sm"
+                              variant="ghost"
+                              onClick={() => setEvidenceTarget(m)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              Evidence
+                            </Button>
+                            <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => {
                                 setOverrideTarget(m);
@@ -966,8 +994,14 @@ export const HqRequirementDetailPage: React.FC = () => {
                               <Sliders className="h-3.5 w-3.5" />
                               Override
                             </Button>
-                            {alreadySubmitted ? (
-                              <Badge tone="emerald">Submitted</Badge>
+                            {existingSub ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDrawerSubmissionId(existingSub.id)}
+                              >
+                                View Pipeline
+                              </Button>
                             ) : (
                               <Button
                                 size="sm"
@@ -1286,6 +1320,26 @@ export const HqRequirementDetailPage: React.FC = () => {
         onClose={() => setDupDialogReason(null)}
         reason={dupDialogReason}
       />
+
+      {/* Explainable Match Evidence Inspection Modal */}
+      <Dialog
+        open={Boolean(evidenceTarget)}
+        onClose={() => setEvidenceTarget(null)}
+        title="Explainable Match Evidence Breakdown"
+        description="Deterministic score, matched vs unproven skills, experience alignment, and recruiter override."
+        maxWidth="max-w-xl"
+      >
+        {evidenceTarget && (
+          <div className="space-y-4">
+            <MatchEvidencePanel match={evidenceTarget} />
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setEvidenceTarget(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 };

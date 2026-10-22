@@ -19,6 +19,7 @@ import {
   ScheduleInterviewModal,
   InterviewFeedbackModal,
   CandidateQualityModal,
+  ScreeningInterviewRunnerModal,
 } from './InterviewModals';
 import {
   fetchSubmissionById,
@@ -67,6 +68,7 @@ export const SubmissionDetailDrawer: React.FC<{
   // Interview & Quality rating modals
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [feedbackInterview, setFeedbackInterview] = useState<Interview | null>(null);
+  const [screeningInterview, setScreeningInterview] = useState<Interview | null>(null);
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
 
   const { data: submission, isLoading } = useQuery({
@@ -398,6 +400,13 @@ export const SubmissionDetailDrawer: React.FC<{
                         <div className="flex flex-wrap gap-2 pt-1">
                           <Button
                             size="sm"
+                            variant="primary"
+                            onClick={() => setScreeningInterview(iv)}
+                          >
+                            Run Screening Session (Capture Q&A)
+                          </Button>
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => handleUpdateInterviewStatus(iv.id, 'completed')}
                           >
@@ -664,6 +673,25 @@ export const SubmissionDetailDrawer: React.FC<{
           submissionId={submission.id}
           candidateName={submission.candidates?.full_name}
           onSubmitted={refreshAll}
+        />
+      )}
+
+      {/* First-Round Screening Interview Runner Modal */}
+      {screeningInterview && submission && (
+        <ScreeningInterviewRunnerModal
+          open={Boolean(screeningInterview)}
+          onClose={() => setScreeningInterview(null)}
+          interviewId={screeningInterview.id}
+          submissionId={submission.id}
+          mode={screeningInterview.mode}
+          candidateName={submission.candidates?.full_name}
+          requirementTitle={submission.requirements?.title}
+          requirementDescription={submission.requirements?.description}
+          requirementSkills={submission.requirements?.skills}
+          candidateSkills={submission.candidates?.skills}
+          candidateExperienceYears={submission.candidates?.total_experience_years}
+          candidateCurrentTitle={submission.candidates?.current_title}
+          onCompleted={refreshAll}
         />
       )}
     </Drawer>
