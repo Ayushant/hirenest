@@ -22,9 +22,21 @@ Create the following 8 accounts via `/signup` (or Supabase Auth) and configure t
 ### Bootstrap SQL for Persona 1 (`admin@hirenest.test`)
 After signing up `admin@hirenest.test`, run this once in the Supabase SQL Editor:
 ```sql
-update public.profiles
-set role = 'admin', status = 'active', approved_at = now()
-where email = 'admin@hirenest.test';
+do $$
+declare
+  v_internal_org uuid;
+begin
+  select id into v_internal_org from public.organizations where type = 'internal' limit 1;
+  if v_internal_org is null then
+    insert into public.organizations (name, type, status, sla_tier)
+    values ('HireNest Internal', 'internal', 'approved', 'enterprise')
+    returning id into v_internal_org;
+  end if;
+
+  update public.profiles
+  set role = 'admin', status = 'active', org_id = v_internal_org
+  where email = 'admin@hirenest.test';
+end $$;
 ```
 
 All other 7 personas can be approved directly inside the app via **Admin → Approvals** (`/admin/approvals`).

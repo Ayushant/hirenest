@@ -350,7 +350,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         </nav>
 
         {/* Bottom User Card */}
-        <div className="border-t border-white/10 p-2.5 space-y-1.5">
+        <div className="border-t border-white/10 p-2.5 space-y-1">
           <div className="px-2 py-1.5 flex items-center gap-2.5">
             <Avatar id={profile?.id} name={profile?.full_name} size="md" />
             <div className="min-w-0 flex-1">
@@ -362,9 +362,13 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               </div>
             </div>
           </div>
+
           <button
             type="button"
-            onClick={() => signOut()}
+            onClick={async () => {
+              await signOut();
+              navigate('/signin', { replace: true });
+            }}
             className="w-full h-[34px] px-2.5 rounded-[6px] flex items-center gap-2 text-[13px] leading-[20px] text-[var(--sidebar-muted)] hover:text-white hover:bg-[var(--sidebar-hover)] transition-colors cursor-pointer"
           >
             <LogOut strokeWidth={1.75} className="h-3.5 w-3.5" />

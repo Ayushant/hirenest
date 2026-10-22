@@ -41,12 +41,24 @@ Users with `role = 'pending'` or `status = 'pending'` are held at `/pending` (**
 Because `approve_user` requires an existing `admin`, promote your first account in the Supabase SQL Editor after signing up:
 
 ```sql
-update public.profiles
-set
-  role = 'admin',
-  status = 'active',
-  approved_at = now()
-where email = 'your-admin-email@company.com';
+do $$
+declare
+  v_internal_org uuid;
+begin
+  select id into v_internal_org from public.organizations where type = 'internal' limit 1;
+  if v_internal_org is null then
+    insert into public.organizations (name, type, status, sla_tier)
+    values ('HireNest Internal', 'internal', 'approved', 'enterprise')
+    returning id into v_internal_org;
+  end if;
+
+  update public.profiles
+  set
+    role = 'admin',
+    status = 'active',
+    org_id = v_internal_org
+  where email = 'your-admin-email@company.com';
+end $$;
 ```
 
 Once signed in as `admin`, you can:
