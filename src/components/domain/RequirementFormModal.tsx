@@ -9,6 +9,7 @@ import {
   Select,
   Textarea,
   SkillsChipInput,
+  Badge,
 } from '../ui/kit';
 import { AiSuggestionBanner, Phase2ComingSoonCard } from './DomainBadges';
 import {
@@ -16,8 +17,18 @@ import {
   updateRequirement,
   upsertRequirementFinancials,
   upsertRequirementMargins,
+  publishAndShareRequirementWithAllVendors,
 } from '../../api/requirements';
 import { suggestSkillsFromJd, improveJdWording } from '../../api/ai';
+import {
+  type BudgetMode,
+  type BudgetUnit,
+  BUDGET_UNIT_METADATA,
+  encodeRequirementMetaToCurrency,
+  formatBudgetDisplay,
+  parseRequirementMeta,
+  validateBudgetValues,
+} from '../../lib/enterpriseLifecycle';
 import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../ui/Toast';
 import type {
@@ -30,7 +41,7 @@ import type {
 
 const requirementSchema = z
   .object({
-    client_org_id: z.string().min(1, 'Client organization is required'),
+    client_org_id: z.string().optional(),
     title: z.string().min(3, 'Title must be at least 3 characters'),
     description: z.string().min(20, 'Description must be at least 20 characters'),
     min_experience: z.coerce.number().min(0, 'Min experience must be >= 0'),
@@ -39,7 +50,6 @@ const requirementSchema = z
     work_mode: z.enum(['onsite', 'hybrid', 'remote']),
     employment_type: z.enum(['full_time', 'contract', 'contract_to_hire', 'part_time']),
     openings: z.coerce.number().int().min(1, 'At least 1 opening required'),
-    vendor_visible_budget: z.string().optional(),
     currency: z.string().min(1, 'Currency is required'),
     submission_sla_hours: z.coerce.number().int().min(1, 'SLA hours must be >= 1'),
     actual_client_budget: z.string().optional(),
@@ -82,9 +92,33 @@ export const RequirementFormModal: React.FC<{
   const isHq = role === 'admin' || role === 'recruiter';
   const isAdmin = role === 'admin';
 
+  const initialMeta = parseRequirementMeta(initialRequirement);
+
   const [skills, setSkills] = useState<string[]>(initialRequirement?.skills || []);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Update 1: Explicit Client Mapping state + Vendor Publication state
+  const [isClientMapped, setIsClientMapped] = useState<boolean>(
+    isHq ? (isEditing ? initialMeta.isClientMapped : true) : true
+  );
+  const [publishForVendors, setPublishForVendors] = useState<boolean>(true);
+  const [clientMapError, setClientMapError] = useState<string | null>(null);
+
+  // Update 2: Budget Range vs Fixed + LPA / LPM Unit state (never silently converts values)
+  const [budgetMode, setBudgetMode] = useState<BudgetMode>(initialMeta.budgetMode || 'range');
+  const [budgetUnit, setBudgetUnit] = useState<BudgetUnit>(initialMeta.budgetUnit || 'LPA');
+  const [budgetMinInput, setBudgetMinInput] = useState<string>(
+    initialMeta.budgetMin !== null && initialMeta.budgetMin !== undefined
+      ? String(initialMeta.budgetMin)
+      : '12'
+  );
+  const [budgetMaxInput, setBudgetMaxInput] = useState<string>(
+    initialMeta.budgetMax !== null && initialMeta.budgetMax !== undefined
+      ? String(initialMeta.budgetMax)
+      : '15'
+  );
+  const [budgetError, setBudgetError] = useState<string | null>(null);
 
   const [aiSkillSuggestions, setAiSkillSuggestions] = useState<string[]>([]);
   const [aiImprovedJd, setAiImprovedJd] = useState<string | null>(null);
@@ -102,7 +136,12 @@ export const RequirementFormModal: React.FC<{
   } = useForm<RequirementFormValues>({
     resolver: zodResolver(requirementSchema) as never,
     defaultValues: {
-      client_org_id: initialRequirement?.client_org_id || userOrgId || '',
+      client_org_id:
+        initialMeta.mappedClientOrgId ||
+        initialRequirement?.client_org_id ||
+        userOrgId ||
+        clientOrgs[0]?.id ||
+        '',
       title: initialRequirement?.title || '',
       description: initialRequirement?.description || '',
       min_experience: initialRequirement?.min_experience ?? 2,
@@ -111,12 +150,7 @@ export const RequirementFormModal: React.FC<{
       work_mode: initialRequirement?.work_mode || 'hybrid',
       employment_type: initialRequirement?.employment_type || 'full_time',
       openings: initialRequirement?.openings ?? 1,
-      vendor_visible_budget:
-        initialRequirement?.vendor_visible_budget !== null &&
-        initialRequirement?.vendor_visible_budget !== undefined
-          ? String(initialRequirement.vendor_visible_budget)
-          : '',
-      currency: initialRequirement?.currency || 'INR',
+      currency: initialMeta.baseCurrency || 'INR',
       submission_sla_hours: initialRequirement?.submission_sla_hours ?? defaultSlaHours,
       actual_client_budget:
         initialFinancials?.actual_client_budget !== null &&
@@ -135,12 +169,40 @@ export const RequirementFormModal: React.FC<{
 
   useEffect(() => {
     if (open) {
+      const parsed = parseRequirementMeta(initialRequirement);
       setSkills(initialRequirement?.skills || []);
       setAiSkillSuggestions([]);
       setAiImprovedJd(null);
       setAiError(null);
+      setClientMapError(null);
+      setBudgetError(null);
+
+      setIsClientMapped(isHq ? (initialRequirement ? parsed.isClientMapped : true) : true);
+      setPublishForVendors(true);
+      setBudgetMode(parsed.budgetMode || 'range');
+      setBudgetUnit(parsed.budgetUnit || 'LPA');
+      setBudgetMinInput(
+        parsed.budgetMin !== null && parsed.budgetMin !== undefined
+          ? String(parsed.budgetMin)
+          : initialRequirement
+            ? ''
+            : '12'
+      );
+      setBudgetMaxInput(
+        parsed.budgetMax !== null && parsed.budgetMax !== undefined
+          ? String(parsed.budgetMax)
+          : initialRequirement
+            ? ''
+            : '15'
+      );
+
       reset({
-        client_org_id: initialRequirement?.client_org_id || userOrgId || '',
+        client_org_id:
+          parsed.mappedClientOrgId ||
+          initialRequirement?.client_org_id ||
+          userOrgId ||
+          clientOrgs[0]?.id ||
+          '',
         title: initialRequirement?.title || '',
         description: initialRequirement?.description || '',
         min_experience: initialRequirement?.min_experience ?? 2,
@@ -149,12 +211,7 @@ export const RequirementFormModal: React.FC<{
         work_mode: initialRequirement?.work_mode || 'hybrid',
         employment_type: initialRequirement?.employment_type || 'full_time',
         openings: initialRequirement?.openings ?? 1,
-        vendor_visible_budget:
-          initialRequirement?.vendor_visible_budget !== null &&
-          initialRequirement?.vendor_visible_budget !== undefined
-            ? String(initialRequirement.vendor_visible_budget)
-            : '',
-        currency: initialRequirement?.currency || 'INR',
+        currency: parsed.baseCurrency || 'INR',
         submission_sla_hours: initialRequirement?.submission_sla_hours ?? defaultSlaHours,
         actual_client_budget:
           initialFinancials?.actual_client_budget !== null &&
@@ -170,10 +227,40 @@ export const RequirementFormModal: React.FC<{
         margin_type: initialMargins?.margin_type || 'percentage',
       });
     }
-  }, [open, initialRequirement, initialFinancials, initialMargins, userOrgId, defaultSlaHours, reset]);
+  }, [
+    open,
+    initialRequirement,
+    initialFinancials,
+    initialMargins,
+    userOrgId,
+    clientOrgs,
+    defaultSlaHours,
+    isHq,
+    reset,
+  ]);
 
   const watchedTitle = watch('title');
   const watchedDesc = watch('description');
+  const watchedCurrency = watch('currency') || 'INR';
+
+  const parsedMinNum =
+    budgetMinInput.trim() !== '' && !Number.isNaN(Number(budgetMinInput))
+      ? Number(budgetMinInput)
+      : null;
+  const parsedMaxNum =
+    budgetMode === 'fixed'
+      ? parsedMinNum
+      : budgetMaxInput.trim() !== '' && !Number.isNaN(Number(budgetMaxInput))
+        ? Number(budgetMaxInput)
+        : null;
+
+  const liveBudgetPreview = formatBudgetDisplay({
+    budgetMode,
+    budgetUnit,
+    budgetMin: parsedMinNum,
+    budgetMax: parsedMaxNum,
+    baseCurrency: watchedCurrency,
+  });
 
   const handleSuggestSkills = async () => {
     setAiLoading('skills');
@@ -216,13 +303,55 @@ export const RequirementFormModal: React.FC<{
       return;
     }
     setSkillsError(null);
+
+    // Validate Client Mapping (Update 1)
+    const effectiveClientOrgId = (values.client_org_id || userOrgId || '').trim();
+    if (isClientMapped && !effectiveClientOrgId) {
+      setClientMapError('Select a client organization to map this requirement to.');
+      return;
+    }
+    setClientMapError(null);
+
+    // Validate LPA / LPM Budget (Update 2)
+    const budgetCheck = validateBudgetValues({
+      budgetMode,
+      budgetUnit,
+      budgetMin: parsedMinNum,
+      budgetMax: parsedMaxNum,
+    });
+    if (!budgetCheck.valid) {
+      setBudgetError(budgetCheck.error || 'Invalid budget range.');
+      return;
+    }
+    setBudgetError(null);
+
     setSubmitting(true);
 
     try {
-      const vendorBudget =
-        values.vendor_visible_budget && values.vendor_visible_budget.trim() !== ''
-          ? Number(values.vendor_visible_budget)
-          : null;
+      // Determine database client_org_id (satisfies FK even when unmapped/internal)
+      const dbClientOrgId =
+        effectiveClientOrgId ||
+        initialRequirement?.client_org_id ||
+        clientOrgs[0]?.id ||
+        userOrgId ||
+        '';
+
+      if (!dbClientOrgId) {
+        throw new Error('At least one client organization is required in the workspace.');
+      }
+
+      const vendorVisibleNumeric =
+        parsedMaxNum !== null ? parsedMaxNum : parsedMinNum !== null ? parsedMinNum : null;
+
+      const encodedCurrency = encodeRequirementMetaToCurrency({
+        baseCurrency: values.currency,
+        budgetUnit,
+        budgetMode,
+        budgetMin: parsedMinNum,
+        budgetMax: parsedMaxNum,
+        isClientMapped,
+        mappedClientOrgId: isClientMapped ? dbClientOrgId : null,
+      });
 
       let savedReq: Requirement;
       if (isEditing && initialRequirement) {
@@ -236,13 +365,13 @@ export const RequirementFormModal: React.FC<{
           work_mode: values.work_mode,
           employment_type: values.employment_type,
           openings: values.openings,
-          vendor_visible_budget: vendorBudget,
-          currency: values.currency,
+          vendor_visible_budget: vendorVisibleNumeric,
+          currency: encodedCurrency,
           submission_sla_hours: values.submission_sla_hours,
         });
       } else {
         savedReq = await createRequirement({
-          client_org_id: values.client_org_id,
+          client_org_id: dbClientOrgId,
           title: values.title,
           description: values.description,
           skills,
@@ -252,10 +381,20 @@ export const RequirementFormModal: React.FC<{
           work_mode: values.work_mode,
           employment_type: values.employment_type,
           openings: values.openings,
-          vendor_visible_budget: vendorBudget,
-          currency: values.currency,
+          vendor_visible_budget: vendorVisibleNumeric,
+          currency: encodedCurrency,
           submission_sla_hours: values.submission_sla_hours,
         });
+      }
+
+      // When HQ creates/edits with vendor publishing enabled, automatically set status = 'open'
+      // and share with all vendor organizations so vendor workspaces see it immediately.
+      if (isHq && publishForVendors) {
+        await publishAndShareRequirementWithAllVendors({
+          requirementId: savedReq.id,
+          slaHours: values.submission_sla_hours,
+        });
+        savedReq = { ...savedReq, status: 'open' };
       }
 
       if (values.actual_client_budget !== undefined || values.financial_notes !== undefined) {
@@ -284,7 +423,9 @@ export const RequirementFormModal: React.FC<{
 
       toast({
         title: isEditing ? 'Requirement updated' : 'Requirement created',
-        description: savedReq.title,
+        description: `${savedReq.title} (${isClientMapped ? 'Mapped to client' : 'Internal / Unmapped'}${
+          isHq && publishForVendors ? ' · Published to vendors' : ''
+        })`,
         tone: 'success',
       });
       onSaved(savedReq);
@@ -305,20 +446,96 @@ export const RequirementFormModal: React.FC<{
       open={open}
       onClose={onClose}
       title={isEditing ? 'Edit requirement' : 'New requirement'}
-      description="Job specification, skills, SLA hours, and budget visibility."
-      maxWidth="max-w-[640px]"
+      description="Job specification, explicit client mapping, LPA/LPM budget unit, and SLA governance."
+      maxWidth="max-w-[660px]"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {isHq && !isEditing && (
-          <Select
-            label="Client organization"
-            {...register('client_org_id')}
-            error={errors.client_org_id?.message}
-            options={[
-              { value: '', label: 'Select client organization...' },
-              ...clientOrgs.map((o) => ({ value: o.id, label: o.name })),
-            ]}
-          />
+        {/* Update 1: Admin / HQ Explicit Client Mapping & Vendor Sourcing Section */}
+        {isHq && (
+          <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3.5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="text-[12px] leading-[16px] font-semibold text-[var(--text-primary)] block">
+                  Client visibility & vendor publication
+                </span>
+                <span className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+                  Unmapped requirements remain hidden from clients while allowing eligible vendor sourcing.
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Badge tone={isClientMapped ? 'emerald' : 'amber'}>
+                  {isClientMapped ? 'Mapped to client' : 'Internal / Unmapped'}
+                </Badge>
+                <Badge tone={publishForVendors ? 'sky' : 'neutral'}>
+                  {publishForVendors ? 'Shared with vendors' : 'Draft only'}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsClientMapped(true);
+                  setClientMapError(null);
+                }}
+                className={`h-8 px-3 rounded-[6px] border text-[12px] leading-[16px] font-medium text-left transition-colors cursor-pointer ${
+                  isClientMapped
+                    ? 'border-[var(--accent)] bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                    : 'border-[var(--border)] bg-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                Explicitly map to client
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsClientMapped(false);
+                  setClientMapError(null);
+                }}
+                className={`h-8 px-3 rounded-[6px] border text-[12px] leading-[16px] font-medium text-left transition-colors cursor-pointer ${
+                  !isClientMapped
+                    ? 'border-[var(--accent)] bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                    : 'border-[var(--border)] bg-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                Keep unmapped (internal / vendor only)
+              </button>
+            </div>
+
+            {isClientMapped ? (
+              <Select
+                label="Mapped client organization"
+                {...register('client_org_id')}
+                error={clientMapError || errors.client_org_id?.message}
+                options={[
+                  { value: '', label: 'Select client organization...' },
+                  ...clientOrgs.map((o) => ({ value: o.id, label: o.name })),
+                ]}
+              />
+            ) : (
+              <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+                This requirement will not appear in client lists, search, counts, exports, or direct client links until an Admin explicitly maps it to a client.
+              </p>
+            )}
+
+            <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[12px] leading-[16px] font-medium text-[var(--text-primary)]">
+                  Publish as Open & share with vendor agencies immediately
+                </div>
+                <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                  Makes this requirement visible in Vendor Shared Requirements with SLA countdown.
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={publishForVendors}
+                onChange={(e) => setPublishForVendors(e.target.checked)}
+                className="h-4 w-4 rounded border-[var(--border)] accent-[#1F4CC4] cursor-pointer"
+              />
+            </div>
+          </div>
         )}
 
         <Input
@@ -502,36 +719,160 @@ export const RequirementFormModal: React.FC<{
           />
         </div>
 
-        {/* Budgets & Financials */}
-        <div className="pt-3 border-t border-[var(--border)] space-y-3">
-          <h4 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
-            Budget & financial governance
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Update 2: Budget Unit Selection (LPA — annual / LPM — monthly) & Financial Governance */}
+        <div className="pt-3 border-t border-[var(--border)] space-y-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+              Requirement budget & financial governance
+            </h4>
+            {/* Mode Toggle: Budget range vs Fixed budget */}
+            <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setBudgetMode('range');
+                  setBudgetError(null);
+                }}
+                className={`px-2.5 py-1 rounded-[4px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                  budgetMode === 'range'
+                    ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Budget range
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBudgetMode('fixed');
+                  setBudgetError(null);
+                }}
+                className={`px-2.5 py-1 rounded-[4px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                  budgetMode === 'fixed'
+                    ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Fixed budget
+              </button>
+            </div>
+          </div>
+
+          {/* Budget Unit Selector: LPA — annual vs LPM — monthly */}
+          <div className="space-y-1.5">
+            <label className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
+              Budget unit
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              {(['LPA', 'LPM'] as const).map((unitCode) => {
+                const info = BUDGET_UNIT_METADATA[unitCode];
+                const active = budgetUnit === unitCode;
+                return (
+                  <button
+                    key={unitCode}
+                    type="button"
+                    onClick={() => {
+                      // Do NOT silently convert numeric values when switching between LPA and LPM
+                      setBudgetUnit(unitCode);
+                      setBudgetError(null);
+                    }}
+                    className={`rounded-[6px] border px-3 py-2 text-left transition-colors cursor-pointer ${
+                      active
+                        ? 'border-[var(--accent)] bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                        : 'border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                    }`}
+                  >
+                    <div className="text-[13px] leading-[18px] font-medium text-[var(--text-primary)]">
+                      {info.selectorLabel}
+                    </div>
+                    <div className="text-[11px] leading-[16px] text-[var(--text-tertiary)]">
+                      {info.fullLabel}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Minimum / Maximum Budget + Preview Only */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+            {budgetMode === 'range' ? (
+              <>
+                <Input
+                  label={`Minimum budget (${budgetUnit})`}
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder={budgetUnit === 'LPA' ? 'e.g. 12' : 'e.g. 1.2'}
+                  value={budgetMinInput}
+                  onChange={(e) => {
+                    setBudgetMinInput(e.target.value);
+                    setBudgetError(null);
+                  }}
+                />
+                <Input
+                  label={`Maximum budget (${budgetUnit})`}
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder={budgetUnit === 'LPA' ? 'e.g. 15' : 'e.g. 1.8'}
+                  value={budgetMaxInput}
+                  onChange={(e) => {
+                    setBudgetMaxInput(e.target.value);
+                    setBudgetError(null);
+                  }}
+                />
+              </>
+            ) : (
+              <div className="sm:col-span-2">
+                <Input
+                  label={`Fixed budget (${budgetUnit})`}
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder={budgetUnit === 'LPA' ? 'e.g. 14' : 'e.g. 1.5'}
+                  value={budgetMinInput}
+                  onChange={(e) => {
+                    setBudgetMinInput(e.target.value);
+                    setBudgetMaxInput(e.target.value);
+                    setBudgetError(null);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Preview only card */}
+            <div className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2">
+              <div className="text-[11px] leading-[14px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                Preview only
+              </div>
+              <div className="mt-1 font-mono tabular-nums text-[15px] leading-[20px] font-semibold text-[var(--text-primary)]">
+                {liveBudgetPreview.formatted}
+              </div>
+              <div className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+                {liveBudgetPreview.subtitle || BUDGET_UNIT_METADATA[budgetUnit].fullLabel}
+              </div>
+            </div>
+          </div>
+
+          {budgetError && (
+            <p className="text-[12px] leading-[16px] text-[var(--status-danger)]">{budgetError}</p>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <Input
-              label="Currency"
-              placeholder="INR / USD"
-              {...register('currency')}
-              error={errors.currency?.message}
-            />
-            <Input
-              label="Vendor-visible budget"
+              label={`Internal client budget (${budgetUnit})`}
               type="number"
-              placeholder="Shared with vendors"
-              {...register('vendor_visible_budget')}
-            />
-            <Input
-              label="Internal client budget"
-              type="number"
+              step="0.1"
               placeholder="Private (Client + HQ)"
               {...register('actual_client_budget')}
             />
+            <Input
+              label="Internal financial notes"
+              placeholder="Billing terms, rate card notes..."
+              {...register('financial_notes')}
+            />
           </div>
-          <Input
-            label="Internal financial notes"
-            placeholder="Billing terms, rate card notes..."
-            {...register('financial_notes')}
-          />
 
           {isAdmin && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -547,7 +888,7 @@ export const RequirementFormModal: React.FC<{
                 {...register('margin_type')}
                 options={[
                   { value: 'percentage', label: 'Percentage (%)' },
-                  { value: 'fixed', label: 'Fixed amount' },
+                  { value: 'fixed', label: `Fixed amount (${budgetUnit})` },
                 ]}
               />
             </div>

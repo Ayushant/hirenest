@@ -1,5 +1,10 @@
 import { format, differenceInMinutes, differenceInHours, parseISO } from 'date-fns';
-import type { SubmissionStage, InterviewRound, RequirementStatus, AppRole } from '../types/db';
+import type { SubmissionStage, InterviewRound, RequirementStatus, AppRole, Requirement } from '../types/db';
+import {
+  parseRequirementMeta,
+  formatBudgetDisplay,
+  BUDGET_UNIT_METADATA,
+} from './enterpriseLifecycle';
 
 export function formatLocalDateTime(isoString: string | null | undefined): string {
   if (!isoString) return '—';
@@ -35,17 +40,82 @@ export function formatRelativeTime(isoString: string | null | undefined): string
   }
 }
 
+/**
+ * Formats a budget or financial amount.
+ * - When `currency` carries structured LPA/LPM metadata (`INR|unit=LPA|mode=range|min=12|max=15...`),
+ *   Wait: if `amount` is the requirement's `vendor_visible_budget` (which equals `budgetMax` or `budgetMin`),
+ *   it renders the full range or fixed LPA/LPM string (e.g. `₹12–15 LPA` or `₹1.5–2 LPM`).
+ *   If `amount` is a distinct figure (such as `actual_client_budget` or `platform_margin`),
+ *   it preserves the requirement's LPA/LPM unit without silently converting LPA <-> LPM.
+ * - For legacy records without a unit field, it renders standard currency formatting.
+ */
 export function formatCurrency(amount: number | null | undefined, currency = 'INR'): string {
+  const rawCurrency = currency || 'INR';
+  if (rawCurrency.includes('|')) {
+    const meta = parseRequirementMeta(rawCurrency, amount ?? null);
+    if (meta.budgetUnit) {
+      const unitInfo = BUDGET_UNIT_METADATA[meta.budgetUnit];
+      const symbol = meta.baseCurrency.toUpperCase() === 'USD' ? '$' : '₹';
+
+      // If caller passed a specific distinct numeric value (e.g. internal client budget or fixed margin)
+      const matchesVendorBudget =
+        amount === null ||
+        amount === undefined ||
+        amount === meta.budgetMax ||
+        amount === meta.budgetMin;
+
+      if (!matchesVendorBudget && amount !== null && amount !== undefined) {
+        const clean = Number.isInteger(amount) ? String(amount) : Number(amount.toFixed(2)).toString();
+        return `${symbol}${clean} ${unitInfo.shortSuffix}`;
+      }
+
+      return formatBudgetDisplay({
+        budgetMode: meta.budgetMode,
+        budgetUnit: meta.budgetUnit,
+        budgetMin: meta.budgetMin,
+        budgetMax: meta.budgetMax,
+        baseCurrency: meta.baseCurrency,
+      }).formatted;
+    }
+  }
+
   if (amount === null || amount === undefined) return '—';
+  const baseCurr = rawCurrency.split('|')[0]?.trim() || 'INR';
   try {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: currency || 'INR',
+      currency: baseCurr,
       maximumFractionDigits: 0,
     }).format(amount);
   } catch {
-    return `${currency} ${amount.toLocaleString()}`;
+    return `${baseCurr} ${amount.toLocaleString()}`;
   }
+}
+
+export function formatRequirementBudgetWithSubtitle(
+  req: Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'>
+): {
+  formatted: string;
+  subtitle: string | null;
+  unit: 'LPA' | 'LPM' | null;
+  isClientMapped: boolean;
+  mappedClientOrgId: string | null;
+} {
+  const meta = parseRequirementMeta(req);
+  const display = formatBudgetDisplay({
+    budgetMode: meta.budgetMode,
+    budgetUnit: meta.budgetUnit,
+    budgetMin: meta.budgetMin,
+    budgetMax: meta.budgetMax,
+    baseCurrency: meta.baseCurrency,
+  });
+  return {
+    formatted: display.formatted,
+    subtitle: display.subtitle,
+    unit: display.unit,
+    isClientMapped: meta.isClientMapped,
+    mappedClientOrgId: meta.mappedClientOrgId,
+  };
 }
 
 /**

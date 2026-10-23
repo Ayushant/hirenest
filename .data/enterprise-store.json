@@ -1,0 +1,194 @@
+{
+  "subscriptions": {
+    "test_acc_1792747670489": {
+      "accountId": "test_acc_1792747670489",
+      "accountName": "Test Corp",
+      "planId": "free_trial",
+      "billingCycle": "annual",
+      "subscriptionStatus": "expired",
+      "trialDurationDays": 15,
+      "trialStartedAt": "2026-10-23T09:27:50.490Z",
+      "trialEndsAt": "2026-11-07T09:27:50.490Z",
+      "paidActivatedAt": null,
+      "currentPeriodEndsAt": null,
+      "updatedAt": "2026-11-07T09:28:50.490Z"
+    },
+    "default_hirenest_account": {
+      "accountId": "default_hirenest_account",
+      "accountName": "HireNest Workspace Account",
+      "planId": "free_trial",
+      "billingCycle": "annual",
+      "subscriptionStatus": "trialing",
+      "trialDurationDays": 15,
+      "trialStartedAt": "2026-10-23T09:28:12.269Z",
+      "trialEndsAt": "2026-11-07T09:28:12.269Z",
+      "paidActivatedAt": null,
+      "currentPeriodEndsAt": null,
+      "updatedAt": "2026-10-23T09:28:12.269Z"
+    },
+    "test_acc_1792748411734": {
+      "accountId": "test_acc_1792748411734",
+      "accountName": "Test Corp",
+      "planId": "free_trial",
+      "billingCycle": "annual",
+      "subscriptionStatus": "expired",
+      "trialDurationDays": 15,
+      "trialStartedAt": "2026-10-23T09:40:11.734Z",
+      "trialEndsAt": "2026-11-07T09:40:11.734Z",
+      "paidActivatedAt": null,
+      "currentPeriodEndsAt": null,
+      "updatedAt": "2026-11-07T09:41:11.734Z"
+    }
+  },
+  "reminders": [
+    {
+      "id": "rem_3a08f062c62f",
+      "accountId": "test_acc_1792748411734",
+      "milestone": "1d",
+      "daysRemaining": 1,
+      "dedupeKey": "test_acc_1792748411734:2026-11-07:1d",
+      "title": "Action required: Your HireNestOS trial expires today",
+      "message": "Your trial expires today. Complete your plan purchase now so your team retains uninterrupted write access.",
+      "urgency": "danger",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-11-06T09:40:11.734Z",
+      "acknowledgedAt": null
+    },
+    {
+      "id": "rem_30d4d9157bd4",
+      "accountId": "test_acc_1792748411734",
+      "milestone": "5d",
+      "daysRemaining": 5,
+      "dedupeKey": "test_acc_1792748411734:2026-11-07:5d",
+      "title": "Urgent: 5 days remaining in your trial",
+      "message": "Your workspace trial ends in 5 days. Upgrade now to avoid restrictions on creating new requirements and submitting candidates.",
+      "urgency": "warning",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-11-02T09:40:11.734Z",
+      "acknowledgedAt": null
+    },
+    {
+      "id": "rem_e436c932ffcc",
+      "accountId": "test_acc_1792748411734",
+      "milestone": "10d",
+      "daysRemaining": 10,
+      "dedupeKey": "test_acc_1792748411734:2026-11-07:10d",
+      "title": "10 days remaining — continue with a paid plan",
+      "message": "Continue uninterrupted access to deterministic candidate matching, vendor SLA tracking, and structured interview rubrics with a paid plan.",
+      "urgency": "info",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-10-28T09:40:11.734Z",
+      "acknowledgedAt": null
+    },
+    {
+      "id": "rem_ecd8df6b40c5",
+      "accountId": "test_acc_1792748411734",
+      "milestone": "15d",
+      "daysRemaining": 15,
+      "dedupeKey": "test_acc_1792748411734:2026-11-07:15d",
+      "title": "15 days remaining in your HireNestOS trial",
+      "message": "Early reminder to review plans and upgrade before your trial period concludes.",
+      "urgency": "info",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-10-23T09:40:11.734Z",
+      "acknowledgedAt": null
+    },
+    {
+      "id": "rem_775cb575d49f",
+      "accountId": "default_hirenest_account",
+      "milestone": "15d",
+      "daysRemaining": 15,
+      "dedupeKey": "default_hirenest_account:2026-11-07:15d",
+      "title": "15 days remaining in your HireNestOS trial",
+      "message": "Early reminder to review plans and upgrade before your trial period concludes.",
+      "urgency": "info",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-10-23T09:28:12.268Z",
+      "acknowledgedAt": null
+    },
+    {
+      "id": "rem_17c36c96ec02",
+      "accountId": "test_acc_1792747670489",
+      "milestone": "1d",
+      "daysRemaining": 1,
+      "dedupeKey": "test_acc_1792747670489:2026-11-07:1d",
+      "title": "Action required: Your HireNestOS trial expires today",
+      "message": "Your trial expires today. Complete your plan purchase now so your team retains uninterrupted write access.",
+      "urgency": "danger",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-11-06T09:27:50.490Z",
+      "acknowledgedAt": null
+    },
+    {
+      "id": "rem_9d854561fbc9",
+      "accountId": "test_acc_1792747670489",
+      "milestone": "5d",
+      "daysRemaining": 5,
+      "dedupeKey": "test_acc_1792747670489:2026-11-07:5d",
+      "title": "Urgent: 5 days remaining in your trial",
+      "message": "Your workspace trial ends in 5 days. Upgrade now to avoid restrictions on creating new requirements and submitting candidates.",
+      "urgency": "warning",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-11-02T09:27:50.490Z",
+      "acknowledgedAt": null
+    },
+    {
+      "id": "rem_8d87ec598ab8",
+      "accountId": "test_acc_1792747670489",
+      "milestone": "10d",
+      "daysRemaining": 10,
+      "dedupeKey": "test_acc_1792747670489:2026-11-07:10d",
+      "title": "10 days remaining — continue with a paid plan",
+      "message": "Continue uninterrupted access to deterministic candidate matching, vendor SLA tracking, and structured interview rubrics with a paid plan.",
+      "urgency": "info",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-10-28T09:27:50.490Z",
+      "acknowledgedAt": null
+    },
+    {
+      "id": "rem_9f9d33479b0a",
+      "accountId": "test_acc_1792747670489",
+      "milestone": "15d",
+      "daysRemaining": 15,
+      "dedupeKey": "test_acc_1792747670489:2026-11-07:15d",
+      "title": "15 days remaining in your HireNestOS trial",
+      "message": "Early reminder to review plans and upgrade before your trial period concludes.",
+      "urgency": "info",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-10-23T09:27:50.489Z",
+      "acknowledgedAt": null
+    }
+  ],
+  "orders": {},
+  "receipts": [],
+  "requirementMappings": {},
+  "publishedRequirements": {},
+  "vendorAcknowledgements": {}
+}

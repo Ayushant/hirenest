@@ -60,7 +60,9 @@ import {
   VendorRequirementDetailPage,
   VendorCandidatePoolPage,
   VendorCandidateDetailPage,
+  VendorMatchIntelligencePage,
   VendorSubmissionsPage,
+  VendorInterviewsPage,
   VendorRatingsPage,
 } from './pages/vendor/VendorWorkspacePages';
 
@@ -70,6 +72,7 @@ import {
   CandidateApplicationsPage,
   CandidateProfilePage,
 } from './pages/candidate/CandidateWorkspacePages';
+import { SubscriptionPage } from './pages/subscription/SubscriptionPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -146,9 +149,12 @@ function AppRoutes() {
         <Route path="interviews" element={<HqInterviewsPage />} />
         <Route path="duplicates" element={<HqDuplicatesPage />} />
         <Route path="vendors" element={<HqVendorPerformancePage />} />
+        <Route path="vendor-performance" element={<HqVendorPerformancePage />} />
         <Route path="feedback" element={<AdminFeedbackModerationPage />} />
+        <Route path="feedback-moderation" element={<AdminFeedbackModerationPage />} />
         <Route path="disputes" element={<AdminDisputesPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
+        <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
       </Route>
 
@@ -172,6 +178,8 @@ function AppRoutes() {
         <Route path="interviews" element={<HqInterviewsPage />} />
         <Route path="duplicates" element={<HqDuplicatesPage />} />
         <Route path="vendors" element={<HqVendorPerformancePage />} />
+        <Route path="vendor-performance" element={<HqVendorPerformancePage />} />
+        <Route path="subscription" element={<SubscriptionPage />} />
       </Route>
 
       {/* Client Workspace (/client/*) */}
@@ -191,6 +199,7 @@ function AppRoutes() {
         <Route path="candidates" element={<ClientCandidatesReviewPage />} />
         <Route path="interviews" element={<ClientInterviewsPage />} />
         <Route path="vendors" element={<ClientVendorSummaryPage />} />
+        <Route path="subscription" element={<SubscriptionPage />} />
       </Route>
 
       {/* Vendor Workspace (/vendor/*) */}
@@ -209,8 +218,12 @@ function AppRoutes() {
         <Route path="requirements/:id" element={<VendorRequirementDetailPage />} />
         <Route path="candidates" element={<VendorCandidatePoolPage />} />
         <Route path="candidates/:id" element={<VendorCandidateDetailPage />} />
+        <Route path="matches" element={<VendorMatchIntelligencePage />} />
         <Route path="submissions" element={<VendorSubmissionsPage />} />
+        <Route path="interviews" element={<VendorInterviewsPage />} />
         <Route path="ratings" element={<VendorRatingsPage />} />
+        <Route path="performance" element={<VendorRatingsPage />} />
+        <Route path="subscription" element={<SubscriptionPage />} />
       </Route>
 
       {/* Candidate Workspace (/candidate/*) */}

@@ -29,6 +29,12 @@ import { CandidateFormModal } from '../../components/domain/CandidateFormModal';
 import { SubmissionDetailDrawer } from '../../components/domain/SubmissionDetailDrawer';
 import { DuplicateDialog } from '../../components/domain/DuplicateDialog';
 import {
+  RequirementsPipelineGrid,
+  PipelineQuickFilterBar,
+  matchesPipelineQuickFilter,
+  type PipelineQuickFilter,
+} from '../../components/domain/RequirementsPipelineView';
+import {
   fetchRequirements,
   fetchRequirementById,
   fetchRequirementVendorShares,
@@ -63,6 +69,7 @@ import {
   formatCurrency,
   formatLocalDate,
   formatLocalDateTime,
+  formatRequirementBudgetWithSubtitle,
   maskEmail,
   maskPhone,
 } from '../../lib/format';
@@ -78,23 +85,26 @@ import type {
 export const VendorDashboardPage: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [quickFilter, setQuickFilter] = useState<PipelineQuickFilter>('all');
+
+  const { data: reqsData } = useQuery({
+    queryKey: ['vendor_requirements', 1, ''],
+    queryFn: () => fetchRequirements({ page: 1, pageSize: 100, forVendor: true }),
+  });
 
   const { data: shares = [] } = useQuery({
     queryKey: ['vendor_shares', profile?.org_id],
     queryFn: () => fetchRequirementVendorShares(undefined, profile?.org_id || undefined),
-    enabled: Boolean(profile?.org_id),
   });
 
   const { data: subsData } = useQuery({
     queryKey: ['vendor_submissions_dash', profile?.org_id],
     queryFn: () => fetchSubmissions({ vendorOrgId: profile?.org_id || undefined, page: 1 }),
-    enabled: Boolean(profile?.org_id),
   });
 
   const { data: interviewsData } = useQuery({
     queryKey: ['vendor_interviews_dash', profile?.org_id],
     queryFn: () => fetchInterviews({ status: 'scheduled', page: 1 }),
-    enabled: Boolean(profile?.org_id),
   });
 
   const { data: perf } = useQuery({
@@ -103,19 +113,25 @@ export const VendorDashboardPage: React.FC = () => {
     enabled: Boolean(profile?.org_id),
   });
 
+  const allRequirements = reqsData?.data || [];
   const activeShares = shares.filter((s) => !s.revoked_at);
   const unacknowledged = activeShares.filter((s) => !s.acknowledged_at);
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   return (
     <div className="space-y-8">
-      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5">
-        <h1 className="type-greeting text-[var(--text-primary)]">
-          Good day, {firstName}
-        </h1>
-        <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
-          Shared requirements, SLA countdowns, and agency performance standing.
-        </p>
+      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="type-greeting text-[var(--text-primary)]">
+            Good day, {firstName}
+          </h1>
+          <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+            Shared requirements, SLA countdowns, and agency performance standing.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => navigate('/vendor/requirements')}>
+          Open requirements pipeline
+        </Button>
       </div>
 
       {/* Needs attention */}
@@ -124,11 +140,11 @@ export const VendorDashboardPage: React.FC = () => {
           Needs attention
         </h2>
         <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
-          {activeShares.length === 0 ? (
+          {activeShares.length === 0 && allRequirements.length === 0 ? (
             <div className="flex h-11 items-center px-4 text-[13px] text-[var(--text-secondary)]">
               No active requirement shares right now.
             </div>
-          ) : (
+          ) : activeShares.length > 0 ? (
             activeShares.slice(0, 8).map((sh) => (
               <div
                 key={sh.id}
@@ -151,6 +167,29 @@ export const VendorDashboardPage: React.FC = () => {
                 </div>
               </div>
             ))
+          ) : (
+            allRequirements.slice(0, 8).map((req) => (
+              <div
+                key={req.id}
+                onClick={() => navigate(`/vendor/requirements/${req.id}`)}
+                className="flex h-11 items-center justify-between gap-4 px-4 hover:bg-[var(--bg-hover)] cursor-pointer text-[13px]"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-medium text-[var(--text-primary)] truncate">
+                    {req.title}
+                  </span>
+                  <Badge tone="emerald">Active</Badge>
+                </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="font-mono tabular-nums text-[12px] text-[var(--text-secondary)]">
+                    {formatRequirementBudgetWithSubtitle(req).formatted}
+                  </span>
+                  <span className="text-[12px] text-[var(--accent)] font-medium">
+                    View →
+                  </span>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>
@@ -166,7 +205,7 @@ export const VendorDashboardPage: React.FC = () => {
           },
           {
             label: 'Active requirements',
-            value: activeShares.length,
+            value: Math.max(activeShares.length, allRequirements.length),
             onClick: () => navigate('/vendor/requirements'),
           },
           {
@@ -177,10 +216,21 @@ export const VendorDashboardPage: React.FC = () => {
           {
             label: 'Scheduled interviews',
             value: interviewsData?.count ?? 0,
-            onClick: () => navigate('/vendor/submissions'),
+            onClick: () => navigate('/vendor/interviews'),
           },
         ]}
       />
+
+      {/* Active Requirements Pipeline on Vendor Overview Dashboard */}
+      {allRequirements.length > 0 && (
+        <RequirementsPipelineGrid
+          requirements={allRequirements}
+          shares={shares}
+          activeFilter={quickFilter}
+          onFilterChange={setQuickFilter}
+          onSelectRequirement={(req) => navigate(`/vendor/requirements/${req.id}`)}
+        />
+      )}
 
       {perf && (
         <div className="space-y-3">
@@ -194,68 +244,140 @@ export const VendorDashboardPage: React.FC = () => {
   );
 };
 
-// 2. Vendor Shared Requirements List Page
+// 2. Vendor Open Requirements Pipeline Page
 export const VendorRequirementsPage: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [quickFilter, setQuickFilter] = useState<PipelineQuickFilter>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['vendor_requirements', page, search],
-    queryFn: () => fetchRequirements({ page, search }),
+    queryFn: () => fetchRequirements({ page, pageSize: 100, search, forVendor: true }),
   });
 
   const { data: shares = [] } = useQuery({
     queryKey: ['vendor_shares', profile?.org_id],
     queryFn: () => fetchRequirementVendorShares(undefined, profile?.org_id || undefined),
-    enabled: Boolean(profile?.org_id),
   });
 
-  return (
-    <div>
-      <PageHeader
-        title="Shared requirements"
-        description="Requirements shared with your agency. Acknowledge shares promptly to record SLA response speed."
-      />
+  const allRequirements = data?.data || [];
+  const filteredRows = allRequirements.filter((req) =>
+    matchesPipelineQuickFilter(req, quickFilter)
+  );
 
-      <div className="mb-4 max-w-xs">
-        <Input
-          placeholder="Search requirement title..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
+  return (
+    <div className="space-y-5">
+      {/* Operational Staffing OS Header Band */}
+      <div className="pb-4 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div>
+            <h1 className="text-[14px] leading-[20px] font-bold uppercase tracking-[0.02em] text-[var(--text-primary)]">
+              Operational Staffing OS
+            </h1>
+            <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+              High-density governance layer, Requirements &amp; AI Matching.
+            </p>
+          </div>
+
+          <div className="w-full sm:w-64">
+            <Input
+              placeholder="SEARCH REQUIREMENTS..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('cards')}
+              className={`px-2.5 py-1 rounded-[4px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                viewMode === 'cards'
+                  ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Pipeline cards
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`px-2.5 py-1 rounded-[4px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Table view
+            </button>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
         <TableSkeleton rows={5} cols={5} />
       ) : error ? (
         <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
-      ) : !data?.data.length ? (
-        <EmptyState
-          title="No requirements shared with your agency yet"
-          description="HireNest HQ shares open requirements with your agency here."
+      ) : !allRequirements.length ? (
+        <div className="space-y-4">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+            <h2 className="text-[12px] leading-[16px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+              Active Requirements Pipeline
+            </h2>
+            <PipelineQuickFilterBar
+              activeFilter={quickFilter}
+              onChange={setQuickFilter}
+            />
+          </div>
+          <EmptyState
+            title="No requirements shared with your agency yet"
+            description="HireNest HQ shares open requirements with your agency here."
+          />
+        </div>
+      ) : viewMode === 'cards' ? (
+        <RequirementsPipelineGrid
+          requirements={allRequirements}
+          shares={shares}
+          activeFilter={quickFilter}
+          onFilterChange={setQuickFilter}
+          onSelectRequirement={(req) => navigate(`/vendor/requirements/${req.id}`)}
         />
       ) : (
-        <div>
+        <div className="space-y-4">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+            <h2 className="text-[12px] leading-[16px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+              Active Requirements Pipeline
+            </h2>
+            <PipelineQuickFilterBar
+              activeFilter={quickFilter}
+              onChange={setQuickFilter}
+            />
+          </div>
+
           <div className="overflow-x-auto">
             <table>
               <thead>
                 <tr>
                   <th>Requirement</th>
-                  <th>Location & mode</th>
+                  <th>Location &amp; mode</th>
                   <th className="text-right">Vendor budget</th>
                   <th>Acknowledgement</th>
                   <th>SLA countdown</th>
                 </tr>
               </thead>
               <tbody>
-                {data.data.map((req) => {
+                {filteredRows.map((req) => {
                   const share = shares.find((s) => s.requirement_id === req.id);
+                  const budgetInfo = formatRequirementBudgetWithSubtitle(req);
                   return (
                     <tr
                       key={req.id}
@@ -273,8 +395,15 @@ export const VendorRequirementsPage: React.FC = () => {
                       <td className="capitalize text-[var(--text-secondary)]">
                         {req.location} · {req.work_mode}
                       </td>
-                      <td className="text-right font-mono tabular-nums text-[var(--text-primary)]">
-                        {formatCurrency(req.vendor_visible_budget, req.currency)}
+                      <td className="text-right">
+                        <div className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                          {budgetInfo.formatted}
+                        </div>
+                        {budgetInfo.subtitle && (
+                          <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                            {budgetInfo.subtitle}
+                          </div>
+                        )}
                       </td>
                       <td>
                         {share?.acknowledged_at ? (
@@ -292,7 +421,7 @@ export const VendorRequirementsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
+          <Pagination page={page} totalCount={filteredRows.length} onPageChange={setPage} />
         </div>
       )}
     </div>
@@ -315,15 +444,19 @@ export const VendorRequirementDetailPage: React.FC = () => {
   const [drawerSubId, setDrawerSubId] = useState<string | null>(null);
 
   const { data: req, isLoading } = useQuery({
-    queryKey: ['vendor_req_detail', id],
-    queryFn: () => fetchRequirementById(id!),
+    queryKey: ['vendor_req_detail', id, profile?.role, profile?.org_id],
+    queryFn: () =>
+      fetchRequirementById(id!, {
+        viewerRole: profile?.role,
+        viewerOrgId: profile?.org_id,
+      }),
     enabled: Boolean(id),
   });
 
   const { data: shares = [] } = useQuery({
     queryKey: ['vendor_req_shares', id, profile?.org_id],
     queryFn: () => fetchRequirementVendorShares(id!, profile?.org_id || undefined),
-    enabled: Boolean(id && profile?.org_id),
+    enabled: Boolean(id),
   });
 
   const { data: matchesData } = useQuery({
@@ -349,7 +482,10 @@ export const VendorRequirementDetailPage: React.FC = () => {
     if (!id) return;
     setAcking(true);
     try {
-      await acknowledgeRequirement({ p_requirement_id: id });
+      await acknowledgeRequirement({
+        p_requirement_id: id,
+        vendorOrgId: profile?.org_id,
+      });
       toast({
         title: 'Requirement acknowledged',
         description: 'Response speed recorded for SLA metrics.',
@@ -357,6 +493,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['vendor_req_shares'] });
       queryClient.invalidateQueries({ queryKey: ['vendor_shares'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_requirements'] });
     } catch (err) {
       toast({
         title: 'Could not acknowledge',
@@ -403,15 +540,13 @@ export const VendorRequirementDetailPage: React.FC = () => {
   if (isLoading || !req) return <TableSkeleton rows={5} cols={4} />;
 
   const mySubmissions = submissionsData?.data || [];
+  const budgetInfo = formatRequirementBudgetWithSubtitle(req);
 
   return (
     <div className="max-w-[1200px]">
       <PageHeader
         title={req.title}
-        description={`${req.location} (${req.work_mode}) · ${req.min_experience}–${req.max_experience} yrs · Vendor budget: ${formatCurrency(
-          req.vendor_visible_budget,
-          req.currency
-        )}`}
+        description={`${req.location} (${req.work_mode}) · ${req.min_experience}–${req.max_experience} yrs · Vendor budget: ${budgetInfo.formatted}${budgetInfo.subtitle ? ` (${budgetInfo.subtitle})` : ''}`}
         actions={
           <div className="flex items-center gap-2">
             {share && <SlaBadge dueAt={share.due_at} showCountdown />}
@@ -604,8 +739,15 @@ export const VendorRequirementDetailPage: React.FC = () => {
           <dl className="divide-y divide-[var(--border)] text-[13px]">
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">Vendor budget</dt>
-              <dd className="font-mono tabular-nums text-[var(--text-primary)]">
-                {formatCurrency(req.vendor_visible_budget, req.currency)}
+              <dd className="text-right">
+                <div className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                  {budgetInfo.formatted}
+                </div>
+                {budgetInfo.subtitle && (
+                  <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                    {budgetInfo.subtitle}
+                  </div>
+                )}
               </dd>
             </div>
             <div className="py-2 flex justify-between gap-2">
@@ -689,6 +831,7 @@ export const VendorCandidatePoolPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'single' | 'bulk'>('single');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['vendor_candidates', profile?.org_id, page, search],
@@ -705,9 +848,27 @@ export const VendorCandidatePoolPage: React.FC = () => {
     <div>
       <PageHeader
         title="Candidate pool"
-        description="Manage candidates owned by your agency. Resume SHA-256 deduplication runs automatically on upload."
+        description="Manage candidates owned by your agency. Resume auto-parsing and SHA-256 deduplication run automatically on upload."
         actions={
-          <Button onClick={() => setAddOpen(true)}>Add candidate</Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setModalMode('bulk');
+                setAddOpen(true);
+              }}
+            >
+              Bulk upload resumes
+            </Button>
+            <Button
+              onClick={() => {
+                setModalMode('single');
+                setAddOpen(true);
+              }}
+            >
+              Add candidate
+            </Button>
+          </div>
         }
       />
 
@@ -729,9 +890,12 @@ export const VendorCandidatePoolPage: React.FC = () => {
       ) : !data?.data.length ? (
         <EmptyState
           title="No candidates in your agency pool yet"
-          description="Add a candidate with resume upload to start matching against shared requirements."
+          description="Add a candidate or bulk-upload resumes to auto-parse skills and start matching against shared requirements."
           actionLabel="Add candidate"
-          onAction={() => setAddOpen(true)}
+          onAction={() => {
+            setModalMode('single');
+            setAddOpen(true);
+          }}
         />
       ) : (
         <div>
@@ -799,10 +963,13 @@ export const VendorCandidatePoolPage: React.FC = () => {
 
       <CandidateFormModal
         open={addOpen}
+        defaultMode={modalMode}
         onClose={() => setAddOpen(false)}
         onCreated={(candidateId) => {
           queryClient.invalidateQueries({ queryKey: ['vendor_candidates'] });
-          navigate(`/vendor/candidates/${candidateId}`);
+          if (modalMode === 'single') {
+            navigate(`/vendor/candidates/${candidateId}`);
+          }
         }}
       />
     </div>
@@ -1729,3 +1896,282 @@ export const VendorRatingsPage: React.FC = () => {
     </div>
   );
 };
+
+// 8. Vendor Match Intelligence Page (/vendor/matches)
+export const VendorMatchIntelligencePage: React.FC = () => {
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const [selectedReqId, setSelectedReqId] = useState<string>('');
+
+  const { data: reqsData, isLoading: loadingReqs } = useQuery({
+    queryKey: ['vendor_requirements_for_matches'],
+    queryFn: () => fetchRequirements({ page: 1, pageSize: 100, forVendor: true }),
+  });
+
+  const requirements = reqsData?.data || [];
+  const activeReqId = selectedReqId || requirements[0]?.id || '';
+  const activeReq = requirements.find((r) => r.id === activeReqId) || null;
+
+  const { data: matchesData, isLoading: loadingMatches } = useQuery({
+    queryKey: ['vendor_match_intelligence', activeReqId],
+    queryFn: () => fetchMatchesForRequirement({ requirementId: activeReqId, page: 1 }),
+    enabled: Boolean(activeReqId),
+  });
+
+  const { data: submissionsData } = useQuery({
+    queryKey: ['vendor_match_subs', activeReqId, profile?.org_id],
+    queryFn: () =>
+      fetchSubmissions({
+        requirementId: activeReqId,
+        vendorOrgId: profile?.org_id || undefined,
+        page: 1,
+      }),
+    enabled: Boolean(activeReqId && profile?.org_id),
+  });
+
+  const mySubmissions = submissionsData?.data || [];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Match intelligence"
+        description="Deterministic 6-pillar candidate matching across your agency pool and active open requirements."
+      />
+
+      {loadingReqs ? (
+        <TableSkeleton rows={4} cols={4} />
+      ) : !requirements.length ? (
+        <EmptyState
+          title="No active requirements available for matching"
+          description="Once HQ publishes and shares requirements with your agency, ranked candidate matches will appear here."
+        />
+      ) : (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-4">
+            <div className="w-full sm:w-96">
+              <Select
+                label="Target requirement"
+                value={activeReqId}
+                onChange={(e) => setSelectedReqId(e.target.value)}
+                options={requirements.map((r) => {
+                  const b = formatRequirementBudgetWithSubtitle(r);
+                  return {
+                    value: r.id,
+                    label: `${r.title} (${r.location} · ${b.formatted})`,
+                  };
+                })}
+              />
+            </div>
+
+            {activeReq && (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/vendor/requirements/${activeReq.id}`)}
+                >
+                  Open requirement &amp; submit →
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {loadingMatches ? (
+            <TableSkeleton rows={5} cols={4} />
+          ) : !matchesData?.data?.length ? (
+            <EmptyState
+              title="No matching candidates in your pool for this requirement"
+              description="Add candidates with overlapping skills in your Candidate Pool to compute ranked matches."
+              actionLabel="Go to Candidates"
+              onAction={() => navigate('/vendor/candidates')}
+            />
+          ) : (
+            <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+              {matchesData.data.map((m, idx) => {
+                const alreadySubmitted = mySubmissions.some(
+                  (s) => s.candidate_id === m.candidate_id
+                );
+                return (
+                  <div
+                    key={m.id}
+                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                          #{idx + 1}
+                        </span>
+                        <Link
+                          to={`/vendor/candidates/${m.candidate_id}`}
+                          className="text-[14px] font-semibold text-[var(--text-primary)] hover:underline truncate"
+                        >
+                          {m.candidates?.full_name || m.candidate_id}
+                        </Link>
+                        <span className="text-[12px] text-[var(--text-secondary)]">
+                          {m.candidates?.current_title || '—'} ·{' '}
+                          <span className="font-mono tabular-nums">
+                            {m.candidates?.total_experience_years ?? '—'} yrs
+                          </span>
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {(m.matched_skills || []).map((sk) => (
+                          <span
+                            key={`m-${sk}`}
+                            className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-primary)]"
+                          >
+                            {sk}
+                          </span>
+                        ))}
+                        {(m.unproven_skills || []).map((sk) => (
+                          <span
+                            key={`u-${sk}`}
+                            className="inline-flex items-center rounded-[6px] border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[11px] text-[var(--text-tertiary)]"
+                          >
+                            {sk}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 shrink-0">
+                      <ScoreBar
+                        score={m.final_score}
+                        isOverridden={m.override_score !== null}
+                      />
+                      {alreadySubmitted ? (
+                        <Badge tone="success">Submitted</Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => navigate(`/vendor/requirements/${activeReqId}`)}
+                        >
+                          Review &amp; submit
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 9. Vendor Interviews Page (/vendor/interviews)
+export const VendorInterviewsPage: React.FC = () => {
+  const { profile } = useAuth();
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [drawerSubId, setDrawerSubId] = useState<string | null>(null);
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['vendor_interviews_page', profile?.org_id, page, statusFilter],
+    queryFn: () =>
+      fetchInterviews({
+        status: (statusFilter as 'scheduled' | 'completed' | 'cancelled' | 'no_show') || undefined,
+        page,
+      }),
+    enabled: Boolean(profile?.org_id),
+  });
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Interviews"
+        description="Scheduled and completed interview rounds for candidates submitted by your agency."
+      />
+
+      <div className="flex items-center gap-2 max-w-xs">
+        <Select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          options={[
+            { value: '', label: 'All interview statuses' },
+            { value: 'scheduled', label: 'Scheduled' },
+            { value: 'completed', label: 'Completed' },
+            { value: 'cancelled', label: 'Cancelled' },
+            { value: 'no_show', label: 'No show' },
+          ]}
+        />
+      </div>
+
+      {isLoading ? (
+        <TableSkeleton rows={5} cols={5} />
+      ) : error ? (
+        <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
+      ) : !data?.data?.length ? (
+        <EmptyState
+          title="No interviews scheduled yet"
+          description="Interviews scheduled for your agency's submitted candidates will appear here."
+        />
+      ) : (
+        <div>
+          <div className="overflow-x-auto border-t border-[var(--border)]">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Requirement</th>
+                  <th>Round &amp; mode</th>
+                  <th>Scheduled at</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.data.map((iv) => (
+                  <tr
+                    key={iv.id}
+                    onClick={() => setDrawerSubId(iv.submission_id)}
+                    className="cursor-pointer"
+                  >
+                    <td className="font-medium text-[var(--text-primary)]">
+                      {iv.submissions?.candidates?.full_name || 'Candidate'}
+                    </td>
+                    <td className="text-[var(--text-secondary)]">
+                      {iv.submissions?.requirements?.title || 'Requirement'}
+                    </td>
+                    <td className="capitalize text-[var(--text-secondary)]">
+                      Round {iv.round_number} · {iv.round_type.replace(/_/g, ' ')} ({iv.mode.replace(/_/g, ' ')})
+                    </td>
+                    <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                      {formatLocalDateTime(iv.scheduled_at)}
+                    </td>
+                    <td>
+                      <Badge
+                        tone={
+                          iv.status === 'completed'
+                            ? 'emerald'
+                            : iv.status === 'scheduled'
+                              ? 'sky'
+                              : 'neutral'
+                        }
+                      >
+                        {iv.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
+        </div>
+      )}
+
+      <SubmissionDetailDrawer
+        submissionId={drawerSubId}
+        onClose={() => setDrawerSubId(null)}
+        role={profile?.role || 'vendor_admin'}
+      />
+    </div>
+  );
+};
+

@@ -29,6 +29,12 @@ import { RequirementFormModal } from '../../components/domain/RequirementFormMod
 import { SubmissionDetailDrawer } from '../../components/domain/SubmissionDetailDrawer';
 import { DuplicateDialog } from '../../components/domain/DuplicateDialog';
 import {
+  RequirementsPipelineGrid,
+  PipelineQuickFilterBar,
+  matchesPipelineQuickFilter,
+  type PipelineQuickFilter,
+} from '../../components/domain/RequirementsPipelineView';
+import {
   fetchRequirements,
   fetchRequirementById,
   fetchRequirementFinancials,
@@ -36,8 +42,11 @@ import {
   fetchRequirementVendorShares,
   setRequirementStatus,
   setRequirementPublic,
+  setRequirementClientMapping,
   shareRequirementWithVendors,
   revokeRequirementShare,
+  publishAndShareRequirementWithAllVendors,
+  syncAllOpenRequirementsWithVendors,
 } from '../../api/requirements';
 import {
   fetchMatchesForRequirement,
@@ -56,6 +65,7 @@ import {
   formatCurrency,
   formatLocalDate,
   formatLocalDateTime,
+  formatRequirementBudgetWithSubtitle,
 } from '../../lib/format';
 import { useToast } from '../../components/ui/Toast';
 import type {
@@ -67,6 +77,7 @@ import type {
 // 1. HQ Requirements List Page
 export const HqRequirementsListPage: React.FC = () => {
   const { profile } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -78,14 +89,19 @@ export const HqRequirementsListPage: React.FC = () => {
   );
   const [clientOrgId, setClientOrgId] = useState('');
   const [publicFilter, setPublicFilter] = useState<string>('');
+  const [mappingFilter, setMappingFilter] = useState<'all' | 'mapped' | 'unmapped'>('all');
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [quickFilter, setQuickFilter] = useState<PipelineQuickFilter>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [createOpen, setCreateOpen] = useState(false);
+  const [syncingVendors, setSyncingVendors] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['requirements', page, status, clientOrgId, publicFilter, search],
+    queryKey: ['requirements', page, status, clientOrgId, publicFilter, mappingFilter, search],
     queryFn: () =>
       fetchRequirements({
         page,
+        pageSize: 100,
         status,
         clientOrgId: clientOrgId || undefined,
         isPublic:
@@ -94,6 +110,7 @@ export const HqRequirementsListPage: React.FC = () => {
             : publicFilter === 'false'
               ? false
               : undefined,
+        mappingFilter,
         search,
       }),
   });
@@ -103,16 +120,78 @@ export const HqRequirementsListPage: React.FC = () => {
     queryFn: () => fetchOrganizations({ type: 'client', page: 1, pageSize: 100 }),
   });
 
+  const handleSyncWithVendors = async () => {
+    setSyncingVendors(true);
+    try {
+      const res = await syncAllOpenRequirementsWithVendors();
+      toast({
+        title: 'Requirements published & shared with vendors',
+        description: `${res.sharedRequirementCount} open requirement(s) shared with vendor agencies (${res.publishedCount} newly published).`,
+        tone: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_shares'] });
+    } catch (err) {
+      toast({
+        title: 'Could not sync requirements with vendors',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setSyncingVendors(false);
+    }
+  };
+
+  const allRequirements = data?.data || [];
+  const filteredRows = allRequirements.filter((req) =>
+    matchesPipelineQuickFilter(req, quickFilter)
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Requirements"
         description="Client requisitions, SLA timers, vendor distributions, and deterministic candidate matches."
         actions={
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            New requirement
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={`px-2.5 py-1 rounded-[4px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                  viewMode === 'cards'
+                    ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Pipeline cards
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`px-2.5 py-1 rounded-[4px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-2xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Table view
+              </button>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleSyncWithVendors}
+              loading={syncingVendors}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Publish &amp; share all with vendors
+            </Button>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              New requirement
+            </Button>
+          </div>
         }
       />
 
@@ -120,7 +199,7 @@ export const HqRequirementsListPage: React.FC = () => {
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-56">
           <Input
-            placeholder="Search title..."
+            placeholder="SEARCH REQUIREMENTS..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -173,7 +252,26 @@ export const HqRequirementsListPage: React.FC = () => {
             ]}
           />
         </div>
-        {(search || clientOrgId || status || publicFilter) && (
+        <div className="w-48">
+          <Select
+            value={mappingFilter}
+            onChange={(e) => {
+              setMappingFilter(e.target.value as 'all' | 'mapped' | 'unmapped');
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All client mappings' },
+              { value: 'mapped', label: 'Explicitly mapped to client' },
+              { value: 'unmapped', label: 'Unmapped (Internal / vendor)' },
+            ].map((o) => ({ value: o.value || 'all', label: o.label }))}
+          />
+        </div>
+        {(search ||
+          clientOrgId ||
+          status ||
+          publicFilter ||
+          mappingFilter !== 'all' ||
+          quickFilter !== 'all') && (
           <Button
             size="sm"
             variant="ghost"
@@ -182,6 +280,8 @@ export const HqRequirementsListPage: React.FC = () => {
               setClientOrgId('');
               setStatus('');
               setPublicFilter('');
+              setMappingFilter('all');
+              setQuickFilter('all');
               setPage(1);
             }}
           >
@@ -194,68 +294,111 @@ export const HqRequirementsListPage: React.FC = () => {
         <TableSkeleton rows={6} cols={6} />
       ) : error ? (
         <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
-      ) : !data?.data.length ? (
+      ) : !allRequirements.length ? (
         <EmptyState
           title="No requirements found"
           description="New client requisitions and published roles will appear here."
           actionLabel="New requirement"
           onAction={() => setCreateOpen(true)}
         />
+      ) : viewMode === 'cards' ? (
+        <RequirementsPipelineGrid
+          requirements={allRequirements}
+          activeFilter={quickFilter}
+          onFilterChange={setQuickFilter}
+          onSelectRequirement={(req) => navigate(`${prefix}/requirements/${req.id}`)}
+          emptyActionLabel="New requirement"
+          onEmptyAction={() => setCreateOpen(true)}
+        />
       ) : (
-        <div>
+        <div className="space-y-4">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+            <h2 className="text-[12px] leading-[16px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+              Active Requirements Pipeline
+            </h2>
+            <PipelineQuickFilterBar
+              activeFilter={quickFilter}
+              onChange={setQuickFilter}
+            />
+          </div>
+
           <div className="overflow-x-auto border-t border-[var(--border)]">
             <table>
               <thead>
                 <tr>
                   <th>Requirement</th>
-                  <th>Client</th>
+                  <th>Client mapping</th>
                   <th>Status</th>
-                  <th>Location & mode</th>
+                  <th>Location &amp; mode</th>
                   <th className="text-right">Vendor budget</th>
                   <th className="text-right">SLA</th>
                   <th>Created</th>
                 </tr>
               </thead>
               <tbody>
-                {data.data.map((req) => (
-                  <tr
-                    key={req.id}
-                    onClick={() => navigate(`${prefix}/requirements/${req.id}`)}
-                    className="cursor-pointer"
-                  >
-                    <td>
-                      <div className="font-medium text-[var(--text-primary)]">
-                        {req.title}
-                      </div>
-                      <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono tabular-nums">
-                        {req.min_experience}–{req.max_experience}y · {req.openings} open
-                        {req.is_public ? ' · Public' : ''}
-                      </div>
-                    </td>
-                    <td className="text-[var(--text-secondary)]">
-                      {req.organizations?.name || '—'}
-                    </td>
-                    <td>
-                      <RequirementStatusBadge status={req.status} />
-                    </td>
-                    <td className="text-[var(--text-secondary)] capitalize">
-                      {req.location} · {req.work_mode}
-                    </td>
-                    <td className="text-right font-mono tabular-nums">
-                      {formatCurrency(req.vendor_visible_budget, req.currency)}
-                    </td>
-                    <td className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
-                      {req.submission_sla_hours}h
-                    </td>
-                    <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
-                      {formatLocalDate(req.created_at)}
-                    </td>
-                  </tr>
-                ))}
+                {filteredRows.map((req) => {
+                  const budgetInfo = formatRequirementBudgetWithSubtitle(req);
+                  return (
+                    <tr
+                      key={req.id}
+                      onClick={() => navigate(`${prefix}/requirements/${req.id}`)}
+                      className="cursor-pointer"
+                    >
+                      <td>
+                        <div className="font-medium text-[var(--text-primary)]">
+                          {req.title}
+                        </div>
+                        <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono tabular-nums">
+                          {req.min_experience}–{req.max_experience}y · {req.openings} open
+                          {req.is_public ? ' · Public' : ''}
+                        </div>
+                      </td>
+                      <td>
+                        {budgetInfo.isClientMapped ? (
+                          <div className="flex items-center gap-1.5">
+                            <Badge tone="emerald">Mapped</Badge>
+                            <span className="text-[var(--text-secondary)] truncate">
+                              {req.organizations?.name || 'Client'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <Badge tone="amber">Unmapped</Badge>
+                            <span className="text-[12px] text-[var(--text-tertiary)]">
+                              Hidden from client
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <RequirementStatusBadge status={req.status} />
+                      </td>
+                      <td className="text-[var(--text-secondary)] capitalize">
+                        {req.location} · {req.work_mode}
+                      </td>
+                      <td className="text-right">
+                        <div className="font-mono tabular-nums text-[var(--text-primary)]">
+                          {budgetInfo.formatted}
+                        </div>
+                        {budgetInfo.subtitle && (
+                          <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                            {budgetInfo.subtitle}
+                          </div>
+                        )}
+                      </td>
+                      <td className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
+                        {req.submission_sla_hours}h
+                      </td>
+                      <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                        {formatLocalDate(req.created_at)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
+          <Pagination page={page} totalCount={filteredRows.length} onPageChange={setPage} />
         </div>
       )}
 
@@ -542,6 +685,34 @@ export const HqRequirementDetailPage: React.FC = () => {
     }
   };
 
+  const handlePublishAndShareAll = async () => {
+    setSharingLoading(true);
+    try {
+      await publishAndShareRequirementWithAllVendors({
+        requirementId: req.id,
+        slaHours: shareSlaHours || req.submission_sla_hours || 48,
+      });
+      toast({
+        title: 'Requirement published & shared with vendors',
+        description: `${req.title} is now Open and distributed to vendor agencies.`,
+        tone: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_shares'] });
+      queryClient.invalidateQueries({ queryKey: ['approved_vendors'] });
+      refreshAll();
+    } catch (err) {
+      toast({
+        title: 'Could not publish & share requirement',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setSharingLoading(false);
+    }
+  };
+
   const submissions = submissionsData?.data || [];
 
   return (
@@ -550,7 +721,16 @@ export const HqRequirementDetailPage: React.FC = () => {
         title={req.title}
         description={`${req.organizations?.name || 'Client'} · ${req.location} · ${req.work_mode}`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handlePublishAndShareAll}
+              loading={sharingLoading}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Publish &amp; share with vendors
+            </Button>
             <Button size="sm" variant="outline" onClick={handleRecomputeMatches}>
               <RefreshCw className="h-3.5 w-3.5" />
               Recompute matches
@@ -610,6 +790,74 @@ export const HqRequirementDetailPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              {/* Vendor Sourcing & Distribution Summary on Overview Tab */}
+              <div className="pt-4 border-t border-[var(--border)] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                      Vendor sourcing &amp; distribution ({shares.length})
+                    </h4>
+                    <p className="mt-0.5 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                      {shares.length > 0
+                        ? `Published (${req.status}) and shared with ${shares.length} vendor agency(s) for active candidate sourcing.`
+                        : 'Publish this requirement and distribute it to all approved vendor agencies.'}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePublishAndShareAll}
+                    loading={sharingLoading}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Publish &amp; share with all vendors
+                  </Button>
+                </div>
+
+                {shares.length > 0 && (
+                  <div className="overflow-x-auto rounded-[8px] border border-[var(--border)]">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Vendor agency</th>
+                          <th>Shared</th>
+                          <th>SLA due</th>
+                          <th>Acknowledged</th>
+                          <th>SLA status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {shares.map((sh) => (
+                          <tr key={sh.id}>
+                            <td className="font-medium">
+                              {sh.organizations?.name || sh.vendor_org_id}
+                            </td>
+                            <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                              {formatLocalDateTime(sh.shared_at)}
+                            </td>
+                            <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                              {formatLocalDateTime(sh.due_at)}
+                            </td>
+                            <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                              {sh.acknowledged_at
+                                ? formatLocalDateTime(sh.acknowledged_at)
+                                : 'Pending'}
+                            </td>
+                            <td>
+                              <SlaBadge
+                                dueAt={sh.due_at}
+                                firstSubmissionAt={null}
+                                revokedAt={sh.revoked_at}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -656,6 +904,67 @@ export const HqRequirementDetailPage: React.FC = () => {
                   {req.is_public ? 'Make private' : 'Publish to job board'}
                 </Button>
               </div>
+
+              {/* Update 1: Explicit Client Mapping Governance */}
+              <div className="pt-4 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">
+                      Client portal mapping & visibility
+                    </h4>
+                    <Badge
+                      tone={
+                        formatRequirementBudgetWithSubtitle(req).isClientMapped
+                          ? 'emerald'
+                          : 'amber'
+                      }
+                    >
+                      {formatRequirementBudgetWithSubtitle(req).isClientMapped
+                        ? `Mapped · ${req.organizations?.name || 'Client'}`
+                        : 'Internal / Unmapped'}
+                    </Badge>
+                  </div>
+                  <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+                    {formatRequirementBudgetWithSubtitle(req).isClientMapped
+                      ? `Explicitly mapped to ${req.organizations?.name || 'client'}. Visible in client lists, search, counts, and detail view.`
+                      : 'Unmapped internal requirement. Hidden from all client surfaces while eligible for vendor sourcing when open & shared.'}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    const currentMapped = formatRequirementBudgetWithSubtitle(req).isClientMapped;
+                    try {
+                      await setRequirementClientMapping({
+                        requirement: req,
+                        isClientMapped: !currentMapped,
+                        mappedClientOrgId: !currentMapped ? req.client_org_id : null,
+                      });
+                      toast({
+                        title: !currentMapped
+                          ? `Requirement mapped to ${req.organizations?.name || 'client'}`
+                          : 'Requirement unmapped from client portal',
+                        description: !currentMapped
+                          ? 'Now visible in the client workspace.'
+                          : 'Now hidden from clients; eligible vendor sourcing remains unaffected.',
+                        tone: 'success',
+                      });
+                      refreshAll();
+                    } catch (err) {
+                      toast({
+                        title: 'Could not update client mapping',
+                        description: mapSupabaseError(err),
+                        tone: 'error',
+                      });
+                    }
+                  }}
+                >
+                  {formatRequirementBudgetWithSubtitle(req).isClientMapped
+                    ? 'Unmap from client (Make internal)'
+                    : `Map to ${req.organizations?.name || 'client'}`}
+                </Button>
+              </div>
             </div>
           )}
 
@@ -663,12 +972,24 @@ export const HqRequirementDetailPage: React.FC = () => {
           {activeTab === 'vendors' && (
             <div className="space-y-6">
               <div className="rounded-[8px] border border-[var(--border)] p-4 space-y-3">
-                <h3 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">
-                  Share with approved vendors
-                </h3>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">
+                    Share with approved vendors
+                  </h3>
+                  <Button
+                    size="sm"
+                    onClick={handlePublishAndShareAll}
+                    loading={sharingLoading}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Publish &amp; share with all vendors
+                  </Button>
+                </div>
                 {req.status !== 'open' ? (
                   <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-                    Requirement must be in <strong>open</strong> status before sharing with vendors.
+                    Requirement is currently in <strong>{req.status}</strong> status. Click{' '}
+                    <strong>Publish &amp; share with all vendors</strong> above to transition it to{' '}
+                    <strong>open</strong> and distribute it to all vendor agencies immediately.
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -1143,11 +1464,15 @@ export const HqRequirementDetailPage: React.FC = () => {
           </div>
 
           <div className="divide-y divide-[var(--border)] text-[13px] leading-[20px]">
-            <div className="py-2 flex justify-between gap-2">
-              <span className="text-[var(--text-secondary)]">Client</span>
-              <span className="font-medium text-[var(--text-primary)] truncate">
-                {req.organizations?.name || '—'}
-              </span>
+            <div className="py-2 flex justify-between items-center gap-2">
+              <span className="text-[var(--text-secondary)]">Client mapping</span>
+              {formatRequirementBudgetWithSubtitle(req).isClientMapped ? (
+                <span className="font-medium text-[var(--text-primary)] truncate">
+                  Mapped · {req.organizations?.name || '—'}
+                </span>
+              ) : (
+                <Badge tone="amber">Unmapped (Internal)</Badge>
+              )}
             </div>
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Openings</span>
@@ -1189,9 +1514,16 @@ export const HqRequirementDetailPage: React.FC = () => {
             </div>
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Vendor budget</span>
-              <span className="font-mono tabular-nums text-[var(--text-primary)]">
-                {formatCurrency(req.vendor_visible_budget, req.currency)}
-              </span>
+              <div className="text-right">
+                <div className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                  {formatRequirementBudgetWithSubtitle(req).formatted}
+                </div>
+                {formatRequirementBudgetWithSubtitle(req).subtitle && (
+                  <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                    {formatRequirementBudgetWithSubtitle(req).subtitle}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Client budget</span>

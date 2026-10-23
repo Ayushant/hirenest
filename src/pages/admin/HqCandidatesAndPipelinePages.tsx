@@ -94,6 +94,7 @@ export const HqCandidatesListPage: React.FC = () => {
   const [maxExp, setMaxExp] = useState('');
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'single' | 'bulk'>('single');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
@@ -131,12 +132,28 @@ export const HqCandidatesListPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Candidates"
-        description="Talent pool with original source attribution, current vendor association, and masked PII in list views."
+        description="Talent pool with resume auto-parsing, original source attribution, current vendor association, and masked PII in list views."
         actions={
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            Add candidate
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setModalMode('bulk');
+                setAddOpen(true);
+              }}
+            >
+              Bulk upload resumes
+            </Button>
+            <Button
+              onClick={() => {
+                setModalMode('single');
+                setAddOpen(true);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add candidate
+            </Button>
+          </div>
         }
       />
 
@@ -324,10 +341,13 @@ export const HqCandidatesListPage: React.FC = () => {
 
       <CandidateFormModal
         open={addOpen}
+        defaultMode={modalMode}
         onClose={() => setAddOpen(false)}
         onCreated={(candidateId) => {
           queryClient.invalidateQueries({ queryKey: ['candidates'] });
-          navigate(`${prefix}/candidates/${candidateId}`);
+          if (modalMode === 'single') {
+            navigate(`${prefix}/candidates/${candidateId}`);
+          }
         }}
       />
     </div>

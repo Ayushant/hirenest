@@ -71,6 +71,7 @@ export const ClientDashboardPage: React.FC = () => {
     queryFn: () =>
       fetchRequirements({
         clientOrgId: profile?.org_id || undefined,
+        onlyClientMapped: true,
         status: 'open',
         page: 1,
       }),
@@ -206,6 +207,7 @@ export const ClientRequirementsPage: React.FC = () => {
       fetchRequirements({
         page,
         clientOrgId: profile?.org_id || undefined,
+        onlyClientMapped: true,
         status,
         search,
       }),
@@ -341,18 +343,30 @@ export const ClientRequirementDetailPage: React.FC = () => {
   const [statusSaving, setStatusSaving] = useState(false);
 
   const { data: req, isLoading } = useQuery({
-    queryKey: ['requirement_detail', id],
-    queryFn: () => fetchRequirementById(id!),
+    queryKey: ['requirement_detail', id, profile?.role, profile?.org_id],
+    queryFn: () =>
+      fetchRequirementById(id!, {
+        viewerRole: profile?.role || 'client_manager',
+        viewerOrgId: profile?.org_id || null,
+      }),
     enabled: Boolean(id),
   });
 
   const { data: financials } = useQuery({
     queryKey: ['requirement_financials', id],
     queryFn: () => fetchRequirementFinancials(id!),
-    enabled: Boolean(id),
+    enabled: Boolean(id && req),
   });
 
-  if (isLoading || !req) return <TableSkeleton rows={4} cols={4} />;
+  if (isLoading) return <TableSkeleton rows={4} cols={4} />;
+  if (!req) {
+    return (
+      <EmptyState
+        title="Requirement not available"
+        description="This requirement is not mapped to your client organization or does not exist."
+      />
+    );
+  }
 
   const allowedActions: Array<{ to: RequirementStatus; label: string }> = [];
   if (isManager) {

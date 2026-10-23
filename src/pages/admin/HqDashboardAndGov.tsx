@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import {
   PageHeader,
   MetricStrip,
@@ -27,7 +27,10 @@ import {
   createOrganization,
   updateOrganization,
 } from '../../api/admin';
-import { fetchRequirements } from '../../api/requirements';
+import {
+  fetchRequirements,
+  syncAllOpenRequirementsWithVendors,
+} from '../../api/requirements';
 import { fetchCandidates } from '../../api/candidates';
 import { fetchSubmissions } from '../../api/submissions';
 import { getVendorPerformanceRpc } from '../../api/interviews';
@@ -38,6 +41,7 @@ import {
   STAGE_LABELS,
   REQUIREMENT_STATUS_LABELS,
   formatLocalDate,
+  formatRequirementBudgetWithSubtitle,
 } from '../../lib/format';
 import { useToast } from '../../components/ui/Toast';
 import type {
@@ -52,14 +56,46 @@ import type {
 // 1. HQ Dashboard: Starts with "Needs attention" list -> 4-metric vertical-divider strip -> Breakdown lists
 export const HqDashboardPage: React.FC = () => {
   const { profile } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isAdmin = profile?.role === 'admin';
   const prefix = isAdmin ? '/admin' : '/recruiter';
+  const [syncingVendors, setSyncingVendors] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin_dashboard_summary'],
     queryFn: fetchAdminDashboardSummary,
   });
+
+  const { data: recentReqs } = useQuery({
+    queryKey: ['requirements', 'dashboard_overview'],
+    queryFn: () => fetchRequirements({ page: 1, pageSize: 20 }),
+  });
+
+  const handlePublishAllToVendors = async () => {
+    setSyncingVendors(true);
+    try {
+      const res = await syncAllOpenRequirementsWithVendors();
+      toast({
+        title: 'Requirements published & shared with vendors',
+        description: `${res.sharedRequirementCount} open requirement(s) distributed to vendor agencies (${res.publishedCount} newly published).`,
+        tone: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin_dashboard_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_shares'] });
+    } catch (err) {
+      toast({
+        title: 'Could not sync requirements with vendors',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setSyncingVendors(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -118,13 +154,29 @@ export const HqDashboardPage: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Workspace Dashboard Header Band (Sky 50 + 24px storm-blue dot grid at 8% opacity) */}
-      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5">
-        <h1 className="type-greeting text-[var(--text-primary)]">
-          {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}` : 'Operations'}
-        </h1>
-        <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
-          Governed overview across client requisitions, vendor SLAs, and pipeline stages.
-        </p>
+      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="type-greeting text-[var(--text-primary)]">
+            {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}` : 'Operations'}
+          </h1>
+          <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+            Governed overview across client requisitions, vendor SLAs, and pipeline stages.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handlePublishAllToVendors}
+            loading={syncingVendors}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Publish &amp; share all with vendors
+          </Button>
+          <Button size="sm" onClick={() => navigate(`${prefix}/requirements`)}>
+            View all requirements
+          </Button>
+        </div>
       </div>
 
       {/* 1. Needs attention */}
@@ -262,6 +314,55 @@ export const HqDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 4. Active Requirements Overview on Dashboard */}
+      {recentReqs?.data && recentReqs.data.length > 0 && (
+        <section className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h3 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+              Active requirements ({recentReqs.data.length})
+            </h3>
+            <Link
+              to={`${prefix}/requirements`}
+              className="text-[12px] font-medium text-[var(--accent)] hover:underline"
+            >
+              Open requirements pipeline →
+            </Link>
+          </div>
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+            {recentReqs.data.slice(0, 6).map((req) => {
+              const budgetInfo = formatRequirementBudgetWithSubtitle(req);
+              return (
+                <div
+                  key={req.id}
+                  onClick={() => navigate(`${prefix}/requirements/${req.id}`)}
+                  className="h-12 px-4 flex items-center justify-between gap-4 text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-medium text-[var(--text-primary)] truncate">
+                      {req.title}
+                    </span>
+                    <Badge tone={req.status === 'open' ? 'emerald' : 'slate'}>
+                      {REQUIREMENT_STATUS_LABELS[req.status]}
+                    </Badge>
+                    <span className="text-[12px] text-[var(--text-secondary)] truncate hidden sm:inline">
+                      {req.organizations?.name || 'Client'} · {req.location} · {req.work_mode}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                      {budgetInfo.formatted}
+                    </span>
+                    <span className="text-[12px] text-[var(--accent)] font-medium">
+                      Open →
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

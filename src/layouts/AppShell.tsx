@@ -20,11 +20,13 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   Sun,
   UserCheck,
   Users,
   X,
   BarChart3,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -34,6 +36,8 @@ import {
 } from '../api/notifications';
 import { fetchPlatformSettings } from '../api/admin';
 import { fetchMyPendingFeedback } from '../api/interviews';
+import { fetchSubscriptionDashboard } from '../api/subscriptions';
+import { fetchRequirements, syncAllOpenRequirementsWithVendors } from '../api/requirements';
 import { ROLE_LABELS, formatRelativeTime } from '../lib/format';
 import { AiAssistantDrawer } from '../components/domain/AiAssistantDrawer';
 import { Avatar } from '../components/ui/kit';
@@ -79,6 +83,34 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
   }, [darkMode]);
 
+  // Automatically ensure existing requirements created by HQ or Client are published ('open')
+  // and shared with all vendor organizations + backend catalog so vendor workspaces see them immediately.
+  useEffect(() => {
+    if ((!isHq && !isClient) || !profile?.id) return;
+    let cancelled = false;
+    const runSync = async () => {
+      if (isHq) {
+        await syncAllOpenRequirementsWithVendors();
+      } else if (isClient) {
+        await fetchRequirements({ page: 1, pageSize: 100 });
+      }
+      if (!cancelled) {
+        queryClient.invalidateQueries({ queryKey: ['requirements'] });
+        queryClient.invalidateQueries({ queryKey: ['requirement_detail'] });
+        queryClient.invalidateQueries({ queryKey: ['requirement_shares'] });
+        queryClient.invalidateQueries({ queryKey: ['approved_vendors'] });
+        queryClient.invalidateQueries({ queryKey: ['vendor_requirements'] });
+        queryClient.invalidateQueries({ queryKey: ['vendor_shares'] });
+      }
+    };
+    runSync().catch(() => {
+      // Non-blocking background sync
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isHq, isClient, profile?.id, queryClient]);
+
   // Keyboard shortcuts: Cmd/Ctrl+J for Assistant (non-candidates), Cmd/Ctrl+K for global search
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -115,6 +147,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     queryKey: ['my_pending_feedback', profile?.id],
     queryFn: fetchMyPendingFeedback,
     enabled: Boolean(profile?.id && (isHq || isClient)),
+  });
+
+  // Authoritative Server Subscription & Trial Lifecycle Status (non-candidates)
+  const accountId = organization?.id || profile?.org_id || 'default_hirenest_account';
+  const { data: subscriptionData } = useQuery({
+    queryKey: ['subscription_dashboard', accountId],
+    queryFn: () => fetchSubscriptionDashboard({ accountId }),
+    enabled: Boolean(profile?.id && !isCandidate),
   });
 
   const markReadMutation = useMutation({
@@ -165,12 +205,20 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Feedback moderation', to: '/admin/feedback-moderation', icon: ClipboardCheck },
             { label: 'Disputes', to: '/admin/disputes', icon: Scale },
             { label: 'Settings & weights', to: '/admin/settings', icon: Settings },
+            { label: 'Subscription & billing', to: '/admin/subscription', icon: CreditCard },
             { label: 'Audit log', to: '/admin/audit-logs', icon: ShieldCheck },
           ],
         };
         return [pipelineGroup, govGroup];
       }
-      return [{ items: pipelineGroup.items }];
+      return [
+        {
+          items: [
+            ...pipelineGroup.items,
+            { label: 'Subscription & billing', to: '/recruiter/subscription', icon: CreditCard },
+          ],
+        },
+      ];
     }
 
     if (role === 'client_manager' || role === 'client_member') {
@@ -192,18 +240,27 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           icon: BarChart3,
         });
       }
+      items.push({
+        label: 'Subscription & billing',
+        to: '/client/subscription',
+        icon: CreditCard,
+      });
       return [{ items }];
     }
 
     if (role === 'vendor_admin' || role === 'vendor_recruiter') {
       return [
         {
+          title: 'Workspace',
           items: [
             { label: 'Dashboard', to: '/vendor', icon: LayoutDashboard },
-            { label: 'Shared requirements', to: '/vendor/requirements', icon: Briefcase },
-            { label: 'Candidate pool', to: '/vendor/candidates', icon: Users },
-            { label: 'My submissions', to: '/vendor/submissions', icon: GitPullRequest },
+            { label: 'Open requirements', to: '/vendor/requirements', icon: Briefcase },
+            { label: 'Candidates', to: '/vendor/candidates', icon: Users },
+            { label: 'Match intelligence', to: '/vendor/matches', icon: Sparkles },
+            { label: 'Submissions', to: '/vendor/submissions', icon: GitPullRequest },
+            { label: 'Interviews', to: '/vendor/interviews', icon: Calendar },
             { label: 'Ratings & performance', to: '/vendor/performance', icon: BarChart3 },
+            { label: 'Subscription & billing', to: '/vendor/subscription', icon: CreditCard },
           ],
         },
       ];
@@ -294,7 +351,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4">
           {navGroups.map((group, gIdx) => (
             <div key={gIdx} className="space-y-0.5">
-              {group.title && navGroups.length > 1 && (
+              {group.title && (
                 <div className="px-2.5 pb-1 text-[11px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--sidebar-muted)]">
                   {group.title}
                 </div>
@@ -542,6 +599,69 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             <Avatar id={profile?.id} name={profile?.full_name} size="sm" />
           </div>
         </header>
+
+        {/* Persistent Trial / Subscription Expiry Banner (Update 3) */}
+        {!isCandidate &&
+          subscriptionData &&
+          subscriptionData.subscription.subscriptionStatus !== 'active' && (
+            <div
+              className={`border-b border-[var(--border)] px-4 sm:px-8 py-2 flex flex-wrap items-center justify-between gap-3 text-[13px] leading-[20px] ${
+                subscriptionData.subscription.subscriptionStatus === 'expired' ||
+                subscriptionData.daysRemaining <= 1
+                  ? 'bg-[var(--status-danger-bg)] text-[var(--status-danger)]'
+                  : subscriptionData.daysRemaining <= 5
+                    ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning)]'
+                    : 'bg-[var(--bg-subtle)] text-[var(--text-primary)]'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-medium">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                    subscriptionData.subscription.subscriptionStatus === 'expired' ||
+                    subscriptionData.daysRemaining <= 1
+                      ? 'bg-[var(--status-danger-dot)]'
+                      : subscriptionData.daysRemaining <= 5
+                        ? 'bg-[var(--status-warning-dot)]'
+                        : 'bg-[#1F4CC4]'
+                  }`}
+                />
+                {subscriptionData.subscription.subscriptionStatus === 'expired' ? (
+                  <span>
+                    Trial expired — Workspace is in restricted read-only state. Existing data is preserved.
+                  </span>
+                ) : subscriptionData.daysRemaining === 1 ? (
+                  <span>
+                    Last day of trial: Your HireNestOS trial expires today. Upgrade now to avoid write restrictions.
+                  </span>
+                ) : (
+                  <span>
+                    Free Trial active:{' '}
+                    <span className="font-mono tabular-nums font-semibold">
+                      {subscriptionData.daysRemaining} days remaining
+                    </span>
+                    {subscriptionData.reminders[0]
+                      ? ` · ${subscriptionData.reminders[0].message}`
+                      : ' · Review plans and upgrade for uninterrupted access.'}
+                  </span>
+                )}
+              </div>
+              <Link
+                to={
+                  role === 'admin'
+                    ? '/admin/subscription'
+                    : role === 'recruiter'
+                      ? '/recruiter/subscription'
+                      : isClient
+                        ? '/client/subscription'
+                        : '/vendor/subscription'
+                }
+                className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#1F4CC4] px-2.5 py-1 text-[12px] leading-[16px] font-medium text-white hover:bg-[#193EA3] transition-colors shrink-0"
+              >
+                <CreditCard className="h-3 w-3" />
+                <span>Purchase Plan / Upgrade Now</span>
+              </Link>
+            </div>
+          )}
 
         {/* Persistent Feedback Pending Banner for Client & HQ */}
         {pendingFeedbackCount > 0 && (isClient || isHq) && (
