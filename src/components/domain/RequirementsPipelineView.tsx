@@ -7,6 +7,7 @@ import {
   MapPin,
   Repeat,
   ArrowDownRight,
+  Trash2,
   Wallet,
 } from 'lucide-react';
 import { Badge, EmptyState } from '../ui/kit';
@@ -140,6 +141,7 @@ export const RequirementsPipelineGrid: React.FC<{
   activeFilter: PipelineQuickFilter;
   onFilterChange: (next: PipelineQuickFilter) => void;
   onSelectRequirement: (req: Requirement) => void;
+  onDeleteRequirement?: (req: Requirement) => void;
   emptyTitle?: string;
   emptyDescription?: string;
   emptyActionLabel?: string;
@@ -150,6 +152,7 @@ export const RequirementsPipelineGrid: React.FC<{
   activeFilter,
   onFilterChange,
   onSelectRequirement,
+  onDeleteRequirement,
   emptyTitle = 'No requirements matching this filter',
   emptyDescription = 'Switch to All Requirements or adjust your search query.',
   emptyActionLabel,
@@ -304,6 +307,20 @@ export const RequirementsPipelineGrid: React.FC<{
                     {share?.due_at && <SlaBadge dueAt={share.due_at} />}
                     {share && !share.acknowledged_at && (
                       <Badge tone="warning">Ack needed</Badge>
+                    )}
+                    {onDeleteRequirement && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteRequirement(req);
+                        }}
+                        title={`Delete requirement ${req.title}`}
+                        className="h-7 px-2 rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[11px] font-medium text-[var(--text-secondary)] hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-600 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Delete</span>
+                      </button>
                     )}
                     <div className="inline-flex items-center gap-0.5 text-[var(--text-tertiary)] group-hover:text-[#1F4CC4] transition-colors">
                       <ArrowDownRight className="h-3.5 w-3.5" />

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays, parseISO } from 'date-fns';
-import { Plus, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Layers, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import {
   PageHeader,
   Button,
@@ -47,22 +47,29 @@ import {
   revokeRequirementShare,
   publishAndShareRequirementWithAllVendors,
   syncAllOpenRequirementsWithVendors,
+  softDeleteRequirement,
+  consolidateDuplicateRequirements,
 } from '../../api/requirements';
 import {
   fetchMatchesForRequirement,
   overrideMatchScore,
   recomputeRequirementMatches,
 } from '../../api/candidates';
+import { decomposeCompoundSkills } from '../../lib/matchingEngine';
 import {
   fetchSubmissions,
   submitCandidateRpc,
 } from '../../api/submissions';
 import { fetchOrganizations, fetchAuditLogs } from '../../api/admin';
 import { useAuth } from '../../auth/AuthProvider';
+import {
+  detectDuplicateRequirementGroups,
+  type DuplicateRequirementGroup,
+} from '../../lib/enterpriseLifecycle';
 import { mapSupabaseError } from '../../lib/errors';
 import {
   STAGE_LABELS,
-  formatCurrency,
+  formatFinancialAmount,
   formatLocalDate,
   formatLocalDateTime,
   formatRequirementBudgetWithSubtitle,
@@ -70,6 +77,7 @@ import {
 import { useToast } from '../../components/ui/Toast';
 import type {
   CandidateMatch,
+  Requirement,
   RequirementStatus,
   SubmissionStage,
 } from '../../types/db';
@@ -96,6 +104,19 @@ export const HqRequirementsListPage: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [syncingVendors, setSyncingVendors] = useState(false);
 
+  // Soft-Delete Confirmation Dialog state
+  const [deleteTarget, setDeleteTarget] = useState<Requirement | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Duplicate Cleanup & Canonical Consolidation Modal state
+  const [duplicatesModalOpen, setDuplicatesModalOpen] = useState(false);
+  const [canonicalSelectionByGroup, setCanonicalSelectionByGroup] = useState<
+    Record<string, string>
+  >({});
+  const [consolidatingGroupKey, setConsolidatingGroupKey] = useState<string | null>(null);
+  const [consolidatingAll, setConsolidatingAll] = useState(false);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['requirements', page, status, clientOrgId, publicFilter, mappingFilter, search],
     queryFn: () =>
@@ -120,6 +141,15 @@ export const HqRequirementsListPage: React.FC = () => {
     queryFn: () => fetchOrganizations({ type: 'client', page: 1, pageSize: 100 }),
   });
 
+  const invalidateAllRequirementQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['requirements'] });
+    queryClient.invalidateQueries({ queryKey: ['client_requirements'] });
+    queryClient.invalidateQueries({ queryKey: ['client_open_reqs'] });
+    queryClient.invalidateQueries({ queryKey: ['vendor_requirements'] });
+    queryClient.invalidateQueries({ queryKey: ['vendor_shares'] });
+    queryClient.invalidateQueries({ queryKey: ['public_requirements'] });
+  };
+
   const handleSyncWithVendors = async () => {
     setSyncingVendors(true);
     try {
@@ -129,9 +159,7 @@ export const HqRequirementsListPage: React.FC = () => {
         description: `${res.sharedRequirementCount} open requirement(s) shared with vendor agencies (${res.publishedCount} newly published).`,
         tone: 'success',
       });
-      queryClient.invalidateQueries({ queryKey: ['requirements'] });
-      queryClient.invalidateQueries({ queryKey: ['vendor_requirements'] });
-      queryClient.invalidateQueries({ queryKey: ['vendor_shares'] });
+      invalidateAllRequirementQueries();
     } catch (err) {
       toast({
         title: 'Could not sync requirements with vendors',
@@ -143,10 +171,128 @@ export const HqRequirementsListPage: React.FC = () => {
     }
   };
 
+  const handleConfirmDeleteRequirement = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      const res = await softDeleteRequirement({
+        requirement: deleteTarget,
+        deletedBy: profile?.id || profile?.email || 'admin',
+        reason: deleteReason.trim() || 'Soft-deleted by Admin via Requirements table',
+      });
+      toast({
+        title: 'Requirement archived (soft-deleted)',
+        description: `"${deleteTarget.title}" (${res.requirementId.slice(0, 8).toUpperCase()}) was removed from active feeds. Linked submissions and audit records remain intact.`,
+        tone: 'success',
+      });
+      setDeleteTarget(null);
+      setDeleteReason('');
+      invalidateAllRequirementQueries();
+    } catch (err) {
+      toast({
+        title: 'Could not delete requirement',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const allRequirements = data?.data || [];
   const filteredRows = allRequirements.filter((req) =>
     matchesPipelineQuickFilter(req, quickFilter)
   );
+
+  // Detect duplicate requirement groups across active records
+  const duplicateGroups = useMemo(
+    () => detectDuplicateRequirementGroups(allRequirements),
+    [allRequirements]
+  );
+
+  const totalExtraDuplicateRecords = useMemo(
+    () =>
+      duplicateGroups.reduce(
+        (acc, grp) => acc + Math.max(0, grp.requirements.length - 1),
+        0
+      ),
+    [duplicateGroups]
+  );
+
+  const getSelectedCanonicalId = (grp: DuplicateRequirementGroup): string => {
+    const chosen = canonicalSelectionByGroup[grp.groupKey];
+    if (chosen && grp.requirements.some((r) => r.id === chosen)) {
+      return chosen;
+    }
+    return grp.recommendedCanonicalId;
+  };
+
+  const handleConsolidateSingleGroup = async (grp: DuplicateRequirementGroup) => {
+    const canonicalId = getSelectedCanonicalId(grp);
+    const canonicalReq = grp.requirements.find((r) => r.id === canonicalId) || grp.requirements[0];
+    const duplicatesToArchive = grp.requirements.filter((r) => r.id !== canonicalReq.id);
+    if (!duplicatesToArchive.length) return;
+
+    setConsolidatingGroupKey(grp.groupKey);
+    try {
+      const res = await consolidateDuplicateRequirements({
+        canonicalRequirement: canonicalReq,
+        duplicateRequirements: duplicatesToArchive,
+        deletedBy: profile?.id || profile?.email || 'admin',
+      });
+      toast({
+        title: 'Duplicate group consolidated',
+        description: `Retained canonical ID ${canonicalReq.id.slice(0, 8).toUpperCase()} for "${canonicalReq.title}" and archived ${res.archivedIds.length} duplicate record(s).`,
+        tone: 'success',
+      });
+      invalidateAllRequirementQueries();
+    } catch (err) {
+      toast({
+        title: 'Could not consolidate duplicate group',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setConsolidatingGroupKey(null);
+    }
+  };
+
+  const handleConsolidateAllGroups = async () => {
+    if (!duplicateGroups.length) return;
+    setConsolidatingAll(true);
+    let totalArchived = 0;
+    try {
+      for (const grp of duplicateGroups) {
+        const canonicalId = getSelectedCanonicalId(grp);
+        const canonicalReq =
+          grp.requirements.find((r) => r.id === canonicalId) || grp.requirements[0];
+        const duplicatesToArchive = grp.requirements.filter((r) => r.id !== canonicalReq.id);
+        if (!duplicatesToArchive.length) continue;
+
+        const res = await consolidateDuplicateRequirements({
+          canonicalRequirement: canonicalReq,
+          duplicateRequirements: duplicatesToArchive,
+          deletedBy: profile?.id || profile?.email || 'admin',
+        });
+        totalArchived += res.archivedIds.length;
+      }
+      toast({
+        title: 'All duplicate requirement groups cleaned up',
+        description: `Consolidated ${duplicateGroups.length} group(s) and soft-archived ${totalArchived} duplicate requirement(s) while preserving submissions and mappings.`,
+        tone: 'success',
+      });
+      setDuplicatesModalOpen(false);
+      invalidateAllRequirementQueries();
+    } catch (err) {
+      toast({
+        title: 'Duplicate consolidation error',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setConsolidatingAll(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -179,6 +325,15 @@ export const HqRequirementsListPage: React.FC = () => {
                 Table view
               </button>
             </div>
+            {duplicateGroups.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setDuplicatesModalOpen(true)}
+              >
+                <Layers className="h-3.5 w-3.5 text-amber-500" />
+                Review duplicates ({totalExtraDuplicateRecords})
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleSyncWithVendors}
@@ -194,6 +349,28 @@ export const HqRequirementsListPage: React.FC = () => {
           </div>
         }
       />
+
+      {/* Duplicate Requirements Governance Banner */}
+      {duplicateGroups.length > 0 && (
+        <div className="rounded-[10px] border border-amber-500/35 bg-amber-500/10 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <div className="text-[13px] leading-[18px] font-semibold text-[var(--text-primary)]">
+                {duplicateGroups.length} duplicate requirement group(s) detected ({totalExtraDuplicateRecords} redundant record{totalExtraDuplicateRecords === 1 ? '' : 's'})
+              </div>
+              <p className="mt-0.5 text-[12px] leading-[18px] text-[var(--text-secondary)]">
+                Review duplicate groups, inspect their exact requirement IDs, and choose the canonical record to retain. Linked candidates, submissions, client mappings, and audit history are preserved before archiving duplicates.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" onClick={() => setDuplicatesModalOpen(true)}>
+              Review &amp; clean up duplicates
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-2">
@@ -307,6 +484,10 @@ export const HqRequirementsListPage: React.FC = () => {
           activeFilter={quickFilter}
           onFilterChange={setQuickFilter}
           onSelectRequirement={(req) => navigate(`${prefix}/requirements/${req.id}`)}
+          onDeleteRequirement={(req) => {
+            setDeleteTarget(req);
+            setDeleteReason('');
+          }}
           emptyActionLabel="New requirement"
           onEmptyAction={() => setCreateOpen(true)}
         />
@@ -333,11 +514,13 @@ export const HqRequirementsListPage: React.FC = () => {
                   <th className="text-right">Vendor budget</th>
                   <th className="text-right">SLA</th>
                   <th>Created</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((req) => {
                   const budgetInfo = formatRequirementBudgetWithSubtitle(req);
+                  const shortId = req.id.replace(/-/g, '').slice(0, 8).toUpperCase();
                   return (
                     <tr
                       key={req.id}
@@ -349,7 +532,7 @@ export const HqRequirementsListPage: React.FC = () => {
                           {req.title}
                         </div>
                         <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono tabular-nums">
-                          {req.min_experience}–{req.max_experience}y · {req.openings} open
+                          ID: {shortId} · {req.min_experience}–{req.max_experience}y · {req.openings} open
                           {req.is_public ? ' · Public' : ''}
                         </div>
                       </td>
@@ -392,6 +575,20 @@ export const HqRequirementsListPage: React.FC = () => {
                       <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                         {formatLocalDate(req.created_at)}
                       </td>
+                      <td className="text-right">
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(req);
+                            setDeleteReason('');
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -402,11 +599,216 @@ export const HqRequirementsListPage: React.FC = () => {
         </div>
       )}
 
+      {/* Soft-Delete Requirement Confirmation Dialog */}
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deleteLoading) {
+            setDeleteTarget(null);
+            setDeleteReason('');
+          }
+        }}
+        title={deleteTarget ? `Delete requirement "${deleteTarget.title}"?` : 'Delete requirement'}
+        description="Soft deletion removes this requirement from active lists and blocks client, vendor, and public access while preserving linked candidate submissions and audit history."
+      >
+        {deleteTarget && (
+          <div className="space-y-4">
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] leading-[18px] space-y-1">
+              <div className="flex justify-between gap-2">
+                <span className="text-[var(--text-secondary)]">Requirement title</span>
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {deleteTarget.title}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-[var(--text-secondary)]">Requirement ID</span>
+                <span className="font-mono text-[var(--text-primary)]">{deleteTarget.id}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-[var(--text-secondary)]">Client / Location</span>
+                <span className="text-[var(--text-primary)]">
+                  {deleteTarget.organizations?.name || 'Internal'} · {deleteTarget.location} ({deleteTarget.work_mode})
+                </span>
+              </div>
+            </div>
+
+            <Textarea
+              label="Deletion / archival reason (recorded in audit history)"
+              rows={2}
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="e.g. Duplicate posting, obsolete requisition, or incorrect specification..."
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                disabled={deleteLoading}
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteReason('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                loading={deleteLoading}
+                onClick={handleConfirmDeleteRequirement}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Confirm delete
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Duplicate Requirements Cleanup & Canonical Consolidation Dialog */}
+      <Dialog
+        open={duplicatesModalOpen}
+        onClose={() => setDuplicatesModalOpen(false)}
+        title="Review & clean up duplicate requirements"
+        description="Inspect duplicate requirement groups and their IDs. Select the canonical record to retain; linked submissions, financials, mappings, and audit logs will be preserved before archiving duplicates."
+        maxWidth="max-w-[760px]"
+      >
+        <div className="space-y-5">
+          {duplicateGroups.length === 0 ? (
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-6 text-center space-y-2">
+              <CheckCircle2 className="h-6 w-6 text-emerald-500 mx-auto" />
+              <div className="text-[14px] font-medium text-[var(--text-primary)]">
+                No duplicate requirements detected
+              </div>
+              <p className="text-[12px] text-[var(--text-secondary)]">
+                All active requirements have unique fingerprints across title, client organization, location, work mode, and skills.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="max-h-[440px] overflow-y-auto space-y-4 pr-1">
+                {duplicateGroups.map((grp) => {
+                  const selectedCanonicalId = getSelectedCanonicalId(grp);
+                  const isConsolidatingThis = consolidatingGroupKey === grp.groupKey;
+
+                  return (
+                    <div
+                      key={grp.groupKey}
+                      className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-4 space-y-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[14px] font-semibold text-[var(--text-primary)]">
+                              {grp.title}
+                            </span>
+                            <Badge tone="amber">{grp.requirements.length} records</Badge>
+                          </div>
+                          <div className="text-[12px] text-[var(--text-secondary)] mt-0.5">
+                            Client: <strong>{grp.clientName}</strong> · Location:{' '}
+                            <strong>{grp.location}</strong> · Mode:{' '}
+                            <strong className="capitalize">{grp.workMode}</strong>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          loading={isConsolidatingThis}
+                          disabled={consolidatingAll}
+                          onClick={() => handleConsolidateSingleGroup(grp)}
+                        >
+                          Retain selected &amp; archive {grp.requirements.length - 1} duplicate(s)
+                        </Button>
+                      </div>
+
+                      <div className="divide-y divide-[var(--border)] rounded-[6px] border border-[var(--border)] bg-[var(--surface)]">
+                        {grp.requirements.map((item) => {
+                          const isCanonical = item.id === selectedCanonicalId;
+                          const budgetInfo = formatRequirementBudgetWithSubtitle(item);
+                          return (
+                            <label
+                              key={item.id}
+                              className={`flex items-start justify-between gap-3 p-3 text-[12px] cursor-pointer transition-colors ${
+                                isCanonical
+                                  ? 'bg-[#1F4CC4]/5'
+                                  : 'hover:bg-[var(--bg-hover)]'
+                              }`}
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <input
+                                  type="radio"
+                                  name={`canonical_${grp.groupKey}`}
+                                  checked={isCanonical}
+                                  onChange={() =>
+                                    setCanonicalSelectionByGroup((prev) => ({
+                                      ...prev,
+                                      [grp.groupKey]: item.id,
+                                    }))
+                                  }
+                                  className="mt-1 accent-[#1F4CC4]"
+                                />
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-mono font-semibold text-[var(--text-primary)]">
+                                      ID: {item.id}
+                                    </span>
+                                    {isCanonical ? (
+                                      <Badge tone="emerald">Canonical (Retain)</Badge>
+                                    ) : (
+                                      <Badge tone="warning">Duplicate (Will archive)</Badge>
+                                    )}
+                                    {item.id === grp.recommendedCanonicalId && (
+                                      <span className="text-[11px] text-[var(--text-tertiary)]">
+                                        (Recommended)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-[var(--text-secondary)]">
+                                    Skills ({item.skills?.length || 0}):{' '}
+                                    {item.skills?.length ? item.skills.join(', ') : 'None'} · Budget:{' '}
+                                    <span className="font-mono">{budgetInfo.formatted}</span> · Created:{' '}
+                                    <span className="font-mono">{formatLocalDateTime(item.created_at)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <RequirementStatusBadge status={item.status} />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--border)]">
+                <span className="text-[12px] text-[var(--text-secondary)]">
+                  Consolidating preserves linked candidates, submissions, financials, and audit logs.
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={consolidatingAll}
+                    onClick={() => setDuplicatesModalOpen(false)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    loading={consolidatingAll}
+                    onClick={handleConsolidateAllGroups}
+                  >
+                    Consolidate all ({duplicateGroups.length} group{duplicateGroups.length === 1 ? '' : 's'})
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </Dialog>
+
       <RequirementFormModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSaved={(saved) => {
-          queryClient.invalidateQueries({ queryKey: ['requirements'] });
+          invalidateAllRequirementQueries();
           navigate(`${prefix}/requirements/${saved.id}`);
         }}
         role={profile?.role || 'recruiter'}
@@ -422,6 +824,7 @@ export const HqRequirementDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const role = profile?.role || 'recruiter';
@@ -685,6 +1088,10 @@ export const HqRequirementDetailPage: React.FC = () => {
     }
   };
 
+  const [detailDeleteOpen, setDetailDeleteOpen] = useState(false);
+  const [detailDeleteReason, setDetailDeleteReason] = useState('');
+  const [detailDeleteLoading, setDetailDeleteLoading] = useState(false);
+
   const handlePublishAndShareAll = async () => {
     setSharingLoading(true);
     try {
@@ -713,6 +1120,36 @@ export const HqRequirementDetailPage: React.FC = () => {
     }
   };
 
+  const handleDetailSoftDelete = async () => {
+    setDetailDeleteLoading(true);
+    try {
+      await softDeleteRequirement({
+        requirement: req,
+        deletedBy: profile?.id || profile?.email || 'admin',
+        reason: detailDeleteReason.trim() || 'Soft-deleted from Requirement Detail view',
+      });
+      toast({
+        title: 'Requirement archived (soft-deleted)',
+        description: `"${req.title}" has been removed from active feeds. Linked submissions and audit records remain preserved.`,
+        tone: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['client_requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor_shares'] });
+      setDetailDeleteOpen(false);
+      navigate(`${prefix}/requirements`);
+    } catch (err) {
+      toast({
+        title: 'Could not delete requirement',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setDetailDeleteLoading(false);
+    }
+  };
+
   const submissions = submissionsData?.data || [];
 
   return (
@@ -737,6 +1174,17 @@ export const HqRequirementDetailPage: React.FC = () => {
             </Button>
             <Button size="sm" onClick={() => setEditOpen(true)}>
               Edit requirement
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                setDetailDeleteReason('');
+                setDetailDeleteOpen(true);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
             </Button>
           </div>
         }
@@ -776,19 +1224,26 @@ export const HqRequirementDetailPage: React.FC = () => {
               </div>
 
               <div className="pt-4 border-t border-[var(--border)] space-y-2">
-                <h4 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
-                  Required skills ({req.skills.length})
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {req.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[12px] leading-[16px] font-medium text-[var(--text-primary)]"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
+                {(() => {
+                  const displaySkills = decomposeCompoundSkills(req.skills || []);
+                  return (
+                    <>
+                      <h4 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                        Required skills ({displaySkills.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {displaySkills.map((skill) => (
+                          <span
+                            key={skill}
+                            className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[12px] leading-[16px] font-medium text-[var(--text-primary)]"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Vendor Sourcing & Distribution Summary on Overview Tab */}
@@ -1219,8 +1674,10 @@ export const HqRequirementDetailPage: React.FC = () => {
                               {(m.matched_skills || []).map((sk) => (
                                 <span
                                   key={sk}
-                                  className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[12px] leading-[16px] text-[var(--text-primary)]"
+                                  title="Matched on candidate resume / profile"
+                                  className="inline-flex items-center gap-1 rounded-[6px] border border-[#2A9D8F]/40 bg-[#2A9D8F]/10 px-2 py-0.5 text-[12px] leading-[16px] font-medium text-[var(--text-primary)]"
                                 >
+                                  <CheckCircle2 className="h-3 w-3 text-[#2A9D8F] shrink-0" />
                                   {sk}
                                 </span>
                               ))}
@@ -1233,9 +1690,24 @@ export const HqRequirementDetailPage: React.FC = () => {
                                   {sk}
                                 </span>
                               ))}
+                              <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-secondary)] ml-1">
+                                · Skills {m.skill_score}% · Exp {m.experience_score}% · Domain{' '}
+                                {m.domain_score ??
+                                  Number(
+                                    (m.evidence as Record<string, unknown> | null)?.domain_score ??
+                                      m.skill_score
+                                  )}
+                                % · Seniority{' '}
+                                {m.seniority_score ??
+                                  Number(
+                                    (m.evidence as Record<string, unknown> | null)
+                                      ?.seniority_score ?? m.experience_score
+                                  )}
+                                %
+                              </span>
                               {m.experience_note && (
-                                <span className="text-[12px] leading-[16px] text-[var(--text-secondary)] ml-1">
-                                  · {m.experience_note}
+                                <span className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
+                                  ({m.experience_note})
                                 </span>
                               )}
                             </div>
@@ -1528,19 +2000,15 @@ export const HqRequirementDetailPage: React.FC = () => {
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Client budget</span>
               <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-                {formatCurrency(financials?.actual_client_budget, req.currency)}
+                {formatFinancialAmount(financials?.actual_client_budget, req)}
               </span>
             </div>
-            {financials?.notes && (
-              <div className="py-2 space-y-0.5">
-                <span className="text-[12px] text-[var(--text-secondary)] block">
-                  Financial notes
-                </span>
-                <span className="text-[12px] text-[var(--text-primary)]">
-                  {financials.notes}
-                </span>
-              </div>
-            )}
+            <div className="py-2 flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Financial notes</span>
+              <span className="text-right text-[12px] text-[var(--text-primary)] max-w-[180px] break-words">
+                {financials?.notes || '—'}
+              </span>
+            </div>
             {isAdmin && (
               <div className="py-2 flex justify-between gap-2">
                 <span className="text-[var(--text-secondary)]">Platform margin</span>
@@ -1549,7 +2017,7 @@ export const HqRequirementDetailPage: React.FC = () => {
                   margins?.platform_margin !== undefined
                     ? margins.margin_type === 'percentage'
                       ? `${margins.platform_margin}%`
-                      : formatCurrency(margins.platform_margin, req.currency)
+                      : formatFinancialAmount(margins.platform_margin, req)
                     : '—'}
                 </span>
               </div>
@@ -1692,6 +2160,61 @@ export const HqRequirementDetailPage: React.FC = () => {
             </div>
           </div>
         )}
+      </Dialog>
+
+      {/* Soft-Delete Confirmation Dialog on Requirement Detail Page */}
+      <Dialog
+        open={detailDeleteOpen}
+        onClose={() => {
+          if (!detailDeleteLoading) setDetailDeleteOpen(false);
+        }}
+        title={`Delete requirement "${req.title}"?`}
+        description="Soft deletion removes this requirement from active lists and blocks client, vendor, and public access while preserving linked candidate submissions and audit history."
+      >
+        <div className="space-y-4">
+          <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] leading-[18px] space-y-1">
+            <div className="flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Requirement title</span>
+              <span className="font-semibold text-[var(--text-primary)]">{req.title}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Requirement ID</span>
+              <span className="font-mono text-[var(--text-primary)]">{req.id}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-[var(--text-secondary)]">Linked submissions</span>
+              <span className="font-mono text-[var(--text-primary)]">
+                {submissions.length} preserved
+              </span>
+            </div>
+          </div>
+
+          <Textarea
+            label="Deletion / archival reason (recorded in audit history)"
+            rows={2}
+            value={detailDeleteReason}
+            onChange={(e) => setDetailDeleteReason(e.target.value)}
+            placeholder="e.g. Duplicate posting, obsolete requisition, or incorrect specification..."
+          />
+
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={detailDeleteLoading}
+              onClick={() => setDetailDeleteOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={detailDeleteLoading}
+              onClick={handleDetailSoftDelete}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Confirm delete
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </div>
   );

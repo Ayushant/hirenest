@@ -1,4 +1,4 @@
-import type { AppRole, Requirement } from '../types/db';
+import type { AppRole, MarginType, Requirement, RequirementFinancials, RequirementMargins } from '../types/db';
 
 // ============================================================================
 // UPDATE 1 & UPDATE 2: Requirement Client Mapping & LPA/LPM Budget Schema
@@ -6,6 +6,14 @@ import type { AppRole, Requirement } from '../types/db';
 
 export type BudgetUnit = 'LPA' | 'LPM';
 export type BudgetMode = 'range' | 'fixed';
+
+export interface RequirementSoftDeleteMeta {
+  isDeleted: boolean;
+  deletedAt: string | null;
+  deletedBy: string | null;
+  canonicalId?: string | null;
+  deleteReason?: string | null;
+}
 
 export interface RequirementExtendedMeta {
   baseCurrency: string;
@@ -15,6 +23,343 @@ export interface RequirementExtendedMeta {
   budgetMax: number | null;
   isClientMapped: boolean;
   mappedClientOrgId: string | null;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  canonicalId?: string | null;
+  fingerprint?: string | null;
+}
+
+export interface DuplicateRequirementGroup {
+  groupKey: string;
+  fingerprint: string;
+  title: string;
+  clientOrgId: string;
+  clientName: string;
+  location: string;
+  workMode: string;
+  skillsSignature: string;
+  requirements: Requirement[];
+  recommendedCanonicalId: string;
+}
+
+const REQ_META_STORAGE_KEY = 'hirenest_req_meta_cache_v1';
+const REQ_FIN_STORAGE_KEY = 'hirenest_req_financials_cache_v1';
+const REQ_MAR_STORAGE_KEY = 'hirenest_req_margins_cache_v1';
+const REQ_DEL_STORAGE_KEY = 'hirenest_req_deleted_cache_v1';
+
+const memoryMetaCache: Record<string, RequirementExtendedMeta> = {};
+const memoryFinancialsCache: Record<string, RequirementFinancials> = {};
+const memoryMarginsCache: Record<string, RequirementMargins> = {};
+const memoryDeletedCache: Record<string, RequirementSoftDeleteMeta> = {};
+
+function readBrowserStorage<T>(key: string): Record<string, T> {
+  if (typeof window === 'undefined' || !window.localStorage) return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, T>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeBrowserStorage<T>(key: string, map: Record<string, T>): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(map));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+export function saveRequirementDeletedCache(
+  requirementId: string,
+  delMeta: RequirementSoftDeleteMeta
+): void {
+  if (!requirementId) return;
+  memoryDeletedCache[requirementId] = delMeta;
+  const current = readBrowserStorage<RequirementSoftDeleteMeta>(REQ_DEL_STORAGE_KEY);
+  current[requirementId] = delMeta;
+  writeBrowserStorage(REQ_DEL_STORAGE_KEY, current);
+
+  const existingMeta = getRequirementExtendedCache(requirementId);
+  if (existingMeta) {
+    saveRequirementExtendedCache(requirementId, {
+      ...existingMeta,
+      isDeleted: delMeta.isDeleted,
+      deletedAt: delMeta.deletedAt,
+      deletedBy: delMeta.deletedBy,
+      canonicalId: delMeta.canonicalId || null,
+    });
+  }
+}
+
+export function getRequirementDeletedCache(
+  requirementId?: string | null
+): RequirementSoftDeleteMeta | null {
+  if (!requirementId) return null;
+  if (memoryDeletedCache[requirementId]) return memoryDeletedCache[requirementId];
+  const current = readBrowserStorage<RequirementSoftDeleteMeta>(REQ_DEL_STORAGE_KEY);
+  if (current[requirementId]) {
+    memoryDeletedCache[requirementId] = current[requirementId];
+    return current[requirementId];
+  }
+  return null;
+}
+
+export function isRequirementSoftDeleted(
+  reqOrId:
+    | (Pick<Requirement, 'currency'> & { id?: string; deleted_at?: string | null })
+    | string
+    | null
+    | undefined
+): boolean {
+  if (!reqOrId) return false;
+  if (typeof reqOrId === 'string') {
+    const byId = getRequirementDeletedCache(reqOrId);
+    if (byId?.isDeleted) return true;
+    if (reqOrId.includes('|del=1')) return true;
+    return false;
+  }
+  if (reqOrId.deleted_at) return true;
+  if (reqOrId.id) {
+    const byId = getRequirementDeletedCache(reqOrId.id);
+    if (byId?.isDeleted) return true;
+  }
+  const meta = parseRequirementMeta(reqOrId as never);
+  return Boolean(meta.isDeleted);
+}
+
+/**
+ * Normalizes strings for deterministic requirement fingerprinting.
+ */
+function normalizeToken(val?: string | null): string {
+  if (!val) return '';
+  return val
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Normalizes skill lists so order or casing differences produce the same canonical signature.
+ */
+export function normalizeSkillsSignature(skills?: string[] | null): string {
+  if (!Array.isArray(skills) || skills.length === 0) return '';
+  const cleaned = Array.from(
+    new Set(
+      skills
+        .map((s) => normalizeToken(s))
+        .filter(Boolean)
+    )
+  ).sort();
+  return cleaned.join(',');
+}
+
+/**
+ * Computes a stable, deterministic fingerprint for a requirement using:
+ * - Job title (normalized)
+ * - Mandatory skills (normalized, sorted, deduplicated)
+ * - Client or hiring organization scope (client_org_id / mappedClientOrgId)
+ * - Location and work mode (normalized)
+ * - Optional source reference / requirement identifier
+ *
+ * Does NOT rely on title alone, ensuring similar roles for different clients remain separate.
+ */
+export function computeRequirementFingerprint(params: {
+  title: string;
+  skills?: string[] | null;
+  client_org_id?: string | null;
+  mappedClientOrgId?: string | null;
+  isClientMapped?: boolean;
+  location?: string | null;
+  work_mode?: string | null;
+  sourceRef?: string | null;
+}): string {
+  const normTitle = normalizeToken(params.title);
+  const normSkills = normalizeSkillsSignature(params.skills);
+  const effectiveClientOrg =
+    params.isClientMapped === false
+      ? `unmapped:${normalizeToken(params.client_org_id || 'hq')}`
+      : `client:${normalizeToken(params.mappedClientOrgId || params.client_org_id || 'hq')}`;
+  const normLocation = normalizeToken(params.location);
+  const normWorkMode = normalizeToken(params.work_mode || 'hybrid');
+  const normSourceRef = normalizeToken(params.sourceRef);
+
+  return [
+    `org=${effectiveClientOrg}`,
+    `title=${normTitle}`,
+    `loc=${normLocation}`,
+    `mode=${normWorkMode}`,
+    `skills=${normSkills}`,
+    ...(normSourceRef ? [`ref=${normSourceRef}`] : []),
+  ].join('||');
+}
+
+/**
+ * Computes a role+client+location+workMode group key used to surface retry duplicates
+ * in the Admin duplicate cleanup tool (even when one retry had empty skills and another had skills).
+ * Never groups across different clients or different locations/work modes.
+ */
+export function computeRequirementDuplicateGroupKey(params: {
+  title: string;
+  client_org_id?: string | null;
+  mappedClientOrgId?: string | null;
+  isClientMapped?: boolean;
+  location?: string | null;
+  work_mode?: string | null;
+}): string {
+  const normTitle = normalizeToken(params.title);
+  const effectiveClientOrg =
+    params.isClientMapped === false
+      ? `unmapped:${normalizeToken(params.client_org_id || 'hq')}`
+      : `client:${normalizeToken(params.mappedClientOrgId || params.client_org_id || 'hq')}`;
+  const normLocation = normalizeToken(params.location);
+  const normWorkMode = normalizeToken(params.work_mode || 'hybrid');
+
+  return `${effectiveClientOrg}||${normTitle}||${normLocation}||${normWorkMode}`;
+}
+
+/**
+ * Identifies duplicate requirement groups among active (non-deleted) requirements.
+ * Groups records that share the same client organization, normalized title, location, and work mode,
+ * where either their normalized skills match OR one of the records was created with empty skills
+ * during a retry. Never groups requirements belonging to different clients.
+ */
+export function detectDuplicateRequirementGroups(
+  requirements: Requirement[]
+): DuplicateRequirementGroup[] {
+  const activeReqs = requirements.filter((r) => !isRequirementSoftDeleted(r));
+  const buckets = new Map<string, Requirement[]>();
+
+  for (const req of activeReqs) {
+    const meta = parseRequirementMeta(req);
+    const baseKey = computeRequirementDuplicateGroupKey({
+      title: req.title,
+      client_org_id: req.client_org_id,
+      mappedClientOrgId: meta.mappedClientOrgId,
+      isClientMapped: meta.isClientMapped,
+      location: req.location,
+      work_mode: req.work_mode,
+    });
+    const list = buckets.get(baseKey) || [];
+    list.push(req);
+    buckets.set(baseKey, list);
+  }
+
+  const duplicateGroups: DuplicateRequirementGroup[] = [];
+
+  for (const [baseKey, groupReqs] of buckets.entries()) {
+    if (groupReqs.length < 2) continue;
+
+    // Sub-partition if two records have explicitly different non-empty skill sets,
+    // while grouping retry duplicates that share the same skills or where a retry had empty skills
+    const sorted = [...groupReqs].sort((a, b) => {
+      const aSkills = Array.isArray(a.skills) ? a.skills.length : 0;
+      const bSkills = Array.isArray(b.skills) ? b.skills.length : 0;
+      if (bSkills !== aSkills) return bSkills - aSkills;
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
+
+    const canonicalCandidate = sorted[0];
+    const meta = parseRequirementMeta(canonicalCandidate);
+    const fp = computeRequirementFingerprint({
+      title: canonicalCandidate.title,
+      skills: canonicalCandidate.skills,
+      client_org_id: canonicalCandidate.client_org_id,
+      mappedClientOrgId: meta.mappedClientOrgId,
+      isClientMapped: meta.isClientMapped,
+      location: canonicalCandidate.location,
+      work_mode: canonicalCandidate.work_mode,
+    });
+
+    duplicateGroups.push({
+      groupKey: baseKey,
+      fingerprint: fp,
+      title: canonicalCandidate.title,
+      clientOrgId: meta.mappedClientOrgId || canonicalCandidate.client_org_id,
+      clientName: canonicalCandidate.organizations?.name || 'Client Organization',
+      location: canonicalCandidate.location,
+      workMode: canonicalCandidate.work_mode,
+      skillsSignature: normalizeSkillsSignature(canonicalCandidate.skills),
+      requirements: sorted,
+      recommendedCanonicalId: canonicalCandidate.id,
+    });
+  }
+
+  return duplicateGroups;
+}
+
+export function saveRequirementExtendedCache(
+  requirementId: string,
+  meta: RequirementExtendedMeta
+): void {
+  if (!requirementId) return;
+  memoryMetaCache[requirementId] = meta;
+  const current = readBrowserStorage<RequirementExtendedMeta>(REQ_META_STORAGE_KEY);
+  current[requirementId] = meta;
+  writeBrowserStorage(REQ_META_STORAGE_KEY, current);
+}
+
+export function getRequirementExtendedCache(
+  requirementId?: string | null
+): RequirementExtendedMeta | null {
+  if (!requirementId) return null;
+  if (memoryMetaCache[requirementId]) return memoryMetaCache[requirementId];
+  const current = readBrowserStorage<RequirementExtendedMeta>(REQ_META_STORAGE_KEY);
+  if (current[requirementId]) {
+    memoryMetaCache[requirementId] = current[requirementId];
+    return current[requirementId];
+  }
+  return null;
+}
+
+export function saveRequirementFinancialsCache(payload: RequirementFinancials): void {
+  if (!payload.requirement_id) return;
+  memoryFinancialsCache[payload.requirement_id] = payload;
+  const current = readBrowserStorage<RequirementFinancials>(REQ_FIN_STORAGE_KEY);
+  current[payload.requirement_id] = payload;
+  writeBrowserStorage(REQ_FIN_STORAGE_KEY, current);
+}
+
+export function getRequirementFinancialsCache(
+  requirementId?: string | null
+): RequirementFinancials | null {
+  if (!requirementId) return null;
+  if (memoryFinancialsCache[requirementId]) return memoryFinancialsCache[requirementId];
+  const current = readBrowserStorage<RequirementFinancials>(REQ_FIN_STORAGE_KEY);
+  if (current[requirementId]) {
+    memoryFinancialsCache[requirementId] = current[requirementId];
+    return current[requirementId];
+  }
+  return null;
+}
+
+export function saveRequirementMarginsCache(payload: {
+  requirement_id: string;
+  platform_margin: number | null;
+  margin_type: MarginType;
+}): void {
+  if (!payload.requirement_id) return;
+  memoryMarginsCache[payload.requirement_id] = payload;
+  const current = readBrowserStorage<RequirementMargins>(REQ_MAR_STORAGE_KEY);
+  current[payload.requirement_id] = payload;
+  writeBrowserStorage(REQ_MAR_STORAGE_KEY, current);
+}
+
+export function getRequirementMarginsCache(
+  requirementId?: string | null
+): RequirementMargins | null {
+  if (!requirementId) return null;
+  if (memoryMarginsCache[requirementId]) return memoryMarginsCache[requirementId];
+  const current = readBrowserStorage<RequirementMargins>(REQ_MAR_STORAGE_KEY);
+  if (current[requirementId]) {
+    memoryMarginsCache[requirementId] = current[requirementId];
+    return current[requirementId];
+  }
+  return null;
 }
 
 export const BUDGET_UNIT_METADATA: Record<
@@ -41,11 +386,11 @@ export const BUDGET_UNIT_METADATA: Record<
 };
 
 /**
- * Encodes structured budget (budgetMin, budgetMax, budgetUnit, budgetMode)
- * and explicit client mapping state into the requirement currency field
- * while keeping legacy plain currency strings ('INR', 'USD') 100% supported.
+ * Encodes structured budget (budgetMin, budgetMax, budgetUnit, budgetMode),
+ * explicit client mapping state, and optional soft-deletion governance metadata
+ * into the requirement currency field while keeping legacy plain currency strings ('INR', 'USD') 100% supported.
  *
- * Format: "<BASE_CURRENCY>|unit=<LPA|LPM>|mode=<range|fixed>|min=<num>|max=<num>|map=<1|0>:<clientOrgId>"
+ * Format: "<BASE_CURRENCY>|unit=<LPA|LPM>|mode=<range|fixed>|min=<num>|max=<num>|map=<1|0>:<clientOrgId>[|del=1:<deletedAt>:<deletedBy>:<canonicalId>]"
  */
 export function encodeRequirementMetaToCurrency(params: {
   baseCurrency?: string;
@@ -55,6 +400,10 @@ export function encodeRequirementMetaToCurrency(params: {
   budgetMax?: number | null;
   isClientMapped: boolean;
   mappedClientOrgId?: string | null;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  canonicalId?: string | null;
 }): string {
   const base = (params.baseCurrency || 'INR').split('|')[0].trim() || 'INR';
   const unit = params.budgetUnit || 'LPA';
@@ -70,24 +419,35 @@ export function encodeRequirementMetaToCurrency(params: {
   const mapFlag = params.isClientMapped ? '1' : '0';
   const mapOrg = params.isClientMapped && params.mappedClientOrgId ? params.mappedClientOrgId : '';
 
-  return `${base}|unit=${unit}|mode=${mode}|min=${minStr}|max=${maxStr}|map=${mapFlag}:${mapOrg}`;
+  let encoded = `${base}|unit=${unit}|mode=${mode}|min=${minStr}|max=${maxStr}|map=${mapFlag}:${mapOrg}`;
+  if (params.isDeleted) {
+    const safeAt = encodeURIComponent(params.deletedAt || new Date().toISOString());
+    const safeBy = encodeURIComponent(params.deletedBy || 'admin');
+    const safeCanonical = encodeURIComponent(params.canonicalId || '');
+    encoded += `|del=1:${safeAt}:${safeBy}:${safeCanonical}`;
+  }
+  return encoded;
 }
 
 /**
- * Parses a requirement's currency & budget fields into structured LPA/LPM budget
- * and explicit client mapping metadata.
+ * Parses a requirement's currency & budget fields into structured LPA/LPM budget,
+ * explicit client mapping, and soft-deletion metadata.
  * Supports legacy records that lack the new unit or mapping fields without
  * silently converting LPA <-> LPM.
  */
 export function parseRequirementMeta(
   reqOrCurrency:
-    | Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'>
+    | (Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'> & { id?: string })
     | string
     | null
     | undefined,
   fallbackAmount?: number | null,
   fallbackClientOrgId?: string | null
 ): RequirementExtendedMeta {
+  const reqId =
+    typeof reqOrCurrency === 'object' && reqOrCurrency !== null && 'id' in reqOrCurrency
+      ? reqOrCurrency.id
+      : undefined;
   const rawCurrency =
     typeof reqOrCurrency === 'string'
       ? reqOrCurrency
@@ -101,7 +461,22 @@ export function parseRequirementMeta(
       ? reqOrCurrency.client_org_id
       : fallbackClientOrgId ?? null;
 
+  const delCached = getRequirementDeletedCache(reqId);
+
   if (!rawCurrency || !rawCurrency.includes('|')) {
+    const cached = getRequirementExtendedCache(reqId);
+    if (cached) {
+      return {
+        ...cached,
+        budgetMin: cached.budgetMin ?? vendorBudget ?? null,
+        budgetMax: cached.budgetMax ?? vendorBudget ?? null,
+        isDeleted: Boolean(delCached?.isDeleted || cached.isDeleted),
+        deletedAt: delCached?.deletedAt || cached.deletedAt || null,
+        deletedBy: delCached?.deletedBy || cached.deletedBy || null,
+        canonicalId: delCached?.canonicalId || cached.canonicalId || null,
+      };
+    }
+
     // Legacy record without unit metadata: preserve raw amount & currency, do not fabricate LPA/LPM conversion
     return {
       baseCurrency: (rawCurrency || 'INR').trim() || 'INR',
@@ -111,6 +486,10 @@ export function parseRequirementMeta(
       budgetMax: vendorBudget ?? null,
       isClientMapped: Boolean(recordClientOrgId),
       mappedClientOrgId: recordClientOrgId || null,
+      isDeleted: Boolean(delCached?.isDeleted),
+      deletedAt: delCached?.deletedAt || null,
+      deletedBy: delCached?.deletedBy || null,
+      canonicalId: delCached?.canonicalId || null,
     };
   }
 
@@ -150,7 +529,22 @@ export function parseRequirementMeta(
     mappedClientOrgId = isClientMapped ? orgPart || recordClientOrgId || null : null;
   }
 
-  return {
+  let isDeleted = Boolean(delCached?.isDeleted);
+  let deletedAt: string | null = delCached?.deletedAt || null;
+  let deletedBy: string | null = delCached?.deletedBy || null;
+  let canonicalId: string | null = delCached?.canonicalId || null;
+
+  if (kv.del !== undefined) {
+    const [delFlag, rawAt, rawBy, rawCanonical] = kv.del.split(':');
+    if (delFlag === '1') {
+      isDeleted = true;
+      deletedAt = rawAt ? decodeURIComponent(rawAt) : deletedAt;
+      deletedBy = rawBy ? decodeURIComponent(rawBy) : deletedBy;
+      canonicalId = rawCanonical ? decodeURIComponent(rawCanonical) : canonicalId;
+    }
+  }
+
+  const result: RequirementExtendedMeta = {
     baseCurrency,
     budgetUnit,
     budgetMode,
@@ -158,7 +552,25 @@ export function parseRequirementMeta(
     budgetMax: parsedMax,
     isClientMapped,
     mappedClientOrgId,
+    isDeleted,
+    deletedAt,
+    deletedBy,
+    canonicalId,
   };
+
+  if (reqId) {
+    saveRequirementExtendedCache(reqId, result);
+    if (isDeleted) {
+      saveRequirementDeletedCache(reqId, {
+        isDeleted: true,
+        deletedAt,
+        deletedBy,
+        canonicalId,
+      });
+    }
+  }
+
+  return result;
 }
 
 export function validateBudgetValues(params: {
@@ -279,11 +691,12 @@ export function formatBudgetDisplay(params: {
 }
 
 /**
- * Authoritative visibility & mapping policy for Update 1:
- * - Admin / Recruiter: full access to mapped and unmapped requirements.
- * - Client: ONLY sees requirements explicitly mapped to their client org (isClientMapped === true && mappedClientOrgId === viewerOrgId).
- *   Unmapped requirements never appear in client lists, search, counts, exports, or direct API access.
- * - Vendor: sees active ('open') requirements shared with their vendor org (or eligible for vendor sourcing).
+ * Authoritative visibility & mapping policy for Update 1 + Soft Deletion Governance:
+ * - Soft-deleted requirements (isDeleted === true) are blocked from all active feeds and unauthorized direct API access.
+ * - Admin / Recruiter: full access to active mapped and unmapped requirements.
+ * - Client: ONLY sees active requirements explicitly mapped to their client org (isClientMapped === true && mappedClientOrgId === viewerOrgId).
+ *   Unmapped or deleted requirements never appear in client lists, search, counts, exports, or direct API access.
+ * - Vendor: sees active ('open'), non-deleted requirements shared with their vendor org (or eligible for vendor sourcing).
  *   Client mapping (isClientMapped === false) NEVER restricts eligible vendor visibility.
  */
 export function evaluateRequirementAccess(params: {
@@ -291,9 +704,36 @@ export function evaluateRequirementAccess(params: {
   viewerRole: AppRole;
   viewerOrgId?: string | null;
   sharedVendorOrgIds?: string[];
-}): { allowed: boolean; reason: string; isClientMapped: boolean; mappedClientOrgId: string | null } {
-  const { requirement, viewerRole, viewerOrgId, sharedVendorOrgIds } = params;
+  allowDeletedForAdminAudit?: boolean;
+}): {
+  allowed: boolean;
+  reason: string;
+  isClientMapped: boolean;
+  mappedClientOrgId: string | null;
+  isDeleted: boolean;
+} {
+  const { requirement, viewerRole, viewerOrgId, sharedVendorOrgIds, allowDeletedForAdminAudit } = params;
   const meta = parseRequirementMeta(requirement);
+  const deleted = Boolean(meta.isDeleted || isRequirementSoftDeleted(requirement));
+
+  if (deleted) {
+    if (allowDeletedForAdminAudit && viewerRole === 'admin') {
+      return {
+        allowed: true,
+        reason: 'Admin audit inspection of soft-deleted requirement.',
+        isClientMapped: meta.isClientMapped,
+        mappedClientOrgId: meta.mappedClientOrgId,
+        isDeleted: true,
+      };
+    }
+    return {
+      allowed: false,
+      reason: 'Requirement has been deleted/archived and is restricted from active feeds and direct access.',
+      isClientMapped: meta.isClientMapped,
+      mappedClientOrgId: meta.mappedClientOrgId,
+      isDeleted: true,
+    };
+  }
 
   if (viewerRole === 'admin' || viewerRole === 'recruiter') {
     return {
@@ -301,6 +741,7 @@ export function evaluateRequirementAccess(params: {
       reason: 'HQ role has full visibility across internal/unmapped and client-mapped requirements.',
       isClientMapped: meta.isClientMapped,
       mappedClientOrgId: meta.mappedClientOrgId,
+      isDeleted: false,
     };
   }
 
@@ -311,6 +752,7 @@ export function evaluateRequirementAccess(params: {
         reason: 'Requirement is internal/unmapped and hidden from client portals.',
         isClientMapped: false,
         mappedClientOrgId: null,
+        isDeleted: false,
       };
     }
     if (!viewerOrgId || meta.mappedClientOrgId !== viewerOrgId) {
@@ -319,6 +761,7 @@ export function evaluateRequirementAccess(params: {
         reason: 'Requirement is mapped to a different client organization.',
         isClientMapped: meta.isClientMapped,
         mappedClientOrgId: meta.mappedClientOrgId,
+        isDeleted: false,
       };
     }
     return {
@@ -326,6 +769,7 @@ export function evaluateRequirementAccess(params: {
       reason: 'Requirement is explicitly mapped to caller client organization.',
       isClientMapped: true,
       mappedClientOrgId: meta.mappedClientOrgId,
+      isDeleted: false,
     };
   }
 
@@ -343,6 +787,7 @@ export function evaluateRequirementAccess(params: {
         reason: 'Requirement is open and permitted for vendor sourcing (independent of client mapping).',
         isClientMapped: meta.isClientMapped,
         mappedClientOrgId: meta.mappedClientOrgId,
+        isDeleted: false,
       };
     }
     return {
@@ -350,6 +795,7 @@ export function evaluateRequirementAccess(params: {
       reason: 'Requirement is not open or not shared with this vendor organization.',
       isClientMapped: meta.isClientMapped,
       mappedClientOrgId: meta.mappedClientOrgId,
+      isDeleted: false,
     };
   }
 
@@ -360,6 +806,7 @@ export function evaluateRequirementAccess(params: {
       reason: allowed ? 'Public open job.' : 'Not published to public job board.',
       isClientMapped: meta.isClientMapped,
       mappedClientOrgId: meta.mappedClientOrgId,
+      isDeleted: false,
     };
   }
 
@@ -368,6 +815,7 @@ export function evaluateRequirementAccess(params: {
     reason: 'Pending or unauthorized role.',
     isClientMapped: meta.isClientMapped,
     mappedClientOrgId: meta.mappedClientOrgId,
+    isDeleted: false,
   };
 }
 

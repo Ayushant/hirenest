@@ -224,6 +224,8 @@ export interface CandidateMatch {
   computed_score: number;
   skill_score: number;
   experience_score: number;
+  domain_score?: number;
+  seniority_score?: number;
   override_score: number | null;
   final_score: number;
   matched_skills: string[];

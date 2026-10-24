@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog,
   Button,
@@ -33,36 +31,35 @@ import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../ui/Toast';
 import type {
   AppRole,
+  EmploymentType,
+  MarginType,
   Organization,
   Requirement,
   RequirementFinancials,
   RequirementMargins,
+  WorkMode,
 } from '../../types/db';
+
+const EMPTY_CLIENT_ORGS: Organization[] = [];
 
 const requirementSchema = z
   .object({
     client_org_id: z.string().optional(),
-    title: z.string().min(3, 'Title must be at least 3 characters'),
-    description: z.string().min(20, 'Description must be at least 20 characters'),
+    title: z.string().trim().min(3, 'Title must be at least 3 characters'),
+    description: z.string().trim().min(20, 'Description must be at least 20 characters'),
     min_experience: z.coerce.number().min(0, 'Min experience must be >= 0'),
     max_experience: z.coerce.number().min(0, 'Max experience must be >= 0'),
-    location: z.string().min(2, 'Location is required'),
+    location: z.string().trim().min(2, 'Location is required'),
     work_mode: z.enum(['onsite', 'hybrid', 'remote']),
     employment_type: z.enum(['full_time', 'contract', 'contract_to_hire', 'part_time']),
     openings: z.coerce.number().int().min(1, 'At least 1 opening required'),
     currency: z.string().min(1, 'Currency is required'),
     submission_sla_hours: z.coerce.number().int().min(1, 'SLA hours must be >= 1'),
-    actual_client_budget: z.string().optional(),
-    financial_notes: z.string().optional(),
-    platform_margin: z.string().optional(),
-    margin_type: z.enum(['fixed', 'percentage']).optional(),
   })
   .refine((data) => data.max_experience >= data.min_experience, {
     message: 'Max experience must be greater than or equal to min experience',
     path: ['max_experience'],
   });
-
-type RequirementFormValues = z.infer<typeof requirementSchema>;
 
 export const RequirementFormModal: React.FC<{
   open: boolean;
@@ -81,7 +78,7 @@ export const RequirementFormModal: React.FC<{
   onSaved,
   role,
   userOrgId,
-  clientOrgs = [],
+  clientOrgs = EMPTY_CLIENT_ORGS,
   defaultSlaHours = 48,
   initialRequirement,
   initialFinancials,
@@ -94,19 +91,52 @@ export const RequirementFormModal: React.FC<{
 
   const initialMeta = parseRequirementMeta(initialRequirement);
 
+  // Controlled state for all requirement fields (ensuring every input/textarea/select accepts typing reliably)
+  const [clientOrgId, setClientOrgId] = useState<string>(
+    initialMeta.mappedClientOrgId ||
+      initialRequirement?.client_org_id ||
+      userOrgId ||
+      clientOrgs[0]?.id ||
+      ''
+  );
+  const [title, setTitle] = useState<string>(initialRequirement?.title || '');
+  const [description, setDescription] = useState<string>(initialRequirement?.description || '');
+  const [minExpInput, setMinExpInput] = useState<string>(
+    String(initialRequirement?.min_experience ?? 2)
+  );
+  const [maxExpInput, setMaxExpInput] = useState<string>(
+    String(initialRequirement?.max_experience ?? 6)
+  );
+  const [openingsInput, setOpeningsInput] = useState<string>(
+    String(initialRequirement?.openings ?? 1)
+  );
+  const [slaHoursInput, setSlaHoursInput] = useState<string>(
+    String(initialRequirement?.submission_sla_hours ?? defaultSlaHours)
+  );
+  const [location, setLocation] = useState<string>(initialRequirement?.location || '');
+  const [workMode, setWorkMode] = useState<WorkMode>(initialRequirement?.work_mode || 'hybrid');
+  const [employmentType, setEmploymentType] = useState<EmploymentType>(
+    initialRequirement?.employment_type || 'full_time'
+  );
+  const [currency, setCurrency] = useState<string>(initialMeta.baseCurrency || 'INR');
+
+  const [fieldErrors, setFieldErrors] = useState< Partial<Record<string, string>> >({});
+
   const [skills, setSkills] = useState<string[]>(initialRequirement?.skills || []);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Update 1: Explicit Client Mapping state + Vendor Publication state
+  // Explicit Client Mapping state + Vendor Publication state
   const [isClientMapped, setIsClientMapped] = useState<boolean>(
     isHq ? (isEditing ? initialMeta.isClientMapped : true) : true
   );
   const [publishForVendors, setPublishForVendors] = useState<boolean>(true);
   const [clientMapError, setClientMapError] = useState<string | null>(null);
 
-  // Update 2: Budget Range vs Fixed + LPA / LPM Unit state (never silently converts values)
-  const [budgetMode, setBudgetMode] = useState<BudgetMode>(initialMeta.budgetMode || 'range');
+  // Budget Range vs Fixed + LPA / LPM Unit state
+  const [budgetMode, setBudgetMode] = useState<BudgetMode>(
+    isEditing ? initialMeta.budgetMode || 'range' : 'range'
+  );
   const [budgetUnit, setBudgetUnit] = useState<BudgetUnit>(initialMeta.budgetUnit || 'LPA');
   const [budgetMinInput, setBudgetMinInput] = useState<string>(
     initialMeta.budgetMin !== null && initialMeta.budgetMin !== undefined
@@ -120,113 +150,116 @@ export const RequirementFormModal: React.FC<{
   );
   const [budgetError, setBudgetError] = useState<string | null>(null);
 
+  // Controlled state for Internal Client Budget, Internal Financial Notes & Platform Margin
+  const [actualClientBudgetInput, setActualClientBudgetInput] = useState<string>(
+    initialFinancials?.actual_client_budget !== null &&
+      initialFinancials?.actual_client_budget !== undefined
+      ? String(initialFinancials.actual_client_budget)
+      : ''
+  );
+  const [financialNotesInput, setFinancialNotesInput] = useState<string>(
+    initialFinancials?.notes || ''
+  );
+  const [platformMarginInput, setPlatformMarginInput] = useState<string>(
+    initialMargins?.platform_margin !== null && initialMargins?.platform_margin !== undefined
+      ? String(initialMargins.platform_margin)
+      : ''
+  );
+  const [marginTypeInput, setMarginTypeInput] = useState<MarginType>(
+    initialMargins?.margin_type || 'percentage'
+  );
+
+  // Prevent re-initializing the form while the user is actively typing/clicking inside the open modal
+  const initializedSessionRef = useRef<string | null>(null);
+  const financialsTouchedRef = useRef<boolean>(false);
+  const marginsTouchedRef = useRef<boolean>(false);
+  const savedRequirementRef = useRef<Requirement | null>(null);
+
   const [aiSkillSuggestions, setAiSkillSuggestions] = useState<string[]>([]);
   const [aiImprovedJd, setAiImprovedJd] = useState<string | null>(null);
   const [aiLabel, setAiLabel] = useState<string>('Suggestion: review before use');
   const [aiLoading, setAiLoading] = useState<'skills' | 'jd' | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    reset,
-    formState: { errors },
-  } = useForm<RequirementFormValues>({
-    resolver: zodResolver(requirementSchema) as never,
-    defaultValues: {
-      client_org_id:
-        initialMeta.mappedClientOrgId ||
+  // Initialize form ONCE per modal open / target requirement change
+  useEffect(() => {
+    if (!open) {
+      initializedSessionRef.current = null;
+      financialsTouchedRef.current = false;
+      marginsTouchedRef.current = false;
+      savedRequirementRef.current = null;
+      return;
+    }
+
+    const sessionKey = initialRequirement?.id ? `edit:${initialRequirement.id}` : 'create';
+    if (initializedSessionRef.current === sessionKey) {
+      return;
+    }
+    initializedSessionRef.current = sessionKey;
+    financialsTouchedRef.current = false;
+    marginsTouchedRef.current = false;
+    savedRequirementRef.current = null;
+
+    const parsed = parseRequirementMeta(initialRequirement);
+    setClientOrgId(
+      parsed.mappedClientOrgId ||
         initialRequirement?.client_org_id ||
         userOrgId ||
         clientOrgs[0]?.id ||
-        '',
-      title: initialRequirement?.title || '',
-      description: initialRequirement?.description || '',
-      min_experience: initialRequirement?.min_experience ?? 2,
-      max_experience: initialRequirement?.max_experience ?? 6,
-      location: initialRequirement?.location || '',
-      work_mode: initialRequirement?.work_mode || 'hybrid',
-      employment_type: initialRequirement?.employment_type || 'full_time',
-      openings: initialRequirement?.openings ?? 1,
-      currency: initialMeta.baseCurrency || 'INR',
-      submission_sla_hours: initialRequirement?.submission_sla_hours ?? defaultSlaHours,
-      actual_client_budget:
-        initialFinancials?.actual_client_budget !== null &&
+        ''
+    );
+    setTitle(initialRequirement?.title || '');
+    setDescription(initialRequirement?.description || '');
+    setMinExpInput(String(initialRequirement?.min_experience ?? 2));
+    setMaxExpInput(String(initialRequirement?.max_experience ?? 6));
+    setOpeningsInput(String(initialRequirement?.openings ?? 1));
+    setSlaHoursInput(String(initialRequirement?.submission_sla_hours ?? defaultSlaHours));
+    setLocation(initialRequirement?.location || '');
+    setWorkMode(initialRequirement?.work_mode || 'hybrid');
+    setEmploymentType(initialRequirement?.employment_type || 'full_time');
+    setCurrency(parsed.baseCurrency || 'INR');
+    setFieldErrors({});
+
+    setSkills(initialRequirement?.skills || []);
+    setSkillsError(null);
+    setAiSkillSuggestions([]);
+    setAiImprovedJd(null);
+    setAiError(null);
+    setClientMapError(null);
+    setBudgetError(null);
+
+    setIsClientMapped(isHq ? (initialRequirement ? parsed.isClientMapped : true) : true);
+    setPublishForVendors(true);
+    setBudgetMode(initialRequirement ? parsed.budgetMode || 'range' : 'range');
+    setBudgetUnit(parsed.budgetUnit || 'LPA');
+    setBudgetMinInput(
+      parsed.budgetMin !== null && parsed.budgetMin !== undefined
+        ? String(parsed.budgetMin)
+        : initialRequirement
+          ? ''
+          : '12'
+    );
+    setBudgetMaxInput(
+      parsed.budgetMax !== null && parsed.budgetMax !== undefined
+        ? String(parsed.budgetMax)
+        : initialRequirement
+          ? ''
+          : '15'
+    );
+
+    setActualClientBudgetInput(
+      initialFinancials?.actual_client_budget !== null &&
         initialFinancials?.actual_client_budget !== undefined
-          ? String(initialFinancials.actual_client_budget)
-          : '',
-      financial_notes: initialFinancials?.notes || '',
-      platform_margin:
-        initialMargins?.platform_margin !== null &&
-        initialMargins?.platform_margin !== undefined
-          ? String(initialMargins.platform_margin)
-          : '',
-      margin_type: initialMargins?.margin_type || 'percentage',
-    },
-  });
-
-  useEffect(() => {
-    if (open) {
-      const parsed = parseRequirementMeta(initialRequirement);
-      setSkills(initialRequirement?.skills || []);
-      setAiSkillSuggestions([]);
-      setAiImprovedJd(null);
-      setAiError(null);
-      setClientMapError(null);
-      setBudgetError(null);
-
-      setIsClientMapped(isHq ? (initialRequirement ? parsed.isClientMapped : true) : true);
-      setPublishForVendors(true);
-      setBudgetMode(parsed.budgetMode || 'range');
-      setBudgetUnit(parsed.budgetUnit || 'LPA');
-      setBudgetMinInput(
-        parsed.budgetMin !== null && parsed.budgetMin !== undefined
-          ? String(parsed.budgetMin)
-          : initialRequirement
-            ? ''
-            : '12'
-      );
-      setBudgetMaxInput(
-        parsed.budgetMax !== null && parsed.budgetMax !== undefined
-          ? String(parsed.budgetMax)
-          : initialRequirement
-            ? ''
-            : '15'
-      );
-
-      reset({
-        client_org_id:
-          parsed.mappedClientOrgId ||
-          initialRequirement?.client_org_id ||
-          userOrgId ||
-          clientOrgs[0]?.id ||
-          '',
-        title: initialRequirement?.title || '',
-        description: initialRequirement?.description || '',
-        min_experience: initialRequirement?.min_experience ?? 2,
-        max_experience: initialRequirement?.max_experience ?? 6,
-        location: initialRequirement?.location || '',
-        work_mode: initialRequirement?.work_mode || 'hybrid',
-        employment_type: initialRequirement?.employment_type || 'full_time',
-        openings: initialRequirement?.openings ?? 1,
-        currency: parsed.baseCurrency || 'INR',
-        submission_sla_hours: initialRequirement?.submission_sla_hours ?? defaultSlaHours,
-        actual_client_budget:
-          initialFinancials?.actual_client_budget !== null &&
-          initialFinancials?.actual_client_budget !== undefined
-            ? String(initialFinancials.actual_client_budget)
-            : '',
-        financial_notes: initialFinancials?.notes || '',
-        platform_margin:
-          initialMargins?.platform_margin !== null &&
-          initialMargins?.platform_margin !== undefined
-            ? String(initialMargins.platform_margin)
-            : '',
-        margin_type: initialMargins?.margin_type || 'percentage',
-      });
-    }
+        ? String(initialFinancials.actual_client_budget)
+        : ''
+    );
+    setFinancialNotesInput(initialFinancials?.notes || '');
+    setPlatformMarginInput(
+      initialMargins?.platform_margin !== null && initialMargins?.platform_margin !== undefined
+        ? String(initialMargins.platform_margin)
+        : ''
+    );
+    setMarginTypeInput(initialMargins?.margin_type || 'percentage');
   }, [
     open,
     initialRequirement,
@@ -236,12 +269,44 @@ export const RequirementFormModal: React.FC<{
     clientOrgs,
     defaultSlaHours,
     isHq,
-    reset,
   ]);
 
-  const watchedTitle = watch('title');
-  const watchedDesc = watch('description');
-  const watchedCurrency = watch('currency') || 'INR';
+  // If clientOrgs loads asynchronously while modal is open and clientOrgId is still empty, default to first org
+  useEffect(() => {
+    if (open && !clientOrgId && clientOrgs.length > 0) {
+      setClientOrgId(clientOrgs[0].id);
+    }
+  }, [open, clientOrgId, clientOrgs]);
+
+  // If editing an existing requirement and initialFinancials finishes loading asynchronously,
+  // populate financial fields without resetting the user's other form inputs.
+  useEffect(() => {
+    if (open && initialRequirement && initialFinancials && !financialsTouchedRef.current) {
+      if (
+        initialFinancials.actual_client_budget !== null &&
+        initialFinancials.actual_client_budget !== undefined
+      ) {
+        setActualClientBudgetInput(String(initialFinancials.actual_client_budget));
+      }
+      if (initialFinancials.notes) {
+        setFinancialNotesInput(initialFinancials.notes);
+      }
+    }
+  }, [open, initialRequirement, initialFinancials]);
+
+  useEffect(() => {
+    if (open && initialRequirement && initialMargins && !marginsTouchedRef.current) {
+      if (
+        initialMargins.platform_margin !== null &&
+        initialMargins.platform_margin !== undefined
+      ) {
+        setPlatformMarginInput(String(initialMargins.platform_margin));
+      }
+      if (initialMargins.margin_type) {
+        setMarginTypeInput(initialMargins.margin_type);
+      }
+    }
+  }, [open, initialRequirement, initialMargins]);
 
   const parsedMinNum =
     budgetMinInput.trim() !== '' && !Number.isNaN(Number(budgetMinInput))
@@ -259,16 +324,21 @@ export const RequirementFormModal: React.FC<{
     budgetUnit,
     budgetMin: parsedMinNum,
     budgetMax: parsedMaxNum,
-    baseCurrency: watchedCurrency,
+    baseCurrency: currency || 'INR',
   });
+
+  const parsedInternalBudgetNum =
+    actualClientBudgetInput.trim() !== '' && !Number.isNaN(Number(actualClientBudgetInput))
+      ? Number(actualClientBudgetInput)
+      : null;
 
   const handleSuggestSkills = async () => {
     setAiLoading('skills');
     setAiError(null);
     try {
       const res = await suggestSkillsFromJd({
-        title: watchedTitle,
-        description: watchedDesc,
+        title,
+        description,
       });
       setAiLabel(res.label);
       setAiSkillSuggestions(res.skills);
@@ -284,8 +354,8 @@ export const RequirementFormModal: React.FC<{
     setAiError(null);
     try {
       const res = await improveJdWording({
-        title: watchedTitle,
-        description: watchedDesc,
+        title,
+        description,
         skills,
       });
       setAiLabel(res.label);
@@ -297,14 +367,45 @@ export const RequirementFormModal: React.FC<{
     }
   };
 
-  const onSubmit = async (values: RequirementFormValues) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const validation = requirementSchema.safeParse({
+      client_org_id: clientOrgId,
+      title,
+      description,
+      min_experience: minExpInput,
+      max_experience: maxExpInput,
+      location,
+      work_mode: workMode,
+      employment_type: employmentType,
+      openings: openingsInput,
+      currency: currency || 'INR',
+      submission_sla_hours: slaHoursInput,
+    });
+
+    if (!validation.success) {
+      const nextErrors: Partial<Record<string, string>> = {};
+      for (const issue of validation.error.issues) {
+        const key = String(issue.path[0] || '');
+        if (key && !nextErrors[key]) {
+          nextErrors[key] = issue.message;
+        }
+      }
+      setFieldErrors(nextErrors);
+      return;
+    }
+    setFieldErrors({});
+
+    const values = validation.data;
+
     if (skills.length === 0) {
       setSkillsError('Add at least one required skill.');
       return;
     }
     setSkillsError(null);
 
-    // Validate Client Mapping (Update 1)
+    // Validate Client Mapping
     const effectiveClientOrgId = (values.client_org_id || userOrgId || '').trim();
     if (isClientMapped && !effectiveClientOrgId) {
       setClientMapError('Select a client organization to map this requirement to.');
@@ -312,7 +413,7 @@ export const RequirementFormModal: React.FC<{
     }
     setClientMapError(null);
 
-    // Validate LPA / LPM Budget (Update 2)
+    // Validate LPA / LPM Budget
     const budgetCheck = validateBudgetValues({
       budgetMode,
       budgetUnit,
@@ -323,12 +424,15 @@ export const RequirementFormModal: React.FC<{
       setBudgetError(budgetCheck.error || 'Invalid budget range.');
       return;
     }
+    if (parsedInternalBudgetNum !== null && parsedInternalBudgetNum < 0) {
+      setBudgetError('Internal client budget must be a positive number.');
+      return;
+    }
     setBudgetError(null);
 
     setSubmitting(true);
 
     try {
-      // Determine database client_org_id (satisfies FK even when unmapped/internal)
       const dbClientOrgId =
         effectiveClientOrgId ||
         initialRequirement?.client_org_id ||
@@ -353,9 +457,10 @@ export const RequirementFormModal: React.FC<{
         mappedClientOrgId: isClientMapped ? dbClientOrgId : null,
       });
 
-      let savedReq: Requirement;
-      if (isEditing && initialRequirement) {
-        savedReq = await updateRequirement(initialRequirement.id, {
+      let savedReq: Requirement & { wasDuplicatePrevented?: boolean };
+      const existingTargetId = initialRequirement?.id || savedRequirementRef.current?.id;
+      if (existingTargetId) {
+        savedReq = await updateRequirement(existingTargetId, {
           title: values.title,
           description: values.description,
           skills,
@@ -386,9 +491,8 @@ export const RequirementFormModal: React.FC<{
           submission_sla_hours: values.submission_sla_hours,
         });
       }
+      savedRequirementRef.current = savedReq;
 
-      // When HQ creates/edits with vendor publishing enabled, automatically set status = 'open'
-      // and share with all vendor organizations so vendor workspaces see it immediately.
       if (isHq && publishForVendors) {
         await publishAndShareRequirementWithAllVendors({
           requirementId: savedReq.id,
@@ -397,36 +501,38 @@ export const RequirementFormModal: React.FC<{
         savedReq = { ...savedReq, status: 'open' };
       }
 
-      if (values.actual_client_budget !== undefined || values.financial_notes !== undefined) {
-        const clientBudgetNum =
-          values.actual_client_budget && values.actual_client_budget.trim() !== ''
-            ? Number(values.actual_client_budget)
-            : null;
-        await upsertRequirementFinancials({
-          requirement_id: savedReq.id,
-          actual_client_budget: clientBudgetNum,
-          notes: values.financial_notes || null,
-        });
-      }
+      await upsertRequirementFinancials({
+        requirement_id: savedReq.id,
+        actual_client_budget: parsedInternalBudgetNum,
+        notes: financialNotesInput.trim() || null,
+      });
 
-      if (isAdmin && values.platform_margin !== undefined && values.margin_type) {
+      if (isAdmin) {
         const marginNum =
-          values.platform_margin && values.platform_margin.trim() !== ''
-            ? Number(values.platform_margin)
+          platformMarginInput.trim() !== '' && !Number.isNaN(Number(platformMarginInput))
+            ? Number(platformMarginInput)
             : null;
         await upsertRequirementMargins({
           requirement_id: savedReq.id,
           platform_margin: marginNum,
-          margin_type: values.margin_type,
+          margin_type: marginTypeInput,
         });
       }
 
       toast({
-        title: isEditing ? 'Requirement updated' : 'Requirement created',
-        description: `${savedReq.title} (${isClientMapped ? 'Mapped to client' : 'Internal / Unmapped'}${
-          isHq && publishForVendors ? ' · Published to vendors' : ''
-        })`,
-        tone: 'success',
+        title: isEditing
+          ? 'Requirement updated'
+          : savedReq.wasDuplicatePrevented
+            ? 'Duplicate prevented — existing requirement retained'
+            : 'Requirement created',
+        description: savedReq.wasDuplicatePrevented
+          ? `An identical active requirement (${savedReq.title}) already exists for this client and location. Linked to canonical ID ${savedReq.id.slice(0, 8).toUpperCase()}.`
+          : `${savedReq.title} · ${liveBudgetPreview.formatted}${
+              parsedInternalBudgetNum !== null
+                ? ` (Internal: ₹${parsedInternalBudgetNum} ${budgetUnit})`
+                : ''
+            }`,
+        tone: savedReq.wasDuplicatePrevented ? 'info' : 'success',
       });
       onSaved(savedReq);
       onClose();
@@ -449,14 +555,14 @@ export const RequirementFormModal: React.FC<{
       description="Job specification, explicit client mapping, LPA/LPM budget unit, and SLA governance."
       maxWidth="max-w-[660px]"
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Update 1: Admin / HQ Explicit Client Mapping & Vendor Sourcing Section */}
+      <form onSubmit={handleFormSubmit} className="space-y-4">
+        {/* Admin / HQ Explicit Client Mapping & Vendor Sourcing Section */}
         {isHq && (
           <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3.5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="text-[12px] leading-[16px] font-semibold text-[var(--text-primary)] block">
-                  Client visibility & vendor publication
+                  Client visibility &amp; vendor publication
                 </span>
                 <span className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
                   Unmapped requirements remain hidden from clients while allowing eligible vendor sourcing.
@@ -506,8 +612,12 @@ export const RequirementFormModal: React.FC<{
             {isClientMapped ? (
               <Select
                 label="Mapped client organization"
-                {...register('client_org_id')}
-                error={clientMapError || errors.client_org_id?.message}
+                value={clientOrgId}
+                onChange={(e) => {
+                  setClientOrgId(e.target.value);
+                  setClientMapError(null);
+                }}
+                error={clientMapError || fieldErrors.client_org_id}
                 options={[
                   { value: '', label: 'Select client organization...' },
                   ...clientOrgs.map((o) => ({ value: o.id, label: o.name })),
@@ -522,7 +632,7 @@ export const RequirementFormModal: React.FC<{
             <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3">
               <div>
                 <div className="text-[12px] leading-[16px] font-medium text-[var(--text-primary)]">
-                  Publish as Open & share with vendor agencies immediately
+                  Publish as Open &amp; share with vendor agencies immediately
                 </div>
                 <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
                   Makes this requirement visible in Vendor Shared Requirements with SLA countdown.
@@ -541,8 +651,14 @@ export const RequirementFormModal: React.FC<{
         <Input
           label="Requirement title"
           placeholder="e.g. Senior Backend Engineer (Distributed Systems)"
-          {...register('title')}
-          error={errors.title?.message}
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            if (fieldErrors.title) {
+              setFieldErrors((prev) => ({ ...prev, title: undefined }));
+            }
+          }}
+          error={fieldErrors.title}
         />
 
         <div className="space-y-2">
@@ -575,8 +691,14 @@ export const RequirementFormModal: React.FC<{
           <Textarea
             rows={5}
             placeholder="Responsibilities, technical environment, and required qualifications..."
-            {...register('description')}
-            error={errors.description?.message}
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              if (fieldErrors.description) {
+                setFieldErrors((prev) => ({ ...prev, description: undefined }));
+              }
+            }}
+            error={fieldErrors.description}
           />
 
           {aiError && (
@@ -589,7 +711,8 @@ export const RequirementFormModal: React.FC<{
               <AiSuggestionBanner
                 label={aiLabel}
                 onUse={() => {
-                  setValue('description', aiImprovedJd, { shouldValidate: true });
+                  setDescription(aiImprovedJd);
+                  setFieldErrors((prev) => ({ ...prev, description: undefined }));
                   setAiImprovedJd(null);
                 }}
                 onDismiss={() => setAiImprovedJd(null)}
@@ -665,27 +788,51 @@ export const RequirementFormModal: React.FC<{
             label="Min exp (yrs)"
             type="number"
             step="0.5"
-            {...register('min_experience')}
-            error={errors.min_experience?.message}
+            value={minExpInput}
+            onChange={(e) => {
+              setMinExpInput(e.target.value);
+              if (fieldErrors.min_experience) {
+                setFieldErrors((prev) => ({ ...prev, min_experience: undefined }));
+              }
+            }}
+            error={fieldErrors.min_experience}
           />
           <Input
             label="Max exp (yrs)"
             type="number"
             step="0.5"
-            {...register('max_experience')}
-            error={errors.max_experience?.message}
+            value={maxExpInput}
+            onChange={(e) => {
+              setMaxExpInput(e.target.value);
+              if (fieldErrors.max_experience) {
+                setFieldErrors((prev) => ({ ...prev, max_experience: undefined }));
+              }
+            }}
+            error={fieldErrors.max_experience}
           />
           <Input
             label="Openings"
             type="number"
-            {...register('openings')}
-            error={errors.openings?.message}
+            value={openingsInput}
+            onChange={(e) => {
+              setOpeningsInput(e.target.value);
+              if (fieldErrors.openings) {
+                setFieldErrors((prev) => ({ ...prev, openings: undefined }));
+              }
+            }}
+            error={fieldErrors.openings}
           />
           <Input
             label="SLA (hours)"
             type="number"
-            {...register('submission_sla_hours')}
-            error={errors.submission_sla_hours?.message}
+            value={slaHoursInput}
+            onChange={(e) => {
+              setSlaHoursInput(e.target.value);
+              if (fieldErrors.submission_sla_hours) {
+                setFieldErrors((prev) => ({ ...prev, submission_sla_hours: undefined }));
+              }
+            }}
+            error={fieldErrors.submission_sla_hours}
           />
         </div>
 
@@ -693,13 +840,20 @@ export const RequirementFormModal: React.FC<{
           <Input
             label="Location"
             placeholder="e.g. Bengaluru / Mumbai"
-            {...register('location')}
-            error={errors.location?.message}
+            value={location}
+            onChange={(e) => {
+              setLocation(e.target.value);
+              if (fieldErrors.location) {
+                setFieldErrors((prev) => ({ ...prev, location: undefined }));
+              }
+            }}
+            error={fieldErrors.location}
           />
           <Select
             label="Work mode"
-            {...register('work_mode')}
-            error={errors.work_mode?.message}
+            value={workMode}
+            onChange={(e) => setWorkMode(e.target.value as WorkMode)}
+            error={fieldErrors.work_mode}
             options={[
               { value: 'hybrid', label: 'Hybrid' },
               { value: 'onsite', label: 'Onsite' },
@@ -708,8 +862,9 @@ export const RequirementFormModal: React.FC<{
           />
           <Select
             label="Employment type"
-            {...register('employment_type')}
-            error={errors.employment_type?.message}
+            value={employmentType}
+            onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
+            error={fieldErrors.employment_type}
             options={[
               { value: 'full_time', label: 'Full time' },
               { value: 'contract', label: 'Contract' },
@@ -719,11 +874,11 @@ export const RequirementFormModal: React.FC<{
           />
         </div>
 
-        {/* Update 2: Budget Unit Selection (LPA — annual / LPM — monthly) & Financial Governance */}
+        {/* Budget Unit Selection (LPA — annual / LPM — monthly) & Financial Governance */}
         <div className="pt-3 border-t border-[var(--border)] space-y-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
-              Requirement budget & financial governance
+              Requirement budget &amp; financial governance
             </h4>
             {/* Mode Toggle: Budget range vs Fixed budget */}
             <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-0.5">
@@ -772,7 +927,6 @@ export const RequirementFormModal: React.FC<{
                     key={unitCode}
                     type="button"
                     onClick={() => {
-                      // Do NOT silently convert numeric values when switching between LPA and LPM
                       setBudgetUnit(unitCode);
                       setBudgetError(null);
                     }}
@@ -864,13 +1018,33 @@ export const RequirementFormModal: React.FC<{
               label={`Internal client budget (${budgetUnit})`}
               type="number"
               step="0.1"
-              placeholder="Private (Client + HQ)"
-              {...register('actual_client_budget')}
+              min="0"
+              placeholder={budgetUnit === 'LPA' ? 'Private (e.g. 16)' : 'Private (e.g. 1.8)'}
+              value={actualClientBudgetInput}
+              onChange={(e) => {
+                financialsTouchedRef.current = true;
+                setActualClientBudgetInput(e.target.value);
+                setBudgetError(null);
+              }}
+              hint={
+                parsedInternalBudgetNum !== null
+                  ? `Internal cap: ₹${parsedInternalBudgetNum} ${budgetUnit} (${BUDGET_UNIT_METADATA[budgetUnit].fullLabel}) · Private to Client & HQ`
+                  : 'Private ceiling visible only to Client & HireNest HQ (never shared with vendors)'
+              }
             />
             <Input
               label="Internal financial notes"
               placeholder="Billing terms, rate card notes..."
-              {...register('financial_notes')}
+              value={financialNotesInput}
+              onChange={(e) => {
+                financialsTouchedRef.current = true;
+                setFinancialNotesInput(e.target.value);
+              }}
+              hint={
+                financialNotesInput.trim()
+                  ? 'Saved to private requirement financials (Client & HQ only)'
+                  : 'Optional commercial terms, PO reference, or billing notes'
+              }
             />
           </div>
 
@@ -880,12 +1054,21 @@ export const RequirementFormModal: React.FC<{
                 label="Platform margin (admin)"
                 type="number"
                 step="0.01"
+                min="0"
                 placeholder="e.g. 12"
-                {...register('platform_margin')}
+                value={platformMarginInput}
+                onChange={(e) => {
+                  marginsTouchedRef.current = true;
+                  setPlatformMarginInput(e.target.value);
+                }}
               />
               <Select
                 label="Margin type (admin)"
-                {...register('margin_type')}
+                value={marginTypeInput}
+                onChange={(e) => {
+                  marginsTouchedRef.current = true;
+                  setMarginTypeInput(e.target.value as MarginType);
+                }}
                 options={[
                   { value: 'percentage', label: 'Percentage (%)' },
                   { value: 'fixed', label: `Fixed amount (${budgetUnit})` },

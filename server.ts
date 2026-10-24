@@ -15,12 +15,16 @@ import {
   REMINDER_MILESTONE_SPECS,
   SUBSCRIPTION_PLANS,
   computePlanPricingWithTax,
+  computeRequirementFingerprint,
   computeServerTrialDaysRemaining,
+  detectDuplicateRequirementGroups,
   evaluateRequirementAccess,
   getMilestoneForDaysRemaining,
+  isRequirementSoftDeleted,
+  parseRequirementMeta,
 } from './src/lib/enterpriseLifecycle';
 import { extractStructuredFieldsFromText } from './src/lib/resumeParser';
-import type { AppRole } from './src/types/db';
+import type { AppRole, Requirement } from './src/types/db';
 
 dotenv.config();
 
@@ -108,6 +112,40 @@ export interface RequirementMappingServerRecord {
   updatedAt: string;
 }
 
+export interface RequirementSoftDeleteServerRecord {
+  requirementId: string;
+  title: string;
+  clientOrgId: string | null;
+  isDeleted: boolean;
+  deletedAt: string;
+  deletedBy: string;
+  canonicalId: string | null;
+  reason: string | null;
+}
+
+export interface RequirementFingerprintServerRecord {
+  fingerprint: string;
+  requirementId: string;
+  title: string;
+  clientOrgId: string | null;
+  location: string;
+  workMode: string;
+  createdAt: string;
+  requirement?: Record<string, unknown>;
+}
+
+export interface RequirementGovernanceAuditEntry {
+  id: string;
+  action: 'requirement_soft_deleted' | 'duplicate_prevented' | 'duplicates_consolidated';
+  requirementId: string;
+  canonicalId?: string | null;
+  archivedIds?: string[];
+  actorId: string;
+  actorRole: string;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
+
 interface EnterpriseServerStore {
   subscriptions: Record<string, AccountSubscriptionRecord>;
   reminders: ReminderDeliveryRecord[];
@@ -116,6 +154,9 @@ interface EnterpriseServerStore {
   requirementMappings: Record<string, RequirementMappingServerRecord>;
   publishedRequirements: Record<string, Record<string, unknown>>;
   vendorAcknowledgements: Record<string, string>;
+  deletedRequirements: Record<string, RequirementSoftDeleteServerRecord>;
+  requirementFingerprints: Record<string, RequirementFingerprintServerRecord>;
+  requirementAuditTrail: RequirementGovernanceAuditEntry[];
 }
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
@@ -134,6 +175,11 @@ function loadEnterpriseStore(): EnterpriseServerStore {
         requirementMappings: parsed.requirementMappings || {},
         publishedRequirements: parsed.publishedRequirements || {},
         vendorAcknowledgements: parsed.vendorAcknowledgements || {},
+        deletedRequirements: parsed.deletedRequirements || {},
+        requirementFingerprints: parsed.requirementFingerprints || {},
+        requirementAuditTrail: Array.isArray(parsed.requirementAuditTrail)
+          ? parsed.requirementAuditTrail
+          : [],
       };
     }
   } catch {
@@ -147,6 +193,9 @@ function loadEnterpriseStore(): EnterpriseServerStore {
     requirementMappings: {},
     publishedRequirements: {},
     vendorAcknowledgements: {},
+    deletedRequirements: {},
+    requirementFingerprints: {},
+    requirementAuditTrail: [],
   };
 }
 
@@ -162,6 +211,17 @@ function saveEnterpriseStore(store: EnterpriseServerStore): void {
 }
 
 const enterpriseStore = loadEnterpriseStore();
+
+// In-memory concurrency mutex for idempotent requirement creation so simultaneous requests cannot race
+const inFlightFingerprintLocks = new Map<
+  string,
+  Promise<{
+    duplicate: boolean;
+    fingerprint: string;
+    canonicalRequirementId: string | null;
+    existingRequirement: Record<string, unknown> | null;
+  }>
+>();
 
 function ensureAccountSubscription(
   accountId: string,
@@ -756,7 +816,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   });
 
   // ==========================================================================
-  // UPDATE 1 & 2: Backend Requirement Mapping Persistence & Access Verification
+  // UPDATE 1, 2 & GOVERNANCE: Mapping, Duplicate Prevention & Soft-Delete APIs
   // ==========================================================================
   app.post('/api/requirements/mapping', (req, res) => {
     const {
@@ -790,6 +850,398 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     res.json({ ok: true, mapping: record });
   });
 
+  /**
+   * Server-side atomic idempotency guard for requirement creation.
+   * Serializes concurrent calls with the same normalized fingerprint so simultaneous
+   * submissions or retries return the canonical record instead of creating duplicates.
+   */
+  app.post('/api/requirements/idempotent-guard', async (req, res) => {
+    const {
+      title,
+      skills,
+      client_org_id,
+      mappedClientOrgId,
+      isClientMapped,
+      location,
+      work_mode,
+      sourceRef,
+      commitRequirement,
+    } = req.body as {
+      title?: string;
+      skills?: string[];
+      client_org_id?: string | null;
+      mappedClientOrgId?: string | null;
+      isClientMapped?: boolean;
+      location?: string;
+      work_mode?: string;
+      sourceRef?: string;
+      commitRequirement?: Record<string, unknown>;
+    };
+
+    if (!title || !title.trim()) {
+      res.status(400).json({ error: 'title is required for fingerprint calculation.' });
+      return;
+    }
+
+    const fingerprint = computeRequirementFingerprint({
+      title,
+      skills,
+      client_org_id,
+      mappedClientOrgId,
+      isClientMapped,
+      location,
+      work_mode,
+      sourceRef,
+    });
+
+    // If caller is committing an newly created canonical requirement into the server fingerprint registry
+    if (commitRequirement && typeof commitRequirement.id === 'string') {
+      const reqId = commitRequirement.id;
+      if (!enterpriseStore.deletedRequirements[reqId]?.isDeleted) {
+        const existingFp = enterpriseStore.requirementFingerprints[fingerprint];
+        if (
+          existingFp &&
+          existingFp.requirementId !== reqId &&
+          !enterpriseStore.deletedRequirements[existingFp.requirementId]?.isDeleted
+        ) {
+          res.json({
+            ok: true,
+            duplicate: true,
+            fingerprint,
+            canonicalRequirementId: existingFp.requirementId,
+            existingRequirement:
+              existingFp.requirement ||
+              enterpriseStore.publishedRequirements[existingFp.requirementId] ||
+              null,
+          });
+          return;
+        }
+
+        enterpriseStore.requirementFingerprints[fingerprint] = {
+          fingerprint,
+          requirementId: reqId,
+          title: String(commitRequirement.title || title),
+          clientOrgId: String(commitRequirement.client_org_id || client_org_id || ''),
+          location: String(commitRequirement.location || location || ''),
+          workMode: String(commitRequirement.work_mode || work_mode || 'hybrid'),
+          createdAt: String(commitRequirement.created_at || new Date().toISOString()),
+          requirement: commitRequirement,
+        };
+        saveEnterpriseStore(enterpriseStore);
+      }
+      res.json({
+        ok: true,
+        duplicate: false,
+        fingerprint,
+        canonicalRequirementId: reqId,
+        existingRequirement: commitRequirement,
+      });
+      return;
+    }
+
+    // Wait for any in-flight check/creation with the same fingerprint
+    const existingLock = inFlightFingerprintLocks.get(fingerprint);
+    if (existingLock) {
+      const lockResult = await existingLock;
+      res.json({ ok: true, ...lockResult });
+      return;
+    }
+
+    const evaluatePromise = (async () => {
+      // 1. Check server fingerprint registry
+      const registered = enterpriseStore.requirementFingerprints[fingerprint];
+      if (
+        registered &&
+        registered.requirementId &&
+        !enterpriseStore.deletedRequirements[registered.requirementId]?.isDeleted
+      ) {
+        const storedReq =
+          registered.requirement ||
+          enterpriseStore.publishedRequirements[registered.requirementId] ||
+          null;
+        return {
+          duplicate: true,
+          fingerprint,
+          canonicalRequirementId: registered.requirementId,
+          existingRequirement: storedReq,
+        };
+      }
+
+      // 2. Also scan publishedRequirements in case an existing requirement matches the fingerprint
+      for (const pub of Object.values(enterpriseStore.publishedRequirements)) {
+        if (!pub || typeof pub.id !== 'string') continue;
+        if (enterpriseStore.deletedRequirements[pub.id]?.isDeleted) continue;
+        if (isRequirementSoftDeleted(pub as never)) continue;
+
+        const pubMeta = parseRequirementMeta(pub as never);
+        const pubFp = computeRequirementFingerprint({
+          title: String(pub.title || ''),
+          skills: Array.isArray(pub.skills) ? (pub.skills as string[]) : [],
+          client_org_id: String(pub.client_org_id || ''),
+          mappedClientOrgId: pubMeta.mappedClientOrgId,
+          isClientMapped: pubMeta.isClientMapped,
+          location: String(pub.location || ''),
+          work_mode: String(pub.work_mode || 'hybrid'),
+        });
+
+        if (pubFp === fingerprint) {
+          enterpriseStore.requirementFingerprints[fingerprint] = {
+            fingerprint,
+            requirementId: pub.id,
+            title: String(pub.title || ''),
+            clientOrgId: String(pub.client_org_id || ''),
+            location: String(pub.location || ''),
+            workMode: String(pub.work_mode || 'hybrid'),
+            createdAt: String(pub.created_at || new Date().toISOString()),
+            requirement: pub,
+          };
+          saveEnterpriseStore(enterpriseStore);
+          return {
+            duplicate: true,
+            fingerprint,
+            canonicalRequirementId: pub.id,
+            existingRequirement: pub,
+          };
+        }
+      }
+
+      return {
+        duplicate: false,
+        fingerprint,
+        canonicalRequirementId: null,
+        existingRequirement: null,
+      };
+    })();
+
+    inFlightFingerprintLocks.set(fingerprint, evaluatePromise);
+    try {
+      const outcome = await evaluatePromise;
+      if (outcome.duplicate) {
+        enterpriseStore.requirementAuditTrail.unshift({
+          id: `aud_${crypto.randomBytes(6).toString('hex')}`,
+          action: 'duplicate_prevented',
+          requirementId: outcome.canonicalRequirementId || 'unknown',
+          canonicalId: outcome.canonicalRequirementId,
+          actorId: 'system',
+          actorRole: 'server_idempotency_guard',
+          details: { fingerprint, title, client_org_id, location, work_mode },
+          createdAt: new Date().toISOString(),
+        });
+        saveEnterpriseStore(enterpriseStore);
+      }
+      res.json({ ok: true, ...outcome });
+    } finally {
+      inFlightFingerprintLocks.delete(fingerprint);
+    }
+  });
+
+  /**
+   * Soft-deletes a requirement on the server, removing it from active catalogs/feeds
+   * and active fingerprint locks while preserving audit history and linked records.
+   */
+  app.post('/api/requirements/delete', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    const {
+      requirementId,
+      title = 'Requirement',
+      clientOrgId = null,
+      deletedBy,
+      canonicalId = null,
+      reason = 'Admin soft deletion',
+    } = req.body as {
+      requirementId?: string;
+      title?: string;
+      clientOrgId?: string | null;
+      deletedBy?: string;
+      canonicalId?: string | null;
+      reason?: string | null;
+    };
+
+    if (!requirementId) {
+      res.status(400).json({ error: 'requirementId is required.' });
+      return;
+    }
+
+    // Enforce authorization if session header is provided: only admin / recruiter / client_manager can delete
+    if (auth.ok && !['admin', 'recruiter', 'client_manager'].includes(auth.role)) {
+      res.status(403).json({ error: 'Only Admin or authorized HQ/Client managers can delete requirements.' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const actor = deletedBy || (auth.ok ? auth.userId : 'admin');
+    const actorRole = auth.ok ? auth.role : 'admin';
+
+    const delRecord: RequirementSoftDeleteServerRecord = {
+      requirementId,
+      title,
+      clientOrgId,
+      isDeleted: true,
+      deletedAt: nowIso,
+      deletedBy: actor,
+      canonicalId: canonicalId || null,
+      reason: reason || null,
+    };
+
+    enterpriseStore.deletedRequirements[requirementId] = delRecord;
+
+    // Remove from active vendor catalog
+    delete enterpriseStore.publishedRequirements[requirementId];
+
+    // Release any fingerprint pointing to this deleted requirement so a genuinely new requirement can be created later if needed
+    for (const [fp, entry] of Object.entries(enterpriseStore.requirementFingerprints)) {
+      if (entry.requirementId === requirementId) {
+        delete enterpriseStore.requirementFingerprints[fp];
+      }
+    }
+
+    enterpriseStore.requirementAuditTrail.unshift({
+      id: `aud_${crypto.randomBytes(6).toString('hex')}`,
+      action: 'requirement_soft_deleted',
+      requirementId,
+      canonicalId: canonicalId || null,
+      actorId: actor,
+      actorRole,
+      details: {
+        title,
+        deletedAt: nowIso,
+        deletedBy: actor,
+        canonicalId: canonicalId || null,
+        reason,
+      },
+      createdAt: nowIso,
+    });
+
+    saveEnterpriseStore(enterpriseStore);
+    res.json({
+      ok: true,
+      deletedRecord: delRecord,
+    });
+  });
+
+  /**
+   * Consolidates a duplicate requirement group into a chosen canonical requirement ID,
+   * soft-deleting the duplicate IDs while preserving mappings and logging an audit trail.
+   */
+  app.post('/api/requirements/duplicates/consolidate', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    const {
+      canonicalRequirementId,
+      duplicateRequirementIds,
+      title = 'Consolidated Requirement',
+      clientOrgId = null,
+      deletedBy,
+    } = req.body as {
+      canonicalRequirementId?: string;
+      duplicateRequirementIds?: string[];
+      title?: string;
+      clientOrgId?: string | null;
+      deletedBy?: string;
+    };
+
+    if (
+      !canonicalRequirementId ||
+      !Array.isArray(duplicateRequirementIds) ||
+      duplicateRequirementIds.length === 0
+    ) {
+      res.status(400).json({
+        error: 'canonicalRequirementId and non-empty duplicateRequirementIds array are required.',
+      });
+      return;
+    }
+
+    if (auth.ok && !['admin', 'recruiter', 'client_manager'].includes(auth.role)) {
+      res.status(403).json({ error: 'Only Admin or authorized managers can consolidate duplicate requirements.' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const actor = deletedBy || (auth.ok ? auth.userId : 'admin');
+    const actorRole = auth.ok ? auth.role : 'admin';
+
+    const archivedIds: string[] = [];
+    for (const dupId of duplicateRequirementIds) {
+      if (!dupId || dupId === canonicalRequirementId) continue;
+      archivedIds.push(dupId);
+
+      // Preserve mapping on canonical if canonical didn't have one
+      if (
+        !enterpriseStore.requirementMappings[canonicalRequirementId] &&
+        enterpriseStore.requirementMappings[dupId]
+      ) {
+        enterpriseStore.requirementMappings[canonicalRequirementId] = {
+          ...enterpriseStore.requirementMappings[dupId],
+          requirementId: canonicalRequirementId,
+          updatedAt: nowIso,
+        };
+      }
+
+      enterpriseStore.deletedRequirements[dupId] = {
+        requirementId: dupId,
+        title,
+        clientOrgId,
+        isDeleted: true,
+        deletedAt: nowIso,
+        deletedBy: actor,
+        canonicalId: canonicalRequirementId,
+        reason: `Consolidated into canonical requirement ${canonicalRequirementId}`,
+      };
+
+      delete enterpriseStore.publishedRequirements[dupId];
+
+      for (const [fp, entry] of Object.entries(enterpriseStore.requirementFingerprints)) {
+        if (entry.requirementId === dupId) {
+          entry.requirementId = canonicalRequirementId;
+        }
+      }
+    }
+
+    enterpriseStore.requirementAuditTrail.unshift({
+      id: `aud_${crypto.randomBytes(6).toString('hex')}`,
+      action: 'duplicates_consolidated',
+      requirementId: canonicalRequirementId,
+      canonicalId: canonicalRequirementId,
+      archivedIds,
+      actorId: actor,
+      actorRole,
+      details: {
+        title,
+        canonicalRequirementId,
+        archivedIds,
+        consolidatedAt: nowIso,
+      },
+      createdAt: nowIso,
+    });
+
+    saveEnterpriseStore(enterpriseStore);
+    res.json({
+      ok: true,
+      canonicalRequirementId,
+      archivedIds,
+      deletedAt: nowIso,
+      deletedBy: actor,
+    });
+  });
+
+  app.get('/api/requirements/governance-state', (_req, res) => {
+    const activeCatalogReqs = Object.values(enterpriseStore.publishedRequirements).filter(
+      (r) =>
+        Boolean(
+          r &&
+            typeof r.id === 'string' &&
+            !enterpriseStore.deletedRequirements[r.id]?.isDeleted &&
+            !isRequirementSoftDeleted(r as never)
+        )
+    ) as unknown as Requirement[];
+
+    res.json({
+      deletedRequirements: enterpriseStore.deletedRequirements,
+      fingerprints: enterpriseStore.requirementFingerprints,
+      duplicateGroups: detectDuplicateRequirementGroups(activeCatalogReqs),
+      auditTrail: enterpriseStore.requirementAuditTrail.slice(0, 100),
+    });
+  });
+
   // Sync requirement catalog from HQ / Client so eligible requirements are visible to authorized vendors
   app.post('/api/requirements/catalog', (req, res) => {
     const { requirements } = req.body as {
@@ -802,6 +1254,13 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
     for (const item of requirements) {
       if (item && typeof item.id === 'string') {
+        if (
+          enterpriseStore.deletedRequirements[item.id]?.isDeleted ||
+          isRequirementSoftDeleted(item as never)
+        ) {
+          delete enterpriseStore.publishedRequirements[item.id];
+          continue;
+        }
         enterpriseStore.publishedRequirements[item.id] = {
           ...enterpriseStore.publishedRequirements[item.id],
           ...item,
@@ -823,7 +1282,12 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   app.get('/api/requirements/catalog', (req, res) => {
     const vendorOrgId = typeof req.query.vendorOrgId === 'string' ? req.query.vendorOrgId : '';
     const allItems = Object.values(enterpriseStore.publishedRequirements)
-      .filter((r) => Boolean(r && typeof r.id === 'string'))
+      .filter((r) => {
+        if (!r || typeof r.id !== 'string') return false;
+        if (enterpriseStore.deletedRequirements[r.id]?.isDeleted) return false;
+        if (isRequirementSoftDeleted(r as never)) return false;
+        return true;
+      })
       .sort((a, b) =>
         String(b.created_at || '').localeCompare(String(a.created_at || ''))
       );
@@ -896,6 +1360,18 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
     if (!requirement || !viewerRole) {
       res.status(400).json({ error: 'requirement and viewerRole are required.' });
+      return;
+    }
+
+    // Server-side check: if deleted in server store, immediately deny direct API access
+    if (enterpriseStore.deletedRequirements[requirement.id]?.isDeleted) {
+      res.status(403).json({
+        allowed: false,
+        reason: 'Requirement has been soft-deleted and cannot be accessed.',
+        isClientMapped: false,
+        mappedClientOrgId: null,
+        isDeleted: true,
+      });
       return;
     }
 

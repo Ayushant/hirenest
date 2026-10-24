@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Plus, Upload, ExternalLink } from 'lucide-react';
 import {
   PageHeader,
   Button,
@@ -790,8 +790,10 @@ export const HqCandidateDetailPage: React.FC = () => {
                               {(m.matched_skills || []).map((sk) => (
                                 <span
                                   key={sk}
-                                  className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[12px] leading-[16px] text-[var(--text-primary)]"
+                                  title="Matched on candidate resume / profile"
+                                  className="inline-flex items-center gap-1 rounded-[6px] border border-[#2A9D8F]/40 bg-[#2A9D8F]/10 px-2 py-0.5 text-[12px] leading-[16px] font-medium text-[var(--text-primary)]"
                                 >
+                                  <CheckCircle2 className="h-3 w-3 text-[#2A9D8F] shrink-0" />
                                   {sk}
                                 </span>
                               ))}
@@ -804,6 +806,26 @@ export const HqCandidateDetailPage: React.FC = () => {
                                   {sk}
                                 </span>
                               ))}
+                              <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-secondary)] ml-1">
+                                · Skills {m.skill_score}% · Exp {m.experience_score}% · Domain{' '}
+                                {m.domain_score ??
+                                  Number(
+                                    (m.evidence as Record<string, unknown> | null)?.domain_score ??
+                                      m.skill_score
+                                  )}
+                                % · Seniority{' '}
+                                {m.seniority_score ??
+                                  Number(
+                                    (m.evidence as Record<string, unknown> | null)
+                                      ?.seniority_score ?? m.experience_score
+                                  )}
+                                %
+                              </span>
+                              {m.experience_note && (
+                                <span className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
+                                  ({m.experience_note})
+                                </span>
+                              )}
                             </div>
 
                             {isOverridden && (

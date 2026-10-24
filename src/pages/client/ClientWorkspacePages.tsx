@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, CheckCircle2, Layers, Trash2 } from 'lucide-react';
 import {
   PageHeader,
   MetricStrip,
@@ -35,6 +36,8 @@ import {
   fetchRequirementById,
   fetchRequirementFinancials,
   setRequirementStatus,
+  softDeleteRequirement,
+  consolidateDuplicateRequirements,
 } from '../../api/requirements';
 import { fetchSubmissions } from '../../api/submissions';
 import {
@@ -46,17 +49,23 @@ import {
 import { fetchMatchesForRequirement } from '../../api/candidates';
 import { fetchPlatformSettings } from '../../api/admin';
 import { useAuth } from '../../auth/AuthProvider';
+import {
+  detectDuplicateRequirementGroups,
+  type DuplicateRequirementGroup,
+} from '../../lib/enterpriseLifecycle';
 import { mapSupabaseError } from '../../lib/errors';
 import {
   ROUND_LABELS,
-  formatCurrency,
+  formatFinancialAmount,
   formatLocalDate,
   formatLocalDateTime,
+  formatRequirementBudgetWithSubtitle,
 } from '../../lib/format';
 import { useToast } from '../../components/ui/Toast';
 import type {
   InterviewRound,
   InterviewStatus,
+  Requirement,
   RequirementStatus,
   SubmissionStage,
 } from '../../types/db';
@@ -191,6 +200,7 @@ export const ClientDashboardPage: React.FC = () => {
 // 2. Client Requirements List Page
 export const ClientRequirementsPage: React.FC = () => {
   const { profile } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -201,11 +211,22 @@ export const ClientRequirementsPage: React.FC = () => {
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [createOpen, setCreateOpen] = useState(false);
 
+  const [deleteTarget, setDeleteTarget] = useState<Requirement | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const [duplicatesModalOpen, setDuplicatesModalOpen] = useState(false);
+  const [canonicalSelectionByGroup, setCanonicalSelectionByGroup] = useState<
+    Record<string, string>
+  >({});
+  const [consolidatingAll, setConsolidatingAll] = useState(false);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['client_requirements', profile?.org_id, page, status, search],
     queryFn: () =>
       fetchRequirements({
         page,
+        pageSize: 100,
         clientOrgId: profile?.org_id || undefined,
         onlyClientMapped: true,
         status,
@@ -214,17 +235,140 @@ export const ClientRequirementsPage: React.FC = () => {
     enabled: Boolean(profile?.org_id),
   });
 
+  const rows = data?.data || [];
+  const duplicateGroups = useMemo(
+    () => detectDuplicateRequirementGroups(rows),
+    [rows]
+  );
+  const totalExtraDuplicateRecords = useMemo(
+    () =>
+      duplicateGroups.reduce(
+        (acc, grp) => acc + Math.max(0, grp.requirements.length - 1),
+        0
+      ),
+    [duplicateGroups]
+  );
+
+  const getSelectedCanonicalId = (grp: DuplicateRequirementGroup): string => {
+    const chosen = canonicalSelectionByGroup[grp.groupKey];
+    if (chosen && grp.requirements.some((r) => r.id === chosen)) {
+      return chosen;
+    }
+    return grp.recommendedCanonicalId;
+  };
+
+  const refreshClientReqs = () => {
+    queryClient.invalidateQueries({ queryKey: ['client_requirements'] });
+    queryClient.invalidateQueries({ queryKey: ['client_open_reqs'] });
+    queryClient.invalidateQueries({ queryKey: ['requirements'] });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      await softDeleteRequirement({
+        requirement: deleteTarget,
+        deletedBy: profile?.id || profile?.email || 'client_manager',
+        reason: deleteReason.trim() || 'Deleted from Client Requirements table',
+      });
+      toast({
+        title: 'Requirement archived (soft-deleted)',
+        description: `"${deleteTarget.title}" was removed from active requirements.`,
+        tone: 'success',
+      });
+      setDeleteTarget(null);
+      setDeleteReason('');
+      refreshClientReqs();
+    } catch (err) {
+      toast({
+        title: 'Could not delete requirement',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleConsolidateAll = async () => {
+    if (!duplicateGroups.length) return;
+    setConsolidatingAll(true);
+    let totalArchived = 0;
+    try {
+      for (const grp of duplicateGroups) {
+        const canonicalId = getSelectedCanonicalId(grp);
+        const canonicalReq =
+          grp.requirements.find((r) => r.id === canonicalId) || grp.requirements[0];
+        const duplicatesToArchive = grp.requirements.filter((r) => r.id !== canonicalReq.id);
+        if (!duplicatesToArchive.length) continue;
+
+        const res = await consolidateDuplicateRequirements({
+          canonicalRequirement: canonicalReq,
+          duplicateRequirements: duplicatesToArchive,
+          deletedBy: profile?.id || profile?.email || 'client_manager',
+        });
+        totalArchived += res.archivedIds.length;
+      }
+      toast({
+        title: 'Duplicate requirements consolidated',
+        description: `Archived ${totalArchived} duplicate requirement(s) while retaining canonical records.`,
+        tone: 'success',
+      });
+      setDuplicatesModalOpen(false);
+      refreshClientReqs();
+    } catch (err) {
+      toast({
+        title: 'Could not consolidate duplicates',
+        description: mapSupabaseError(err),
+        tone: 'error',
+      });
+    } finally {
+      setConsolidatingAll(false);
+    }
+  };
+
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title="Requirements"
         description="Author job specifications, manage internal budgets, and submit requisitions to HireNest HQ."
         actions={
           isManager ? (
-            <Button onClick={() => setCreateOpen(true)}>Create requirement</Button>
+            <div className="flex items-center gap-2">
+              {duplicateGroups.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setDuplicatesModalOpen(true)}
+                >
+                  <Layers className="h-3.5 w-3.5 text-amber-500" />
+                  Review duplicates ({totalExtraDuplicateRecords})
+                </Button>
+              )}
+              <Button onClick={() => setCreateOpen(true)}>Create requirement</Button>
+            </div>
           ) : undefined
         }
       />
+
+      {isManager && duplicateGroups.length > 0 && (
+        <div className="rounded-[10px] border border-amber-500/35 bg-amber-500/10 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <div className="text-[13px] leading-[18px] font-semibold text-[var(--text-primary)]">
+                {duplicateGroups.length} duplicate requirement group(s) detected ({totalExtraDuplicateRecords} redundant record{totalExtraDuplicateRecords === 1 ? '' : 's'})
+              </div>
+              <p className="mt-0.5 text-[12px] leading-[18px] text-[var(--text-secondary)]">
+                Review duplicate postings, choose the canonical record to retain, and archive redundant rows.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" onClick={() => setDuplicatesModalOpen(true)}>
+            Review &amp; clean up duplicates
+          </Button>
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl">
         <Input
@@ -257,7 +401,7 @@ export const ClientRequirementsPage: React.FC = () => {
         <TableSkeleton rows={5} cols={5} />
       ) : error ? (
         <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
-      ) : !data?.data.length ? (
+      ) : !rows.length ? (
         <EmptyState
           title="No requirements created yet"
           description={
@@ -276,48 +420,240 @@ export const ClientRequirementsPage: React.FC = () => {
                 <tr>
                   <th>Title</th>
                   <th>Status</th>
-                  <th>Location & mode</th>
+                  <th>Location &amp; mode</th>
                   <th className="text-right">Vendor budget</th>
                   <th>Created</th>
+                  {isManager && <th className="text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {data.data.map((req) => (
-                  <tr
-                    key={req.id}
-                    onClick={() => navigate(`/client/requirements/${req.id}`)}
-                    className="cursor-pointer"
-                  >
-                    <td className="font-medium text-[var(--text-primary)]">
-                      {req.title}
-                    </td>
-                    <td>
-                      <RequirementStatusBadge status={req.status} />
-                    </td>
-                    <td className="capitalize text-[var(--text-secondary)]">
-                      {req.location} · {req.work_mode}
-                    </td>
-                    <td className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
-                      {formatCurrency(req.vendor_visible_budget, req.currency)}
-                    </td>
-                    <td className="font-mono tabular-nums text-[var(--text-secondary)]">
-                      {formatLocalDate(req.created_at)}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((req) => {
+                  const budgetInfo = formatRequirementBudgetWithSubtitle(req);
+                  const shortId = req.id.replace(/-/g, '').slice(0, 8).toUpperCase();
+                  return (
+                    <tr
+                      key={req.id}
+                      onClick={() => navigate(`/client/requirements/${req.id}`)}
+                      className="cursor-pointer"
+                    >
+                      <td>
+                        <div className="font-medium text-[var(--text-primary)]">
+                          {req.title}
+                        </div>
+                        <div className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                          ID: {shortId}
+                        </div>
+                      </td>
+                      <td>
+                        <RequirementStatusBadge status={req.status} />
+                      </td>
+                      <td className="capitalize text-[var(--text-secondary)]">
+                        {req.location} · {req.work_mode}
+                      </td>
+                      <td className="text-right">
+                        <div className="font-mono tabular-nums text-[var(--text-primary)]">
+                          {budgetInfo.formatted}
+                        </div>
+                        {budgetInfo.subtitle && (
+                          <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                            {budgetInfo.subtitle}
+                          </div>
+                        )}
+                      </td>
+                      <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                        {formatLocalDate(req.created_at)}
+                      </td>
+                      {isManager && (
+                        <td className="text-right">
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(req);
+                              setDeleteReason('');
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
+          <Pagination page={page} totalCount={rows.length} onPageChange={setPage} />
         </div>
       )}
+
+      {/* Soft-Delete Confirmation Dialog */}
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deleteLoading) {
+            setDeleteTarget(null);
+            setDeleteReason('');
+          }
+        }}
+        title={deleteTarget ? `Delete requirement "${deleteTarget.title}"?` : 'Delete requirement'}
+        description="Soft deletion removes this requirement from active lists while preserving linked submissions and audit history."
+      >
+        {deleteTarget && (
+          <div className="space-y-4">
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] leading-[18px] space-y-1">
+              <div className="flex justify-between gap-2">
+                <span className="text-[var(--text-secondary)]">Requirement title</span>
+                <span className="font-semibold text-[var(--text-primary)]">{deleteTarget.title}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-[var(--text-secondary)]">Requirement ID</span>
+                <span className="font-mono text-[var(--text-primary)]">{deleteTarget.id}</span>
+              </div>
+            </div>
+
+            <Textarea
+              label="Reason (optional)"
+              rows={2}
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="e.g. Duplicate posting or obsolete requisition..."
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                disabled={deleteLoading}
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteReason('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                loading={deleteLoading}
+                onClick={handleConfirmDelete}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Confirm delete
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Duplicate Cleanup Modal */}
+      <Dialog
+        open={duplicatesModalOpen}
+        onClose={() => setDuplicatesModalOpen(false)}
+        title="Review & clean up duplicate requirements"
+        description="Select the canonical record to retain for each duplicate group. Linked submissions and financial notes will be preserved before archiving duplicates."
+        maxWidth="max-w-[740px]"
+      >
+        <div className="space-y-4">
+          {duplicateGroups.length === 0 ? (
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-6 text-center space-y-2">
+              <CheckCircle2 className="h-6 w-6 text-emerald-500 mx-auto" />
+              <div className="text-[14px] font-medium text-[var(--text-primary)]">
+                No duplicate requirements detected
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="max-h-[420px] overflow-y-auto space-y-4 pr-1">
+                {duplicateGroups.map((grp) => {
+                  const selectedCanonicalId = getSelectedCanonicalId(grp);
+                  return (
+                    <div
+                      key={grp.groupKey}
+                      className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-4 space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[14px] font-semibold text-[var(--text-primary)]">
+                            {grp.title}
+                          </span>
+                          <span className="ml-2 text-[12px] text-[var(--text-secondary)]">
+                            ({grp.location} · {grp.workMode})
+                          </span>
+                        </div>
+                        <Badge tone="amber">{grp.requirements.length} records</Badge>
+                      </div>
+                      <div className="divide-y divide-[var(--border)] rounded-[6px] border border-[var(--border)] bg-[var(--surface)]">
+                        {grp.requirements.map((item) => {
+                          const isCanonical = item.id === selectedCanonicalId;
+                          return (
+                            <label
+                              key={item.id}
+                              className={`flex items-start justify-between gap-3 p-3 text-[12px] cursor-pointer ${
+                                isCanonical ? 'bg-[#1F4CC4]/5' : 'hover:bg-[var(--bg-hover)]'
+                              }`}
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <input
+                                  type="radio"
+                                  name={`client_canonical_${grp.groupKey}`}
+                                  checked={isCanonical}
+                                  onChange={() =>
+                                    setCanonicalSelectionByGroup((prev) => ({
+                                      ...prev,
+                                      [grp.groupKey]: item.id,
+                                    }))
+                                  }
+                                  className="mt-1 accent-[#1F4CC4]"
+                                />
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-semibold text-[var(--text-primary)]">
+                                      ID: {item.id}
+                                    </span>
+                                    {isCanonical ? (
+                                      <Badge tone="emerald">Canonical (Retain)</Badge>
+                                    ) : (
+                                      <Badge tone="warning">Duplicate (Archive)</Badge>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-[var(--text-secondary)]">
+                                    Skills ({item.skills?.length || 0}):{' '}
+                                    {item.skills?.length ? item.skills.join(', ') : 'None'} · Created:{' '}
+                                    <span className="font-mono">{formatLocalDateTime(item.created_at)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <RequirementStatusBadge status={item.status} />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <Button variant="outline" onClick={() => setDuplicatesModalOpen(false)}>
+                  Close
+                </Button>
+                <Button loading={consolidatingAll} onClick={handleConsolidateAll}>
+                  Consolidate all ({duplicateGroups.length} group{duplicateGroups.length === 1 ? '' : 's'})
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Dialog>
 
       {isManager && (
         <RequirementFormModal
           open={createOpen}
           onClose={() => setCreateOpen(false)}
           onSaved={(saved) => {
-            queryClient.invalidateQueries({ queryKey: ['client_requirements'] });
+            refreshClientReqs();
+            queryClient.invalidateQueries({ queryKey: ['requirement_detail', saved.id] });
+            queryClient.invalidateQueries({ queryKey: ['requirement_financials', saved.id] });
             navigate(`/client/requirements/${saved.id}`);
           }}
           role={profile?.role || 'client_manager'}
@@ -367,6 +703,8 @@ export const ClientRequirementDetailPage: React.FC = () => {
       />
     );
   }
+
+  const budgetInfo = formatRequirementBudgetWithSubtitle(req);
 
   const allowedActions: Array<{ to: RequirementStatus; label: string }> = [];
   if (isManager) {
@@ -471,6 +809,64 @@ export const ClientRequirementDetailPage: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Budget & Financial Governance Summary Card */}
+            <div className="pt-4 border-t border-[var(--border)]">
+              <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
+                      Budget &amp; internal financial governance
+                    </h3>
+                    <p className="text-[12px] text-[var(--text-secondary)]">
+                      Vendor-visible budget vs. private internal client budget and financial notes.
+                    </p>
+                  </div>
+                  {isManager && (
+                    <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                      Edit budget &amp; notes
+                    </Button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-3">
+                    <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                      Vendor-visible budget
+                    </div>
+                    <div className="mt-1 font-mono tabular-nums text-[15px] font-semibold text-[var(--text-primary)]">
+                      {budgetInfo.formatted}
+                    </div>
+                    {budgetInfo.subtitle && (
+                      <div className="text-[11px] text-[var(--text-secondary)]">
+                        {budgetInfo.subtitle}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-3">
+                    <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                      Internal client budget
+                    </div>
+                    <div className="mt-1 font-mono tabular-nums text-[15px] font-semibold text-[var(--text-primary)]">
+                      {formatFinancialAmount(financials?.actual_client_budget, req)}
+                    </div>
+                    <div className="text-[11px] text-[var(--text-secondary)]">
+                      Private (Client + HQ only)
+                    </div>
+                  </div>
+
+                  <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-3">
+                    <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                      Internal financial notes
+                    </div>
+                    <div className="mt-1 text-[13px] text-[var(--text-primary)] break-words">
+                      {financials?.notes || '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -486,14 +882,27 @@ export const ClientRequirementDetailPage: React.FC = () => {
             </div>
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">Vendor budget</dt>
-              <dd className="font-mono tabular-nums text-[var(--text-primary)]">
-                {formatCurrency(req.vendor_visible_budget, req.currency)}
+              <dd className="text-right">
+                <div className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
+                  {budgetInfo.formatted}
+                </div>
+                {budgetInfo.subtitle && (
+                  <div className="text-[11px] text-[var(--text-tertiary)]">
+                    {budgetInfo.subtitle}
+                  </div>
+                )}
               </dd>
             </div>
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">Internal budget</dt>
               <dd className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-                {formatCurrency(financials?.actual_client_budget, req.currency)}
+                {formatFinancialAmount(financials?.actual_client_budget, req)}
+              </dd>
+            </div>
+            <div className="py-2 flex justify-between gap-2">
+              <dt className="text-[12px] text-[var(--text-secondary)]">Financial notes</dt>
+              <dd className="text-right text-[var(--text-primary)] max-w-[180px] break-words">
+                {financials?.notes || '—'}
               </dd>
             </div>
             <div className="py-2 flex justify-between gap-2">
@@ -509,12 +918,6 @@ export const ClientRequirementDetailPage: React.FC = () => {
               </dd>
             </div>
           </dl>
-          {financials?.notes && (
-            <div className="pt-2 border-t border-[var(--border)] text-[12px]">
-              <span className="text-[var(--text-secondary)] block mb-1">Internal notes</span>
-              <p className="text-[var(--text-primary)]">{financials.notes}</p>
-            </div>
-          )}
         </aside>
       </div>
 
@@ -523,6 +926,7 @@ export const ClientRequirementDetailPage: React.FC = () => {
           open={editOpen}
           onClose={() => setEditOpen(false)}
           onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['client_requirements'] });
             queryClient.invalidateQueries({ queryKey: ['requirement_detail', id] });
             queryClient.invalidateQueries({ queryKey: ['requirement_financials', id] });
           }}

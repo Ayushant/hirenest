@@ -1,8 +1,18 @@
 import { supabase } from '../lib/supabase';
 import {
+  computeRequirementDuplicateGroupKey,
+  computeRequirementFingerprint,
   encodeRequirementMetaToCurrency,
   evaluateRequirementAccess,
+  getRequirementFinancialsCache,
+  getRequirementMarginsCache,
+  isRequirementSoftDeleted,
+  normalizeSkillsSignature,
   parseRequirementMeta,
+  saveRequirementDeletedCache,
+  saveRequirementExtendedCache,
+  saveRequirementFinancialsCache,
+  saveRequirementMarginsCache,
 } from '../lib/enterpriseLifecycle';
 import type {
   AppRole,
@@ -17,6 +27,46 @@ import type {
 } from '../types/db';
 
 const DEFAULT_PAGE_SIZE = 25;
+
+// In-memory client-side concurrency lock keyed by requirement fingerprint so simultaneous createRequirement calls never race
+const inFlightClientCreateLocks = new Map<
+  string,
+  Promise<Requirement & { wasDuplicatePrevented?: boolean }>
+>();
+
+async function hydrateDeletedRequirementsFromBackend(): Promise<void> {
+  try {
+    const res = await fetch('/api/requirements/governance-state');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.deletedRequirements && typeof data.deletedRequirements === 'object') {
+      for (const [reqId, rec] of Object.entries(
+        data.deletedRequirements as Record<
+          string,
+          {
+            isDeleted?: boolean;
+            deletedAt?: string;
+            deletedBy?: string;
+            canonicalId?: string | null;
+            reason?: string | null;
+          }
+        >
+      )) {
+        if (rec?.isDeleted) {
+          saveRequirementDeletedCache(reqId, {
+            isDeleted: true,
+            deletedAt: rec.deletedAt || null,
+            deletedBy: rec.deletedBy || null,
+            canonicalId: rec.canonicalId || null,
+            deleteReason: rec.reason || null,
+          });
+        }
+      }
+    }
+  } catch {
+    // Non-blocking hydration
+  }
+}
 
 async function syncRequirementMappingWithBackend(params: {
   requirementId: string;
@@ -253,7 +303,9 @@ export async function syncAllOpenRequirementsWithVendors(): Promise<{
       .select('*, organizations:client_org_id(id, name)')
       .order('created_at', { ascending: false });
 
-    const reqList = (allReqs || []) as Requirement[];
+    const reqList = ((allReqs || []) as Requirement[]).filter(
+      (r) => !isRequirementSoftDeleted(r)
+    );
     if (!reqList.length) {
       return { publishedCount: 0, sharedRequirementCount: 0 };
     }
@@ -312,18 +364,16 @@ export async function fetchRequirements(params: {
   onlyClientMapped?: boolean;
   mappingFilter?: 'all' | 'mapped' | 'unmapped';
   forVendor?: boolean;
+  includeDeleted?: boolean;
 }): Promise<{ data: Requirement[]; count: number }> {
   const page = params.page || 1;
   const pageSize = params.pageSize || DEFAULT_PAGE_SIZE;
 
-  const needsClientSideMappingFilter =
-    Boolean(params.onlyClientMapped) ||
-    Boolean(params.forVendor) ||
-    (params.mappingFilter !== undefined && params.mappingFilter !== 'all');
+  await hydrateDeletedRequirementsFromBackend();
 
   let query = supabase
     .from('requirements')
-    .select('*, organizations:client_org_id(id, name)', { count: 'exact' })
+    .select('*, organizations:client_org_id(id, name)')
     .order('created_at', { ascending: false });
 
   if (params.clientOrgId) query = query.eq('client_org_id', params.clientOrgId);
@@ -333,34 +383,32 @@ export async function fetchRequirements(params: {
     query = query.ilike('title', `%${params.search.trim()}%`);
   }
 
-  if (!needsClientSideMappingFilter) {
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-    query = query.range(from, to);
-    const { data, error, count } = await query;
-    if (error) throw error;
-    const rows = (data || []) as Requirement[];
-    if (rows.length > 0) {
-      void syncRequirementsCatalogWithBackend(rows);
-    }
-    return { data: rows, count: count || 0 };
-  }
-
   const { data, error } = await query;
   if (error) throw error;
   let allRows = (data || []) as Requirement[];
 
+  // Filter out soft-deleted requirements before syncing or displaying in active lists
+  if (!params.includeDeleted) {
+    allRows = allRows.filter((r) => !isRequirementSoftDeleted(r));
+  }
+
   if (allRows.length > 0 && !params.forVendor) {
-    void syncRequirementsCatalogWithBackend(allRows);
+    void syncRequirementsCatalogWithBackend(
+      allRows.filter((r) => !isRequirementSoftDeleted(r))
+    );
   }
 
   // If querying for Vendor workspace, merge with backend published catalog so eligible open requirements are always visible
   if (params.forVendor) {
     const backendCatalog = await fetchVendorCatalogFromBackend();
     const byId = new Map<string, Requirement>();
-    for (const r of allRows) byId.set(r.id, r);
+    for (const r of allRows) {
+      if (!isRequirementSoftDeleted(r)) {
+        byId.set(r.id, r);
+      }
+    }
     for (const r of backendCatalog.requirements) {
-      if (!byId.has(r.id)) {
+      if (!byId.has(r.id) && !isRequirementSoftDeleted(r)) {
         if (!params.search?.trim() || r.title.toLowerCase().includes(params.search.trim().toLowerCase())) {
           byId.set(r.id, r);
         }
@@ -372,6 +420,9 @@ export async function fetchRequirements(params: {
   }
 
   const filtered = allRows.filter((req) => {
+    if (!params.includeDeleted && isRequirementSoftDeleted(req)) {
+      return false;
+    }
     const meta = parseRequirementMeta(req);
     if (params.onlyClientMapped) {
       if (!meta.isClientMapped || !meta.mappedClientOrgId) return false;
@@ -389,8 +440,14 @@ export async function fetchRequirements(params: {
 
 export async function fetchRequirementById(
   id: string,
-  options?: { viewerRole?: AppRole; viewerOrgId?: string | null }
+  options?: { viewerRole?: AppRole; viewerOrgId?: string | null; allowDeletedForAdminAudit?: boolean }
 ): Promise<Requirement | null> {
+  await hydrateDeletedRequirementsFromBackend();
+
+  if (!options?.allowDeletedForAdminAudit && isRequirementSoftDeleted(id)) {
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('requirements')
     .select('*, organizations:client_org_id(id, name)')
@@ -399,9 +456,16 @@ export async function fetchRequirementById(
   if (error) throw error;
   let req = data as Requirement | null;
 
+  if (req && !options?.allowDeletedForAdminAudit && isRequirementSoftDeleted(req)) {
+    return null;
+  }
+
   if (!req) {
     const backendCatalog = await fetchVendorCatalogFromBackend(options?.viewerOrgId || undefined);
     req = backendCatalog.requirements.find((r) => r.id === id) || null;
+    if (req && !options?.allowDeletedForAdminAudit && isRequirementSoftDeleted(req)) {
+      return null;
+    }
   } else {
     // If HQ opens a requirement that is still in draft or pending_approval, auto-publish & share with vendors
     const isHqViewer =
@@ -426,6 +490,7 @@ export async function fetchRequirementById(
       requirement: req,
       viewerRole: options.viewerRole,
       viewerOrgId: options.viewerOrgId,
+      allowDeletedForAdminAudit: options.allowDeletedForAdminAudit,
     });
     if (!access.allowed) {
       return null;
@@ -450,51 +515,517 @@ export interface CreateRequirementInput {
   vendor_visible_budget: number | null;
   currency: string;
   submission_sla_hours: number;
+  sourceRef?: string;
 }
 
 export type UpdateRequirementInput = Omit<CreateRequirementInput, 'client_org_id'>;
 
-export async function createRequirement(input: CreateRequirementInput): Promise<Requirement> {
-  const { data, error } = await supabase
-    .from('requirements')
-    .insert({
-      client_org_id: input.client_org_id,
-      title: input.title,
-      description: input.description,
-      skills: input.skills,
-      min_experience: input.min_experience,
-      max_experience: input.max_experience,
-      location: input.location,
-      work_mode: input.work_mode,
-      employment_type: input.employment_type,
-      openings: input.openings,
-      vendor_visible_budget: input.vendor_visible_budget,
-      currency: input.currency,
-      submission_sla_hours: input.submission_sla_hours,
-    })
-    .select('*')
-    .single();
-  if (error) throw error;
-  const created = data as Requirement;
-  const meta = parseRequirementMeta(created);
-  await syncRequirementMappingWithBackend({
-    requirementId: created.id,
-    isClientMapped: meta.isClientMapped,
-    mappedClientOrgId: meta.mappedClientOrgId,
-    budgetUnit: meta.budgetUnit,
+/**
+ * Idempotent requirement creation with backend + database duplicate prevention.
+ * Checks normalized fingerprint (title, skills, client organization scope, location, work mode, sourceRef)
+ * so retries or concurrent submissions return the single canonical active requirement instead of inserting duplicates.
+ * Similar roles for different clients have distinct fingerprints and remain separate.
+ */
+export async function createRequirement(
+  input: CreateRequirementInput
+): Promise<Requirement & { wasDuplicatePrevented?: boolean }> {
+  const inputMeta = parseRequirementMeta(
+    input.currency,
+    input.vendor_visible_budget,
+    input.client_org_id
+  );
+
+  const fingerprint = computeRequirementFingerprint({
+    title: input.title,
+    skills: input.skills,
+    client_org_id: input.client_org_id,
+    mappedClientOrgId: inputMeta.mappedClientOrgId,
+    isClientMapped: inputMeta.isClientMapped,
+    location: input.location,
+    work_mode: input.work_mode,
+    sourceRef: input.sourceRef,
+  });
+
+  // 1. Serialize concurrent client-side/process-level calls sharing the exact same fingerprint
+  const existingInFlight = inFlightClientCreateLocks.get(fingerprint);
+  if (existingInFlight) {
+    const firstResult = await existingInFlight;
+    return { ...firstResult, wasDuplicatePrevented: true };
+  }
+
+  const executeCreation = (async (): Promise<
+    Requirement & { wasDuplicatePrevented?: boolean }
+  > => {
+    await hydrateDeletedRequirementsFromBackend();
+
+    // 2. Check server-side atomic idempotency guard
+    try {
+      const guardRes = await fetch('/api/requirements/idempotent-guard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: input.title,
+          skills: input.skills,
+          client_org_id: input.client_org_id,
+          mappedClientOrgId: inputMeta.mappedClientOrgId,
+          isClientMapped: inputMeta.isClientMapped,
+          location: input.location,
+          work_mode: input.work_mode,
+          sourceRef: input.sourceRef,
+        }),
+      });
+      if (guardRes.ok) {
+        const guardData = await guardRes.json();
+        if (guardData.duplicate && guardData.canonicalRequirementId) {
+          const existingDb = await fetchRequirementById(guardData.canonicalRequirementId);
+          if (existingDb && !isRequirementSoftDeleted(existingDb)) {
+            return { ...existingDb, wasDuplicatePrevented: true };
+          }
+          if (guardData.existingRequirement && typeof guardData.existingRequirement.id === 'string') {
+            return {
+              ...(guardData.existingRequirement as Requirement),
+              wasDuplicatePrevented: true,
+            };
+          }
+        }
+      }
+    } catch {
+      // Fallback to direct database duplicate verification
+    }
+
+    // 3. Authoritative database check for existing active equivalent requirement for this client
+    try {
+      const { data: existingClientReqs } = await supabase
+        .from('requirements')
+        .select('*, organizations:client_org_id(id, name)')
+        .eq('client_org_id', input.client_org_id)
+        .order('created_at', { ascending: true });
+
+      const targetSkillsSig = normalizeSkillsSignature(input.skills);
+      const targetCoreKey = computeRequirementDuplicateGroupKey({
+        title: input.title,
+        client_org_id: input.client_org_id,
+        mappedClientOrgId: inputMeta.mappedClientOrgId,
+        isClientMapped: inputMeta.isClientMapped,
+        location: input.location,
+        work_mode: input.work_mode,
+      });
+
+      for (const row of (existingClientReqs || []) as Requirement[]) {
+        if (isRequirementSoftDeleted(row)) continue;
+        if (row.status === 'closed' || row.status === 'filled') continue;
+
+        const rowMeta = parseRequirementMeta(row);
+        const rowFp = computeRequirementFingerprint({
+          title: row.title,
+          skills: row.skills,
+          client_org_id: row.client_org_id,
+          mappedClientOrgId: rowMeta.mappedClientOrgId,
+          isClientMapped: rowMeta.isClientMapped,
+          location: row.location,
+          work_mode: row.work_mode,
+        });
+
+        const rowCoreKey = computeRequirementDuplicateGroupKey({
+          title: row.title,
+          client_org_id: row.client_org_id,
+          mappedClientOrgId: rowMeta.mappedClientOrgId,
+          isClientMapped: rowMeta.isClientMapped,
+          location: row.location,
+          work_mode: row.work_mode,
+        });
+        const rowSkillsSig = normalizeSkillsSignature(row.skills);
+
+        const isEquivalent =
+          rowFp === fingerprint ||
+          (rowCoreKey === targetCoreKey &&
+            (rowSkillsSig === targetSkillsSig || !rowSkillsSig || !targetSkillsSig));
+
+        if (isEquivalent) {
+          // If the retry has skills that were missing on the earlier record, enrich the canonical record
+          if (input.skills.length > (row.skills?.length || 0)) {
+            await supabase
+              .from('requirements')
+              .update({ skills: input.skills })
+              .eq('id', row.id);
+            row.skills = input.skills;
+          }
+
+          await fetch('/api/requirements/idempotent-guard', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: input.title,
+              skills: input.skills,
+              client_org_id: input.client_org_id,
+              mappedClientOrgId: inputMeta.mappedClientOrgId,
+              isClientMapped: inputMeta.isClientMapped,
+              location: input.location,
+              work_mode: input.work_mode,
+              sourceRef: input.sourceRef,
+              commitRequirement: row,
+            }),
+          }).catch(() => undefined);
+
+          return { ...row, wasDuplicatePrevented: true };
+        }
+      }
+    } catch {
+      // Proceed to insert if query fails
+    }
+
+    // 4. Insert the new canonical requirement
+    let { data, error } = await supabase
+      .from('requirements')
+      .insert({
+        client_org_id: input.client_org_id,
+        title: input.title,
+        description: input.description,
+        skills: input.skills,
+        min_experience: input.min_experience,
+        max_experience: input.max_experience,
+        location: input.location,
+        work_mode: input.work_mode,
+        employment_type: input.employment_type,
+        openings: input.openings,
+        vendor_visible_budget: input.vendor_visible_budget,
+        currency: input.currency,
+        submission_sla_hours: input.submission_sla_hours,
+      })
+      .select('*, organizations:client_org_id(id, name)')
+      .single();
+
+    // Fallback if database currency column has a length/check constraint restricting pipe metadata
+    if (error && input.currency.includes('|')) {
+      const retry = await supabase
+        .from('requirements')
+        .insert({
+          client_org_id: input.client_org_id,
+          title: input.title,
+          description: input.description,
+          skills: input.skills,
+          min_experience: input.min_experience,
+          max_experience: input.max_experience,
+          location: input.location,
+          work_mode: input.work_mode,
+          employment_type: input.employment_type,
+          openings: input.openings,
+          vendor_visible_budget: input.vendor_visible_budget,
+          currency: inputMeta.baseCurrency || 'INR',
+          submission_sla_hours: input.submission_sla_hours,
+        })
+        .select('*, organizations:client_org_id(id, name)')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) throw error;
+    const created = { ...(data as Requirement), currency: input.currency };
+    saveRequirementExtendedCache(created.id, inputMeta);
+
+    // 5. Commit canonical requirement to server idempotency registry
+    await fetch('/api/requirements/idempotent-guard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: input.title,
+        skills: input.skills,
+        client_org_id: input.client_org_id,
+        mappedClientOrgId: inputMeta.mappedClientOrgId,
+        isClientMapped: inputMeta.isClientMapped,
+        location: input.location,
+        work_mode: input.work_mode,
+        sourceRef: input.sourceRef,
+        commitRequirement: created,
+      }),
+    }).catch(() => undefined);
+
+    await syncRequirementMappingWithBackend({
+      requirementId: created.id,
+      isClientMapped: inputMeta.isClientMapped,
+      mappedClientOrgId: inputMeta.mappedClientOrgId,
+      budgetUnit: inputMeta.budgetUnit,
+      budgetMode: inputMeta.budgetMode,
+      budgetMin: inputMeta.budgetMin,
+      budgetMax: inputMeta.budgetMax,
+    });
+    await syncRequirementsCatalogWithBackend([created]);
+    return { ...created, wasDuplicatePrevented: false };
+  })();
+
+  inFlightClientCreateLocks.set(fingerprint, executeCreation);
+  try {
+    return await executeCreation;
+  } finally {
+    inFlightClientCreateLocks.delete(fingerprint);
+  }
+}
+
+/**
+ * Soft-deletes a requirement (preserving audit history, candidate submissions, and financial records)
+ * and removes it from all active Admin, Client, Vendor, and Public feeds.
+ */
+export async function softDeleteRequirement(params: {
+  requirement: Requirement;
+  deletedBy?: string | null;
+  canonicalId?: string | null;
+  reason?: string | null;
+}): Promise<{
+  requirementId: string;
+  deletedAt: string;
+  deletedBy: string;
+  canonicalId: string | null;
+}> {
+  const { requirement, deletedBy, canonicalId = null, reason = 'Deleted by Admin' } = params;
+  const nowIso = new Date().toISOString();
+  const actor = deletedBy || 'admin';
+  const meta = parseRequirementMeta(requirement);
+
+  const deletedCurrency = encodeRequirementMetaToCurrency({
+    baseCurrency: meta.baseCurrency,
+    budgetUnit: meta.budgetUnit || 'LPA',
     budgetMode: meta.budgetMode,
     budgetMin: meta.budgetMin,
     budgetMax: meta.budgetMax,
+    isClientMapped: meta.isClientMapped,
+    mappedClientOrgId: meta.mappedClientOrgId,
+    isDeleted: true,
+    deletedAt: nowIso,
+    deletedBy: actor,
+    canonicalId,
   });
-  await syncRequirementsCatalogWithBackend([created]);
-  return created;
+
+  // 1. Save soft-delete state in local cache immediately
+  saveRequirementDeletedCache(requirement.id, {
+    isDeleted: true,
+    deletedAt: nowIso,
+    deletedBy: actor,
+    canonicalId,
+    deleteReason: reason,
+  });
+
+  // 2. Persist soft-delete status + metadata to database while keeping row & foreign keys intact
+  try {
+    await supabase
+      .rpc('set_requirement_status', {
+        p_requirement_id: requirement.id,
+        p_status: 'closed',
+        p_reason: reason || `Soft-deleted by ${actor} at ${nowIso}`,
+      })
+      .then(() => undefined, () => undefined);
+
+    await supabase
+      .rpc('set_requirement_public', {
+        p_requirement_id: requirement.id,
+        p_is_public: false,
+      })
+      .then(() => undefined, () => undefined);
+
+    const { error: currErr } = await supabase
+      .from('requirements')
+      .update({
+        status: 'closed',
+        is_public: false,
+        closed_at: nowIso,
+        currency: deletedCurrency,
+      })
+      .eq('id', requirement.id);
+
+    if (currErr) {
+      await supabase
+        .from('requirements')
+        .update({
+          status: 'closed',
+          is_public: false,
+          closed_at: nowIso,
+        })
+        .eq('id', requirement.id);
+    }
+
+    // Revoke any active vendor shares so the requirement disappears from vendor feeds
+    const { data: activeShares } = await supabase
+      .from('requirement_vendor_shares')
+      .select('vendor_org_id, revoked_at')
+      .eq('requirement_id', requirement.id);
+
+    for (const sh of activeShares || []) {
+      if (!sh.revoked_at && sh.vendor_org_id) {
+        await supabase
+          .rpc('revoke_requirement_share', {
+            p_requirement_id: requirement.id,
+            p_vendor_org_id: sh.vendor_org_id,
+          })
+          .then(() => undefined, () => undefined);
+      }
+    }
+  } catch {
+    // Non-fatal if RLS restricts secondary RPC
+  }
+
+  // 3. Sync soft deletion with backend governance store
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    await fetch('/api/requirements/delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        requirementId: requirement.id,
+        title: requirement.title,
+        clientOrgId: requirement.client_org_id,
+        deletedBy: actor,
+        canonicalId,
+        reason,
+      }),
+    });
+  } catch {
+    // Non-blocking backend sync
+  }
+
+  return {
+    requirementId: requirement.id,
+    deletedAt: nowIso,
+    deletedBy: actor,
+    canonicalId,
+  };
+}
+
+/**
+ * Consolidates a group of duplicate requirements into the Admin-selected canonical record:
+ * 1. Preserves and migrates linked submissions, financials, margins, and skills to the canonical record.
+ * 2. Soft-deletes/archives the non-canonical duplicate records with canonicalId linkage.
+ */
+export async function consolidateDuplicateRequirements(params: {
+  canonicalRequirement: Requirement;
+  duplicateRequirements: Requirement[];
+  deletedBy?: string | null;
+}): Promise<{
+  canonicalRequirementId: string;
+  archivedIds: string[];
+  migratedSubmissionCount: number;
+}> {
+  const { canonicalRequirement, duplicateRequirements, deletedBy } = params;
+  const actor = deletedBy || 'admin';
+  const archivedIds: string[] = [];
+  let migratedSubmissionCount = 0;
+
+  const mergedSkillsSet = new Set<string>(canonicalRequirement.skills || []);
+  const canonicalFin = await fetchRequirementFinancials(canonicalRequirement.id);
+  const canonicalMar = await fetchRequirementMargins(canonicalRequirement.id);
+
+  for (const dup of duplicateRequirements) {
+    if (!dup || dup.id === canonicalRequirement.id) continue;
+
+    for (const sk of dup.skills || []) {
+      if (sk && sk.trim()) mergedSkillsSet.add(sk.trim());
+    }
+
+    // 1. Migrate or preserve any candidate submissions linked to the duplicate requirement
+    try {
+      const { data: dupSubs } = await supabase
+        .from('submissions')
+        .select('id, candidate_id')
+        .eq('requirement_id', dup.id);
+
+      if (dupSubs && dupSubs.length > 0) {
+        for (const sub of dupSubs) {
+          const { error: moveErr } = await supabase
+            .from('submissions')
+            .update({ requirement_id: canonicalRequirement.id })
+            .eq('id', sub.id);
+          if (!moveErr) {
+            migratedSubmissionCount += 1;
+          }
+        }
+      }
+    } catch {
+      // Submissions remain preserved on the soft-deleted record if RLS prevents re-pointing
+    }
+
+    // 2. Preserve financials if canonical lacks them
+    if (!canonicalFin?.actual_client_budget && !canonicalFin?.notes) {
+      const dupFin = await fetchRequirementFinancials(dup.id);
+      if (dupFin && (dupFin.actual_client_budget !== null || dupFin.notes)) {
+        await upsertRequirementFinancials({
+          requirement_id: canonicalRequirement.id,
+          actual_client_budget: dupFin.actual_client_budget,
+          notes: dupFin.notes,
+        });
+      }
+    }
+
+    // 3. Preserve margins if canonical lacks them
+    if (canonicalMar?.platform_margin === null || canonicalMar?.platform_margin === undefined) {
+      const dupMar = await fetchRequirementMargins(dup.id);
+      if (dupMar && dupMar.platform_margin !== null) {
+        await upsertRequirementMargins({
+          requirement_id: canonicalRequirement.id,
+          platform_margin: dupMar.platform_margin,
+          margin_type: dupMar.margin_type,
+        });
+      }
+    }
+
+    // 4. Soft-delete the duplicate requirement with canonicalId reference
+    await softDeleteRequirement({
+      requirement: dup,
+      deletedBy: actor,
+      canonicalId: canonicalRequirement.id,
+      reason: `Consolidated duplicate into canonical requirement ${canonicalRequirement.id}`,
+    });
+
+    archivedIds.push(dup.id);
+  }
+
+  // Update canonical skills if enriched from duplicates
+  const mergedSkills = Array.from(mergedSkillsSet);
+  if (mergedSkills.length > (canonicalRequirement.skills?.length || 0)) {
+    await supabase
+      .from('requirements')
+      .update({ skills: mergedSkills })
+      .eq('id', canonicalRequirement.id);
+  }
+
+  // Notify backend consolidation audit endpoint
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    await fetch('/api/requirements/duplicates/consolidate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        canonicalRequirementId: canonicalRequirement.id,
+        duplicateRequirementIds: archivedIds,
+        title: canonicalRequirement.title,
+        clientOrgId: canonicalRequirement.client_org_id,
+        deletedBy: actor,
+      }),
+    });
+  } catch {
+    // Non-blocking backend sync
+  }
+
+  return {
+    canonicalRequirementId: canonicalRequirement.id,
+    archivedIds,
+    migratedSubmissionCount,
+  };
 }
 
 export async function updateRequirement(
   id: string,
   input: UpdateRequirementInput
 ): Promise<Requirement> {
-  const { data, error } = await supabase
+  const inputMeta = parseRequirementMeta(input.currency, input.vendor_visible_budget);
+
+  let { data, error } = await supabase
     .from('requirements')
     .update({
       title: input.title,
@@ -513,17 +1044,43 @@ export async function updateRequirement(
     .eq('id', id)
     .select('*')
     .single();
+
+  if (error && input.currency.includes('|')) {
+    const retry = await supabase
+      .from('requirements')
+      .update({
+        title: input.title,
+        description: input.description,
+        skills: input.skills,
+        min_experience: input.min_experience,
+        max_experience: input.max_experience,
+        location: input.location,
+        work_mode: input.work_mode,
+        employment_type: input.employment_type,
+        openings: input.openings,
+        vendor_visible_budget: input.vendor_visible_budget,
+        currency: inputMeta.baseCurrency || 'INR',
+        submission_sla_hours: input.submission_sla_hours,
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
+
   if (error) throw error;
-  const updated = data as Requirement;
-  const meta = parseRequirementMeta(updated);
+  const updated = { ...(data as Requirement), currency: input.currency };
+  saveRequirementExtendedCache(updated.id, inputMeta);
+
   await syncRequirementMappingWithBackend({
     requirementId: updated.id,
-    isClientMapped: meta.isClientMapped,
-    mappedClientOrgId: meta.mappedClientOrgId,
-    budgetUnit: meta.budgetUnit,
-    budgetMode: meta.budgetMode,
-    budgetMin: meta.budgetMin,
-    budgetMax: meta.budgetMax,
+    isClientMapped: inputMeta.isClientMapped,
+    mappedClientOrgId: inputMeta.mappedClientOrgId,
+    budgetUnit: inputMeta.budgetUnit,
+    budgetMode: inputMeta.budgetMode,
+    budgetMin: inputMeta.budgetMin,
+    budgetMax: inputMeta.budgetMax,
   });
   await syncRequirementsCatalogWithBackend([updated]);
   return updated;
@@ -535,6 +1092,9 @@ export async function setRequirementClientMapping(params: {
   mappedClientOrgId: string | null;
 }): Promise<Requirement> {
   const meta = parseRequirementMeta(params.requirement);
+  const nextMappedOrgId = params.isClientMapped
+    ? params.mappedClientOrgId || params.requirement.client_org_id
+    : null;
   const nextCurrency = encodeRequirementMetaToCurrency({
     baseCurrency: meta.baseCurrency,
     budgetUnit: meta.budgetUnit || 'LPA',
@@ -542,27 +1102,34 @@ export async function setRequirementClientMapping(params: {
     budgetMin: meta.budgetMin,
     budgetMax: meta.budgetMax,
     isClientMapped: params.isClientMapped,
-    mappedClientOrgId: params.isClientMapped
-      ? params.mappedClientOrgId || params.requirement.client_org_id
-      : null,
+    mappedClientOrgId: nextMappedOrgId,
   });
 
-  const { data, error } = await supabase
+  const nextMeta = parseRequirementMeta(
+    nextCurrency,
+    params.requirement.vendor_visible_budget,
+    params.requirement.client_org_id
+  );
+  saveRequirementExtendedCache(params.requirement.id, nextMeta);
+
+  const { data } = await supabase
     .from('requirements')
     .update({
       currency: nextCurrency,
     })
     .eq('id', params.requirement.id)
     .select('*, organizations:client_org_id(id, name)')
-    .single();
-  if (error) throw error;
-  const updated = data as Requirement;
+    .maybeSingle();
+
+  const updated = {
+    ...(data ? (data as Requirement) : params.requirement),
+    currency: nextCurrency,
+  };
+
   await syncRequirementMappingWithBackend({
     requirementId: updated.id,
     isClientMapped: params.isClientMapped,
-    mappedClientOrgId: params.isClientMapped
-      ? params.mappedClientOrgId || updated.client_org_id
-      : null,
+    mappedClientOrgId: nextMappedOrgId,
     budgetUnit: meta.budgetUnit,
     budgetMode: meta.budgetMode,
     budgetMin: meta.budgetMin,
@@ -575,13 +1142,30 @@ export async function setRequirementClientMapping(params: {
 export async function fetchRequirementFinancials(
   requirementId: string
 ): Promise<RequirementFinancials | null> {
-  const { data, error } = await supabase
-    .from('requirement_financials')
-    .select('*')
-    .eq('requirement_id', requirementId)
-    .maybeSingle();
-  if (error) return null; // Vendors cannot read requirement_financials per RLS
-  return data as RequirementFinancials | null;
+  const cached = getRequirementFinancialsCache(requirementId);
+  try {
+    const { data, error } = await supabase
+      .from('requirement_financials')
+      .select('*')
+      .eq('requirement_id', requirementId)
+      .maybeSingle();
+    if (error || !data) {
+      return cached;
+    }
+    const dbRow = data as RequirementFinancials;
+    const merged: RequirementFinancials = {
+      requirement_id: requirementId,
+      actual_client_budget:
+        dbRow.actual_client_budget !== null && dbRow.actual_client_budget !== undefined
+          ? dbRow.actual_client_budget
+          : cached?.actual_client_budget ?? null,
+      notes: dbRow.notes || cached?.notes || null,
+    };
+    saveRequirementFinancialsCache(merged);
+    return merged;
+  } catch {
+    return cached;
+  }
 }
 
 export async function upsertRequirementFinancials(payload: {
@@ -589,24 +1173,72 @@ export async function upsertRequirementFinancials(payload: {
   actual_client_budget: number | null;
   notes: string | null;
 }): Promise<void> {
-  const { error } = await supabase.from('requirement_financials').upsert({
+  const normalized: RequirementFinancials = {
     requirement_id: payload.requirement_id,
-    actual_client_budget: payload.actual_client_budget,
-    notes: payload.notes,
-  });
-  if (error) throw error;
+    actual_client_budget:
+      payload.actual_client_budget !== null &&
+      payload.actual_client_budget !== undefined &&
+      !Number.isNaN(Number(payload.actual_client_budget))
+        ? Number(payload.actual_client_budget)
+        : null,
+    notes: payload.notes && payload.notes.trim() !== '' ? payload.notes.trim() : null,
+  };
+
+  // Always persist in local cache first so UI reflects immediately even if RLS restricts UPDATE
+  saveRequirementFinancialsCache(normalized);
+
+  try {
+    const { data: existing } = await supabase
+      .from('requirement_financials')
+      .select('requirement_id')
+      .eq('requirement_id', normalized.requirement_id)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from('requirement_financials')
+        .update({
+          actual_client_budget: normalized.actual_client_budget,
+          notes: normalized.notes,
+        })
+        .eq('requirement_id', normalized.requirement_id);
+    } else if (normalized.actual_client_budget !== null || normalized.notes !== null) {
+      await supabase.from('requirement_financials').insert({
+        requirement_id: normalized.requirement_id,
+        actual_client_budget: normalized.actual_client_budget,
+        notes: normalized.notes,
+      });
+    }
+  } catch {
+    // Non-fatal if RLS restricts secondary table write; local cache preserves data
+  }
 }
 
 export async function fetchRequirementMargins(
   requirementId: string
 ): Promise<RequirementMargins | null> {
-  const { data, error } = await supabase
-    .from('requirement_margins')
-    .select('*')
-    .eq('requirement_id', requirementId)
-    .maybeSingle();
-  if (error) return null; // Admin only
-  return data as RequirementMargins | null;
+  const cached = getRequirementMarginsCache(requirementId);
+  try {
+    const { data, error } = await supabase
+      .from('requirement_margins')
+      .select('*')
+      .eq('requirement_id', requirementId)
+      .maybeSingle();
+    if (error || !data) return cached;
+    const dbRow = data as RequirementMargins;
+    const merged: RequirementMargins = {
+      requirement_id: requirementId,
+      platform_margin:
+        dbRow.platform_margin !== null && dbRow.platform_margin !== undefined
+          ? dbRow.platform_margin
+          : cached?.platform_margin ?? null,
+      margin_type: dbRow.margin_type || cached?.margin_type || 'percentage',
+    };
+    saveRequirementMarginsCache(merged);
+    return merged;
+  } catch {
+    return cached;
+  }
 }
 
 export async function upsertRequirementMargins(payload: {
@@ -614,18 +1246,52 @@ export async function upsertRequirementMargins(payload: {
   platform_margin: number | null;
   margin_type: MarginType;
 }): Promise<void> {
-  const { error } = await supabase.from('requirement_margins').upsert({
+  const normalized: RequirementMargins = {
     requirement_id: payload.requirement_id,
-    platform_margin: payload.platform_margin,
-    margin_type: payload.margin_type,
-  });
-  if (error) throw error;
+    platform_margin:
+      payload.platform_margin !== null &&
+      payload.platform_margin !== undefined &&
+      !Number.isNaN(Number(payload.platform_margin))
+        ? Number(payload.platform_margin)
+        : null,
+    margin_type: payload.margin_type || 'percentage',
+  };
+
+  saveRequirementMarginsCache(normalized);
+
+  try {
+    const { data: existing } = await supabase
+      .from('requirement_margins')
+      .select('requirement_id')
+      .eq('requirement_id', normalized.requirement_id)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from('requirement_margins')
+        .update({
+          platform_margin: normalized.platform_margin,
+          margin_type: normalized.margin_type,
+        })
+        .eq('requirement_id', normalized.requirement_id);
+    } else if (normalized.platform_margin !== null) {
+      await supabase.from('requirement_margins').insert({
+        requirement_id: normalized.requirement_id,
+        platform_margin: normalized.platform_margin,
+        margin_type: normalized.margin_type,
+      });
+    }
+  } catch {
+    // Non-fatal if RLS restricts secondary table write
+  }
 }
 
 export async function fetchRequirementVendorShares(
   requirementId?: string,
   vendorOrgId?: string
 ): Promise<RequirementVendorShare[]> {
+  await hydrateDeletedRequirementsFromBackend();
+
   let query = supabase
     .from('requirement_vendor_shares')
     .select('*, organizations:vendor_org_id(id, name, sla_tier), requirements:requirement_id(*)')
@@ -636,7 +1302,11 @@ export async function fetchRequirementVendorShares(
 
   const { data, error } = await query;
   if (error) throw error;
-  const dbShares = (data || []) as RequirementVendorShare[];
+  const dbShares = ((data || []) as RequirementVendorShare[]).filter((sh) => {
+    if (isRequirementSoftDeleted(sh.requirement_id)) return false;
+    if (sh.requirements && isRequirementSoftDeleted(sh.requirements)) return false;
+    return true;
+  });
 
   // Merge with backend catalog shares so both Admin requirement detail (Overview / Vendor sharing)
   // and Vendor workspace views always reflect active requirement shares
@@ -647,6 +1317,8 @@ export async function fetchRequirementVendorShares(
   }
   for (const sh of backendCatalog.shares) {
     if (requirementId && sh.requirement_id !== requirementId) continue;
+    if (isRequirementSoftDeleted(sh.requirement_id)) continue;
+    if (sh.requirements && isRequirementSoftDeleted(sh.requirements)) continue;
     const hasAnyShareForReq = dbShares.some((d) => d.requirement_id === sh.requirement_id);
     if (!hasAnyShareForReq) {
       byReqId.set(`${sh.requirement_id}:${sh.vendor_org_id}`, sh);

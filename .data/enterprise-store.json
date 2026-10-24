@@ -190,5 +190,178 @@
   "receipts": [],
   "requirementMappings": {},
   "publishedRequirements": {},
-  "vendorAcknowledgements": {}
+  "vendorAcknowledgements": {},
+  "deletedRequirements": {
+    "req_canonical_a_reg_1792827599998": {
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "title": "Principal Cloud Architect (reg_1792827599998)",
+      "clientOrgId": "org_client_alpha_001",
+      "isDeleted": true,
+      "deletedAt": "2026-10-24T07:40:00.238Z",
+      "deletedBy": "admin_regression_tester",
+      "canonicalId": null,
+      "reason": "Regression test soft deletion"
+    },
+    "dup_2_reg_1792827599998": {
+      "requirementId": "dup_2_reg_1792827599998",
+      "title": "Azure AI (Microsoft Foundry)",
+      "clientOrgId": "org_client_alpha_001",
+      "isDeleted": true,
+      "deletedAt": "2026-10-24T07:40:00.261Z",
+      "deletedBy": "admin_regression_tester",
+      "canonicalId": "dup_1_reg_1792827599998",
+      "reason": "Consolidated into canonical requirement dup_1_reg_1792827599998"
+    }
+  },
+  "requirementFingerprints": {},
+  "requirementAuditTrail": [
+    {
+      "id": "aud_4e6eddbfd47c",
+      "action": "duplicates_consolidated",
+      "requirementId": "dup_1_reg_1792827599998",
+      "canonicalId": "dup_1_reg_1792827599998",
+      "archivedIds": [
+        "dup_2_reg_1792827599998"
+      ],
+      "actorId": "admin_regression_tester",
+      "actorRole": "admin",
+      "details": {
+        "title": "Azure AI (Microsoft Foundry)",
+        "canonicalRequirementId": "dup_1_reg_1792827599998",
+        "archivedIds": [
+          "dup_2_reg_1792827599998"
+        ],
+        "consolidatedAt": "2026-10-24T07:40:00.261Z"
+      },
+      "createdAt": "2026-10-24T07:40:00.261Z"
+    },
+    {
+      "id": "aud_66bec2f5e856",
+      "action": "requirement_soft_deleted",
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "canonicalId": null,
+      "actorId": "admin_regression_tester",
+      "actorRole": "admin",
+      "details": {
+        "title": "Principal Cloud Architect (reg_1792827599998)",
+        "deletedAt": "2026-10-24T07:40:00.238Z",
+        "deletedBy": "admin_regression_tester",
+        "canonicalId": null,
+        "reason": "Regression test soft deletion"
+      },
+      "createdAt": "2026-10-24T07:40:00.238Z"
+    },
+    {
+      "id": "aud_60efd9c817fa",
+      "action": "duplicate_prevented",
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "canonicalId": "req_canonical_a_reg_1792827599998",
+      "actorId": "system",
+      "actorRole": "server_idempotency_guard",
+      "details": {
+        "fingerprint": "org=client:org_client_alpha_001||title=principal cloud architect (reg_1792827599998)||loc=hyderabad||mode=hybrid||skills=azure ai,kubernetes,terraform",
+        "title": "Principal Cloud Architect (reg_1792827599998)",
+        "client_org_id": "org_client_alpha_001",
+        "location": "Hyderabad",
+        "work_mode": "hybrid"
+      },
+      "createdAt": "2026-10-24T07:40:00.212Z"
+    },
+    {
+      "id": "aud_31646e387d43",
+      "action": "duplicate_prevented",
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "canonicalId": "req_canonical_a_reg_1792827599998",
+      "actorId": "system",
+      "actorRole": "server_idempotency_guard",
+      "details": {
+        "fingerprint": "org=client:org_client_alpha_001||title=principal cloud architect (reg_1792827599998)||loc=hyderabad||mode=hybrid||skills=azure ai,kubernetes,terraform",
+        "title": "Principal Cloud Architect (reg_1792827599998)",
+        "client_org_id": "org_client_alpha_001",
+        "location": "Hyderabad",
+        "work_mode": "hybrid"
+      },
+      "createdAt": "2026-10-24T07:40:00.207Z"
+    },
+    {
+      "id": "aud_a7eee8b28626",
+      "action": "duplicate_prevented",
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "canonicalId": "req_canonical_a_reg_1792827599998",
+      "actorId": "system",
+      "actorRole": "server_idempotency_guard",
+      "details": {
+        "fingerprint": "org=client:org_client_alpha_001||title=principal cloud architect (reg_1792827599998)||loc=hyderabad||mode=hybrid||skills=azure ai,kubernetes,terraform",
+        "title": "Principal Cloud Architect (reg_1792827599998)",
+        "client_org_id": "org_client_alpha_001",
+        "location": "Hyderabad",
+        "work_mode": "hybrid"
+      },
+      "createdAt": "2026-10-24T07:40:00.205Z"
+    },
+    {
+      "id": "aud_32391a5b0165",
+      "action": "duplicate_prevented",
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "canonicalId": "req_canonical_a_reg_1792827599998",
+      "actorId": "system",
+      "actorRole": "server_idempotency_guard",
+      "details": {
+        "fingerprint": "org=client:org_client_alpha_001||title=principal cloud architect (reg_1792827599998)||loc=hyderabad||mode=hybrid||skills=azure ai,kubernetes,terraform",
+        "title": "Principal Cloud Architect (reg_1792827599998)",
+        "client_org_id": "org_client_alpha_001",
+        "location": "Hyderabad",
+        "work_mode": "hybrid"
+      },
+      "createdAt": "2026-10-24T07:40:00.202Z"
+    },
+    {
+      "id": "aud_f65e98d72579",
+      "action": "duplicate_prevented",
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "canonicalId": "req_canonical_a_reg_1792827599998",
+      "actorId": "system",
+      "actorRole": "server_idempotency_guard",
+      "details": {
+        "fingerprint": "org=client:org_client_alpha_001||title=principal cloud architect (reg_1792827599998)||loc=hyderabad||mode=hybrid||skills=azure ai,kubernetes,terraform",
+        "title": "Principal Cloud Architect (reg_1792827599998)",
+        "client_org_id": "org_client_alpha_001",
+        "location": "Hyderabad",
+        "work_mode": "hybrid"
+      },
+      "createdAt": "2026-10-24T07:40:00.199Z"
+    },
+    {
+      "id": "aud_02e420f7d41b",
+      "action": "duplicate_prevented",
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "canonicalId": "req_canonical_a_reg_1792827599998",
+      "actorId": "system",
+      "actorRole": "server_idempotency_guard",
+      "details": {
+        "fingerprint": "org=client:org_client_alpha_001||title=principal cloud architect (reg_1792827599998)||loc=hyderabad||mode=hybrid||skills=azure ai,kubernetes,terraform",
+        "title": "Principal Cloud Architect (reg_1792827599998)",
+        "client_org_id": "org_client_alpha_001",
+        "location": "Hyderabad",
+        "work_mode": "hybrid"
+      },
+      "createdAt": "2026-10-24T07:40:00.195Z"
+    },
+    {
+      "id": "aud_2d18f791e450",
+      "action": "duplicate_prevented",
+      "requirementId": "req_canonical_a_reg_1792827599998",
+      "canonicalId": "req_canonical_a_reg_1792827599998",
+      "actorId": "system",
+      "actorRole": "server_idempotency_guard",
+      "details": {
+        "fingerprint": "org=client:org_client_alpha_001||title=principal cloud architect (reg_1792827599998)||loc=hyderabad||mode=hybrid||skills=azure ai,kubernetes,terraform",
+        "title": "  principal cloud architect (reg_1792827599998)  ",
+        "client_org_id": "org_client_alpha_001",
+        "location": "Hyderabad",
+        "work_mode": "hybrid"
+      },
+      "createdAt": "2026-10-24T07:40:00.180Z"
+    }
+  ]
 }

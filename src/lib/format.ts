@@ -50,21 +50,19 @@ export function formatRelativeTime(isoString: string | null | undefined): string
  * - For legacy records without a unit field, it renders standard currency formatting.
  */
 export function formatCurrency(amount: number | null | undefined, currency = 'INR'): string {
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return '—';
   const rawCurrency = currency || 'INR';
   if (rawCurrency.includes('|')) {
-    const meta = parseRequirementMeta(rawCurrency, amount ?? null);
+    const meta = parseRequirementMeta(rawCurrency, amount);
     if (meta.budgetUnit) {
       const unitInfo = BUDGET_UNIT_METADATA[meta.budgetUnit];
       const symbol = meta.baseCurrency.toUpperCase() === 'USD' ? '$' : '₹';
 
       // If caller passed a specific distinct numeric value (e.g. internal client budget or fixed margin)
       const matchesVendorBudget =
-        amount === null ||
-        amount === undefined ||
-        amount === meta.budgetMax ||
-        amount === meta.budgetMin;
+        amount === meta.budgetMax || amount === meta.budgetMin;
 
-      if (!matchesVendorBudget && amount !== null && amount !== undefined) {
+      if (!matchesVendorBudget) {
         const clean = Number.isInteger(amount) ? String(amount) : Number(amount.toFixed(2)).toString();
         return `${symbol}${clean} ${unitInfo.shortSuffix}`;
       }
@@ -79,7 +77,6 @@ export function formatCurrency(amount: number | null | undefined, currency = 'IN
     }
   }
 
-  if (amount === null || amount === undefined) return '—';
   const baseCurr = rawCurrency.split('|')[0]?.trim() || 'INR';
   try {
     return new Intl.NumberFormat('en-IN', {
@@ -92,8 +89,30 @@ export function formatCurrency(amount: number | null | undefined, currency = 'IN
   }
 }
 
+/**
+ * Formats a single financial figure (such as internal `actual_client_budget` or `platform_margin`)
+ * preserving the requirement's LPA/LPM unit without confusing it with a vendor budget range.
+ */
+export function formatFinancialAmount(
+  amount: number | null | undefined,
+  reqOrCurrency?:
+    | (Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'> & { id?: string })
+    | string
+    | null
+): string {
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return '—';
+  const meta = parseRequirementMeta(reqOrCurrency, amount);
+  const symbol = meta.baseCurrency.toUpperCase() === 'USD' ? '$' : '₹';
+  if (meta.budgetUnit) {
+    const unitInfo = BUDGET_UNIT_METADATA[meta.budgetUnit];
+    const clean = Number.isInteger(amount) ? String(amount) : Number(amount.toFixed(2)).toString();
+    return `${symbol}${clean} ${unitInfo.shortSuffix}`;
+  }
+  return formatCurrency(amount, meta.baseCurrency);
+}
+
 export function formatRequirementBudgetWithSubtitle(
-  req: Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'>
+  req: Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'> & { id?: string }
 ): {
   formatted: string;
   subtitle: string | null;

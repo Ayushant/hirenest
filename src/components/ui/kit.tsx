@@ -6,6 +6,7 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react';
+import { decomposeCompoundSkills } from '../../lib/matchingEngine';
 
 // Category palette (in order):
 // #1F4CC4 rich blue · #4F95DB sky · #6A89A7 storm blue · #384959 storm slate · #2A9D8F teal · #D99A2B amber
@@ -803,16 +804,25 @@ export const SkillsChipInput: React.FC<{
   const [draft, setDraft] = React.useState('');
 
   const addSkill = (raw: string) => {
-    const cleaned = raw.trim();
-    if (!cleaned) return;
-    if (!skills.some((s) => s.toLowerCase() === cleaned.toLowerCase())) {
-      onChange([...skills, cleaned]);
+    const tokens = decomposeCompoundSkills([raw]);
+    if (tokens.length === 0) return;
+
+    const next = [...skills];
+    let changed = false;
+    for (const token of tokens) {
+      if (!next.some((s) => s.toLowerCase() === token.toLowerCase())) {
+        next.push(token);
+        changed = true;
+      }
+    }
+    if (changed) {
+      onChange(next);
     }
     setDraft('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
       e.preventDefault();
       addSkill(draft);
     }
@@ -829,6 +839,11 @@ export const SkillsChipInput: React.FC<{
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
+          onBlur={() => {
+            if (draft.trim()) {
+              addSkill(draft);
+            }
+          }}
           placeholder="Type a skill and press Enter (e.g. TypeScript, PostgreSQL)"
           className="flex-1 h-[34px] rounded-[6px] border border-[var(--border)] px-3 text-[14px] leading-[20px] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--focus-border)] focus:ring-[3px] focus:ring-[var(--focus-ring)]"
         />
