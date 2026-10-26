@@ -7,6 +7,7 @@ import {
   MapPin,
   Repeat,
   ArrowDownRight,
+  Share2,
   Trash2,
   Wallet,
 } from 'lucide-react';
@@ -141,6 +142,7 @@ export const RequirementsPipelineGrid: React.FC<{
   activeFilter: PipelineQuickFilter;
   onFilterChange: (next: PipelineQuickFilter) => void;
   onSelectRequirement: (req: Requirement) => void;
+  onShareRequirement?: (req: Requirement) => void;
   onDeleteRequirement?: (req: Requirement) => void;
   emptyTitle?: string;
   emptyDescription?: string;
@@ -152,6 +154,7 @@ export const RequirementsPipelineGrid: React.FC<{
   activeFilter,
   onFilterChange,
   onSelectRequirement,
+  onShareRequirement,
   onDeleteRequirement,
   emptyTitle = 'No requirements matching this filter',
   emptyDescription = 'Switch to All Requirements or adjust your search query.',
@@ -307,6 +310,20 @@ export const RequirementsPipelineGrid: React.FC<{
                     {share?.due_at && <SlaBadge dueAt={share.due_at} />}
                     {share && !share.acknowledged_at && (
                       <Badge tone="warning">Ack needed</Badge>
+                    )}
+                    {onShareRequirement && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShareRequirement(req);
+                        }}
+                        title={`Share requirement ${req.title} via WhatsApp, Link, or In-app`}
+                        className="h-7 px-2.5 rounded-[6px] border border-[#1F4CC4]/35 bg-[#1F4CC4]/10 text-[11px] font-semibold text-[#1F4CC4] hover:bg-[#1F4CC4] hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Share2 className="h-3 w-3" />
+                        <span>Share Requirement</span>
+                      </button>
                     )}
                     {onDeleteRequirement && (
                       <button

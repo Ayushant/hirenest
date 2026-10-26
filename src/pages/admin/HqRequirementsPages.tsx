@@ -2,7 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays, parseISO } from 'date-fns';
-import { AlertTriangle, CheckCircle2, Layers, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Layers,
+  MessageSquare,
+  Plus,
+  RefreshCw,
+  Share2,
+  Trash2,
+} from 'lucide-react';
 import {
   PageHeader,
   Button,
@@ -34,6 +43,11 @@ import {
   matchesPipelineQuickFilter,
   type PipelineQuickFilter,
 } from '../../components/domain/RequirementsPipelineView';
+import {
+  ShareRequirementModal,
+  RequirementSharingFlowPanel,
+} from '../../components/domain/ShareRequirementModal';
+import { fetchRequirementShareActivities } from '../../lib/requirementSharing';
 import {
   fetchRequirements,
   fetchRequirementById,
@@ -109,6 +123,9 @@ export const HqRequirementsListPage: React.FC = () => {
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Share Requirement Modal state (Steps 3, 4 & 5)
+  const [shareModalTarget, setShareModalTarget] = useState<Requirement | null>(null);
+
   // Duplicate Cleanup & Canonical Consolidation Modal state
   const [duplicatesModalOpen, setDuplicatesModalOpen] = useState(false);
   const [canonicalSelectionByGroup, setCanonicalSelectionByGroup] = useState<
@@ -139,6 +156,17 @@ export const HqRequirementsListPage: React.FC = () => {
   const { data: clientsData } = useQuery({
     queryKey: ['organizations_clients'],
     queryFn: () => fetchOrganizations({ type: 'client', page: 1, pageSize: 100 }),
+  });
+
+  const { data: approvedVendorsList } = useQuery({
+    queryKey: ['approved_vendors'],
+    queryFn: () =>
+      fetchOrganizations({ type: 'vendor', status: 'approved', page: 1, pageSize: 100 }),
+  });
+
+  const { data: allShareActivities = [], refetch: refetchShareActivities } = useQuery({
+    queryKey: ['requirement_share_activities_all'],
+    queryFn: () => fetchRequirementShareActivities(),
   });
 
   const invalidateAllRequirementQueries = () => {
@@ -350,6 +378,44 @@ export const HqRequirementsListPage: React.FC = () => {
         }
       />
 
+      {/* Simple Requirement Sharing Flow Strip (Matches User Diagram) */}
+      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[var(--text-primary)]">
+            <span className="inline-flex items-center gap-1.5 text-[#1F4CC4]">
+              <Share2 className="h-3.5 w-3.5" />
+              Simple Sharing Flow:
+            </span>
+            <span>1. Requirement in HireNestOS</span>
+            <span className="text-[var(--text-tertiary)]">→</span>
+            <span>2. Click &ldquo;Share Requirement&rdquo;</span>
+            <span className="text-[var(--text-tertiary)]">→</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Vendor Sharing</span>
+            <span className="text-[var(--text-tertiary)]">/</span>
+            <span className="text-amber-600 dark:text-amber-400">Direct Candidates</span>
+            <span className="text-[var(--text-tertiary)]">→</span>
+            <span>WhatsApp · Copy Link · In-app</span>
+            <span className="text-[var(--text-tertiary)]">→</span>
+            <span>Track Responses in HireNestOS</span>
+          </div>
+          <p className="text-[12px] text-[var(--text-secondary)]">
+            Expected outcome: Every shared requirement originates from HireNestOS, recipients respond through the platform, and the team tracks what was shared, with whom, and what happened next ({allShareActivities.length} share activity record{allShareActivities.length === 1 ? '' : 's'} logged).
+          </p>
+        </div>
+
+        {allRequirements.length > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setShareModalTarget(allRequirements[0])}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Share Requirement
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Duplicate Requirements Governance Banner */}
       {duplicateGroups.length > 0 && (
         <div className="rounded-[10px] border border-amber-500/35 bg-amber-500/10 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -484,6 +550,7 @@ export const HqRequirementsListPage: React.FC = () => {
           activeFilter={quickFilter}
           onFilterChange={setQuickFilter}
           onSelectRequirement={(req) => navigate(`${prefix}/requirements/${req.id}`)}
+          onShareRequirement={(req) => setShareModalTarget(req)}
           onDeleteRequirement={(req) => {
             setDeleteTarget(req);
             setDeleteReason('');
@@ -576,18 +643,31 @@ export const HqRequirementsListPage: React.FC = () => {
                         {formatLocalDate(req.created_at)}
                       </td>
                       <td className="text-right">
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteTarget(req);
-                            setDeleteReason('');
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </Button>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShareModalTarget(req);
+                            }}
+                          >
+                            <Share2 className="h-3.5 w-3.5 text-[#1F4CC4]" />
+                            Share
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(req);
+                              setDeleteReason('');
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -815,6 +895,20 @@ export const HqRequirementsListPage: React.FC = () => {
         userOrgId={profile?.org_id || null}
         clientOrgs={clientsData?.data || []}
       />
+
+      {/* Share Requirement Modal (WhatsApp · Copy Link · In-app Feed) */}
+      <ShareRequirementModal
+        open={Boolean(shareModalTarget)}
+        onClose={() => setShareModalTarget(null)}
+        requirement={shareModalTarget}
+        approvedVendors={approvedVendorsList?.data || []}
+        sharedByName={profile?.full_name || profile?.email || 'HireNest HQ'}
+        sharedByRole={profile?.role || 'admin'}
+        onShared={() => {
+          invalidateAllRequirementQueries();
+          void refetchShareActivities();
+        }}
+      />
     </div>
   );
 };
@@ -904,6 +998,14 @@ export const HqRequirementDetailPage: React.FC = () => {
     enabled: Boolean(id && isAdmin),
   });
 
+  const { data: shareActivities = [], refetch: refetchReqShareActivities } = useQuery({
+    queryKey: ['requirement_share_activities', id],
+    queryFn: () => fetchRequirementShareActivities(id!),
+    enabled: Boolean(id),
+  });
+
+  const [shareRequirementModalOpen, setShareRequirementModalOpen] = useState(false);
+
   if (isLoading || !req) {
     return <TableSkeleton rows={6} cols={5} />;
   }
@@ -915,6 +1017,9 @@ export const HqRequirementDetailPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['requirement_shares', id] });
     queryClient.invalidateQueries({ queryKey: ['requirement_matches', id] });
     queryClient.invalidateQueries({ queryKey: ['requirement_submissions', id] });
+    queryClient.invalidateQueries({ queryKey: ['requirement_share_activities', id] });
+    queryClient.invalidateQueries({ queryKey: ['requirement_share_activities_all'] });
+    void refetchReqShareActivities();
   };
 
   const handleConfirmStatusChange = async () => {
@@ -1161,6 +1266,13 @@ export const HqRequirementDetailPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
+              onClick={() => setShareRequirementModalOpen(true)}
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Share Requirement
+            </Button>
+            <Button
+              size="sm"
               variant="outline"
               onClick={handlePublishAndShareAll}
               loading={sharingLoading}
@@ -1172,7 +1284,7 @@ export const HqRequirementDetailPage: React.FC = () => {
               <RefreshCw className="h-3.5 w-3.5" />
               Recompute matches
             </Button>
-            <Button size="sm" onClick={() => setEditOpen(true)}>
+            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
               Edit requirement
             </Button>
             <Button
@@ -1198,7 +1310,11 @@ export const HqRequirementDetailPage: React.FC = () => {
             tabs={[
               { id: 'overview', label: 'Overview' },
               { id: 'status', label: 'Status' },
-              { id: 'vendors', label: 'Vendor sharing', count: shares.length },
+              {
+                id: 'vendors',
+                label: 'Sharing & responses',
+                count: Math.max(shares.length, shareActivities.length),
+              },
               {
                 id: 'matches',
                 label: 'Matches',
@@ -1259,15 +1375,24 @@ export const HqRequirementDetailPage: React.FC = () => {
                         : 'Publish this requirement and distribute it to all approved vendor agencies.'}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handlePublishAndShareAll}
-                    loading={sharingLoading}
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Publish &amp; share with all vendors
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setShareRequirementModalOpen(true)}
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      Share Requirement (WhatsApp / Link / In-app)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handlePublishAndShareAll}
+                      loading={sharingLoading}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Publish &amp; share with all vendors
+                    </Button>
+                  </div>
                 </div>
 
                 {shares.length > 0 && (
@@ -1423,9 +1548,18 @@ export const HqRequirementDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 3: VENDOR SHARING */}
+          {/* TAB 3: SHARING & RESPONSES (7-Step Flow + Vendor SLA Table) */}
           {activeTab === 'vendors' && (
             <div className="space-y-6">
+              <RequirementSharingFlowPanel
+                requirement={req}
+                shares={shares}
+                submissions={submissions}
+                activities={shareActivities}
+                onOpenShareModal={() => setShareRequirementModalOpen(true)}
+                onRefresh={refreshAll}
+              />
+
               <div className="rounded-[8px] border border-[var(--border)] p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h3 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">
@@ -2216,6 +2350,18 @@ export const HqRequirementDetailPage: React.FC = () => {
           </div>
         </div>
       </Dialog>
+
+      {/* Share Requirement Modal (WhatsApp · Copy Link · In-app Feed) */}
+      <ShareRequirementModal
+        open={shareRequirementModalOpen}
+        onClose={() => setShareRequirementModalOpen(false)}
+        requirement={req}
+        approvedVendors={approvedVendors?.data || []}
+        existingShares={shares}
+        sharedByName={profile?.full_name || profile?.email || 'HireNest HQ'}
+        sharedByRole={profile?.role || 'admin'}
+        onShared={refreshAll}
+      />
     </div>
   );
 };

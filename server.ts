@@ -157,6 +157,7 @@ interface EnterpriseServerStore {
   deletedRequirements: Record<string, RequirementSoftDeleteServerRecord>;
   requirementFingerprints: Record<string, RequirementFingerprintServerRecord>;
   requirementAuditTrail: RequirementGovernanceAuditEntry[];
+  requirementShareActivities: Array<Record<string, unknown>>;
 }
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
@@ -180,6 +181,9 @@ function loadEnterpriseStore(): EnterpriseServerStore {
         requirementAuditTrail: Array.isArray(parsed.requirementAuditTrail)
           ? parsed.requirementAuditTrail
           : [],
+        requirementShareActivities: Array.isArray(parsed.requirementShareActivities)
+          ? parsed.requirementShareActivities
+          : [],
       };
     }
   } catch {
@@ -196,6 +200,7 @@ function loadEnterpriseStore(): EnterpriseServerStore {
     deletedRequirements: {},
     requirementFingerprints: {},
     requirementAuditTrail: [],
+    requirementShareActivities: [],
   };
 }
 
@@ -1341,6 +1346,52 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     enterpriseStore.vendorAcknowledgements[ackKey] = nowIso;
     saveEnterpriseStore(enterpriseStore);
     res.json({ ok: true, acknowledgedAt: nowIso });
+  });
+
+  // 7-Step Requirement Sharing & Response Tracking Ledger API
+  app.get('/api/requirements/shares-ledger', (req, res) => {
+    const requirementId =
+      typeof req.query.requirementId === 'string' ? req.query.requirementId : '';
+    const allActivities = Array.isArray(enterpriseStore.requirementShareActivities)
+      ? enterpriseStore.requirementShareActivities
+      : [];
+    const filtered = requirementId
+      ? allActivities.filter((a) => String(a.requirementId || '') === requirementId)
+      : allActivities;
+    res.json({
+      ok: true,
+      activities: filtered,
+    });
+  });
+
+  app.post('/api/requirements/shares-ledger', (req, res) => {
+    const { activity } = req.body as { activity?: Record<string, unknown> };
+    if (!activity || typeof activity.id !== 'string' || typeof activity.requirementId !== 'string') {
+      res.status(400).json({ error: 'Valid share activity object is required.' });
+      return;
+    }
+
+    if (!Array.isArray(enterpriseStore.requirementShareActivities)) {
+      enterpriseStore.requirementShareActivities = [];
+    }
+
+    const idx = enterpriseStore.requirementShareActivities.findIndex(
+      (a) => String(a.id) === String(activity.id)
+    );
+    if (idx >= 0) {
+      enterpriseStore.requirementShareActivities[idx] = {
+        ...enterpriseStore.requirementShareActivities[idx],
+        ...activity,
+      };
+    } else {
+      enterpriseStore.requirementShareActivities.unshift(activity);
+    }
+
+    saveEnterpriseStore(enterpriseStore);
+    res.json({
+      ok: true,
+      activity,
+    });
   });
 
   app.post('/api/requirements/verify-access', (req, res) => {
