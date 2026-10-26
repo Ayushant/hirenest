@@ -320,19 +320,25 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Top Wordmark: "HireNest" in 14/600 white with small rich-blue square mark carrying a sky #88BDF2 dot */}
+        {/* Top Wordmark with HireNest Logo */}
         <div className="h-[52px] px-4 flex items-center justify-between border-b border-white/10">
           <Link to={firstLink} className="min-w-0 flex items-center gap-2.5">
-            <span className="h-6 w-6 rounded-[6px] bg-[#1F4CC4] flex items-center justify-center shrink-0">
-              <span className="h-2 w-2 rounded-full bg-[#88BDF2]" />
-            </span>
+            <img
+              src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
+              alt="HireNest Workforce Logo"
+              className="h-8 w-8 rounded-[6px] bg-white object-contain p-0.5 shrink-0 shadow-xs"
+            />
             <div className="min-w-0 flex flex-col">
               <span className="text-[14px] leading-[18px] font-semibold text-white truncate">
                 HireNest
               </span>
-              {organization?.name && (
+              {organization?.name ? (
                 <span className="text-[11px] leading-[14px] text-[var(--sidebar-muted)] truncate">
                   {organization.name}
+                </span>
+              ) : (
+                <span className="text-[10px] leading-[13px] text-[var(--sidebar-muted)] truncate">
+                  Workforce Pvt Ltd
                 </span>
               )}
             </div>
@@ -431,6 +437,18 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             <LogOut strokeWidth={1.75} className="h-3.5 w-3.5" />
             <span>Sign out</span>
           </button>
+
+          <div className="pt-1.5 px-2.5 border-t border-white/10 text-[11px] leading-[16px] text-[var(--sidebar-muted)]">
+            Built by{' '}
+            <a
+              href="https://atkind.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-[#88BDF2] hover:text-white hover:underline transition-colors"
+            >
+              Atkind Pvt Ltd
+            </a>
+          </div>
         </div>
       </aside>
 
@@ -447,6 +465,13 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             >
               <Menu strokeWidth={1.75} className="h-4 w-4" />
             </button>
+            <Link to={firstLink} className="lg:hidden shrink-0">
+              <img
+                src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
+                alt="HireNest Workforce Logo"
+                className="h-7 w-7 rounded-[6px] bg-white object-contain p-0.5 border border-[var(--border)]"
+              />
+            </Link>
 
             {/* Breadcrumbs: Section / Page */}
             <div className="flex items-center gap-1.5 text-[13px] leading-[20px] text-[var(--text-secondary)] truncate">
@@ -688,6 +713,31 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         <main className="flex-1 py-6 px-4 sm:px-8 max-w-[1320px] w-full mx-auto space-y-6">
           {children}
         </main>
+
+        {/* Workspace Footer */}
+        <footer className="border-t border-[var(--border)] bg-[var(--surface)] px-4 sm:px-8 py-3">
+          <div className="max-w-[1320px] w-full mx-auto flex flex-wrap items-center justify-between gap-2 text-[12px] leading-[16px] text-[var(--text-tertiary)]">
+            <span className="inline-flex items-center gap-2">
+              <img
+                src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
+                alt="HireNest Workforce Logo"
+                className="h-5 w-5 rounded-[4px] bg-white object-contain p-0.5 border border-[var(--border)]"
+              />
+              <span>HireNestOS · Hire Nest Workforce Private Limited</span>
+            </span>
+            <span>
+              Built by{' '}
+              <a
+                href="https://atkind.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[var(--accent)] hover:underline"
+              >
+                Atkind Pvt Ltd
+              </a>
+            </span>
+          </div>
+        </footer>
       </div>
 
       {/* General Staffing Help Assistant Drawer (non-candidate roles only) */}

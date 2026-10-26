@@ -26,13 +26,20 @@ const AuthSplitLayout: React.FC<{
       }}
       className="lg:w-[42%] bg-[#1E2A36] text-[#D6E1EC] p-8 sm:p-12 flex flex-col justify-between shrink-0"
     >
-      <div className="flex items-center gap-2.5">
-        <span className="h-6 w-6 rounded-[6px] bg-[#1F4CC4] flex items-center justify-center shrink-0">
-          <span className="h-2 w-2 rounded-full bg-[#88BDF2]" />
-        </span>
-        <span className="text-[14px] leading-[18px] font-semibold text-white">
-          HireNest
-        </span>
+      <div className="flex items-center gap-3">
+        <img
+          src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
+          alt="HireNest Workforce Logo"
+          className="h-11 w-11 rounded-[8px] bg-white object-contain p-1 shrink-0 shadow-sm"
+        />
+        <div className="flex flex-col">
+          <span className="text-[15px] leading-[20px] font-semibold text-white">
+            HireNest
+          </span>
+          <span className="text-[11px] leading-[14px] text-[#8FA6BC]">
+            Hire Nest Workforce Pvt Ltd
+          </span>
+        </div>
       </div>
 
       <div className="my-10 lg:my-0 max-w-md space-y-3">
@@ -45,17 +52,54 @@ const AuthSplitLayout: React.FC<{
         </p>
       </div>
 
-      <div className="text-[12px] leading-[16px] text-[#8FA6BC] font-mono tabular-nums">
-        HireNest Workforce Operations
+      <div className="space-y-1 text-[12px] leading-[16px] text-[#8FA6BC]">
+        <div className="font-mono tabular-nums">HireNest Workforce Operations</div>
+        <div>
+          Built by{' '}
+          <a
+            href="https://atkind.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-[#88BDF2] hover:text-white hover:underline transition-colors"
+          >
+            Atkind Pvt Ltd
+          </a>
+        </div>
       </div>
     </div>
 
     {/* Right 58% Storm 50 Canvas with White Form Card */}
-    <div className="flex-1 lg:w-[58%] flex items-center justify-center p-6 sm:p-10 bg-[var(--app-bg)]">
+    <div className="flex-1 lg:w-[58%] flex flex-col items-center justify-center p-6 sm:p-10 bg-[var(--app-bg)]">
       <div
         className={`w-full ${maxWidthClass} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7 space-y-5 text-left`}
       >
+        <div className="flex items-center gap-3 pb-3 border-b border-[var(--border)]">
+          <img
+            src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
+            alt="HireNest Workforce Private Limited"
+            className="h-10 w-auto rounded-[6px] bg-white object-contain shrink-0"
+          />
+          <div className="min-w-0">
+            <div className="text-[13px] leading-[18px] font-semibold text-[var(--text-primary)]">
+              HireNestOS
+            </div>
+            <div className="text-[11px] leading-[15px] text-[var(--text-tertiary)] truncate">
+              Hire Nest Workforce Private Limited
+            </div>
+          </div>
+        </div>
         {children}
+      </div>
+      <div className="mt-4 text-[12px] leading-[16px] text-[var(--text-tertiary)]">
+        Built by{' '}
+        <a
+          href="https://atkind.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-[var(--accent)] hover:underline"
+        >
+          Atkind Pvt Ltd
+        </a>
       </div>
     </div>
   </div>

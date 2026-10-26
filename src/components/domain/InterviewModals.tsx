@@ -18,7 +18,11 @@ import {
   createCandidateQualityFeedback,
 } from '../../api/interviews';
 import { transitionSubmissionRpc } from '../../api/submissions';
-import { suggestInterviewQuestions, tidyInterviewNotes } from '../../api/ai';
+import {
+  suggestInterviewQuestions,
+  tidyInterviewNotes,
+  evaluateScreeningResponses,
+} from '../../api/ai';
 import { mapSupabaseError } from '../../lib/errors';
 import { ROUND_LABELS } from '../../lib/format';
 import { useToast } from '../ui/Toast';
@@ -741,6 +745,7 @@ export const ScreeningInterviewRunnerModal: React.FC<{
   const [decision, setDecision] = useState<InterviewDecision>('advance');
 
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiEvaluating, setAiEvaluating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiLabel, setAiLabel] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -774,6 +779,44 @@ export const ScreeningInterviewRunnerModal: React.FC<{
       setAiError(err instanceof Error ? err.message : 'AI assistant unavailable right now');
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleEvaluateWithAi = async () => {
+    const answeredCount = qaList.filter((q) => q.response.trim().length > 0).length;
+    if (answeredCount === 0) {
+      setAiError('Record at least one candidate response before running AI screening evaluation.');
+      return;
+    }
+    setAiEvaluating(true);
+    setAiError(null);
+    try {
+      const res = await evaluateScreeningResponses({
+        requirement_title: requirementTitle,
+        requirement_skills: requirementSkills,
+        mode,
+        qa_pairs: qaList.map((q) => ({
+          topic: q.topic,
+          question: q.question,
+          response: q.response,
+        })),
+      });
+      setAiLabel(res.label);
+      if (res.evaluation) {
+        setStrengths(res.evaluation.strengths || strengths);
+        setGaps(res.evaluation.gaps || gaps);
+        setFollowUps(res.evaluation.followUps || followUps);
+        setSummaryNotes(res.evaluation.summary || summaryNotes);
+        if (res.evaluation.skill_rating) setSkillRating(res.evaluation.skill_rating);
+        if (res.evaluation.communication_rating) {
+          setCommRating(res.evaluation.communication_rating);
+        }
+        if (res.evaluation.overall_rating) setOverallRating(res.evaluation.overall_rating);
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'AI evaluation unavailable right now');
+    } finally {
+      setAiEvaluating(false);
     }
   };
 
@@ -878,19 +921,30 @@ export const ScreeningInterviewRunnerModal: React.FC<{
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               Screening questions ({qaList.length})
             </h4>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              loading={aiLoading}
-              onClick={handleLoadSuggestedQuestions}
-            >
-              Suggest interview questions
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                loading={aiLoading}
+                onClick={handleLoadSuggestedQuestions}
+              >
+                Suggest interview questions
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                loading={aiEvaluating}
+                onClick={handleEvaluateWithAi}
+              >
+                Evaluate responses with AI
+              </Button>
+            </div>
           </div>
 
           {aiError && (
