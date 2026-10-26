@@ -73,6 +73,7 @@ import {
   CandidateProfilePage,
 } from './pages/candidate/CandidateWorkspacePages';
 import { SubscriptionPage } from './pages/subscription/SubscriptionPage';
+import { PrivacyGovernancePage } from './pages/privacy/PrivacyGovernancePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -155,6 +156,7 @@ function AppRoutes() {
         <Route path="disputes" element={<AdminDisputesPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
+        <Route path="privacy" element={<PrivacyGovernancePage />} />
         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
       </Route>
 
@@ -180,6 +182,7 @@ function AppRoutes() {
         <Route path="vendors" element={<HqVendorPerformancePage />} />
         <Route path="vendor-performance" element={<HqVendorPerformancePage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
+        <Route path="privacy" element={<PrivacyGovernancePage />} />
       </Route>
 
       {/* Client Workspace (/client/*) */}
@@ -200,6 +203,7 @@ function AppRoutes() {
         <Route path="interviews" element={<ClientInterviewsPage />} />
         <Route path="vendors" element={<ClientVendorSummaryPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
+        <Route path="privacy" element={<PrivacyGovernancePage />} />
       </Route>
 
       {/* Vendor Workspace (/vendor/*) */}
@@ -224,6 +228,7 @@ function AppRoutes() {
         <Route path="ratings" element={<VendorRatingsPage />} />
         <Route path="performance" element={<VendorRatingsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
+        <Route path="privacy" element={<PrivacyGovernancePage />} />
       </Route>
 
       {/* Candidate Workspace (/candidate/*) */}
@@ -241,6 +246,7 @@ function AppRoutes() {
         <Route path="browse" element={<CandidateBrowseJobsPage />} />
         <Route path="applications" element={<CandidateApplicationsPage />} />
         <Route path="profile" element={<CandidateProfilePage />} />
+        <Route path="privacy" element={<PrivacyGovernancePage />} />
       </Route>
 
       {/* Catch-all */}

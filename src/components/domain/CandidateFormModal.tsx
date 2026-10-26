@@ -19,6 +19,7 @@ import {
 } from '../../api/candidates';
 import { computeFileSha256, validateResumeFile } from '../../lib/hash';
 import { parseResumeFile } from '../../lib/resumeParser';
+import { recordPrivacyAcknowledgementApi } from '../../lib/dpdpPrivacy';
 import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../ui/Toast';
 
@@ -81,6 +82,7 @@ export const CandidateFormModal: React.FC<{
   const [parsingSingle, setParsingSingle] = useState(false);
   const [parsedSuccessBanner, setParsedSuccessBanner] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dpdpNoticeAccepted, setDpdpNoticeAccepted] = useState(true);
 
   // Bulk upload state
   const [bulkItems, setBulkItems] = useState<BulkCandidateItem[]>([]);
@@ -453,6 +455,21 @@ export const CandidateFormModal: React.FC<{
         await uploadCandidateResume(result.candidate_id, resumeFile, resumeHash);
       }
 
+      if (dpdpNoticeAccepted) {
+        await recordPrivacyAcknowledgementApi({
+          subjectRef: `cand_${result.candidate_id}`,
+          subjectName: values.full_name,
+          noticeId: isSelfOnboarding ? 'HN-DPDP-NOTICE-2026-V2' : 'HN-DPDP-VENDOR-2026-V1',
+          version: isSelfOnboarding ? '2.4.0' : '1.2.0',
+          purpose: isSelfOnboarding
+            ? 'Candidate profile creation, resume parsing, 4-dimension JD matching & authorised client submission'
+            : 'Recruiter/Vendor candidate onboarding & DPDP notice representation attestation',
+          processingBasis: 'consent',
+          action: 'consented',
+          captureSource: isSelfOnboarding ? 'candidate_portal' : 'resume_upload',
+        }).catch(() => undefined);
+      }
+
       toast({
         title: 'Candidate profile created',
         description: values.full_name,
@@ -647,11 +664,31 @@ export const CandidateFormModal: React.FC<{
               {...register('summary')}
             />
 
+            {/* DPDP Act, 2023 Notice & Consent / Representation Attestation */}
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] leading-[18px] text-[var(--text-secondary)]">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dpdpNoticeAccepted}
+                  onChange={(e) => setDpdpNoticeAccepted(e.target.checked)}
+                  className="mt-1 rounded border-[var(--border)]"
+                />
+                <span>
+                  <strong className="text-[var(--text-primary)]">
+                    DPDP Act, 2023 Privacy Notice &amp; Consent ({isSelfOnboarding ? 'v2.4.0' : 'v1.2.0'}):
+                  </strong>{' '}
+                  {isSelfOnboarding
+                    ? 'I acknowledge the HireNestOS Personal Data Protection Notice and consent to processing my resume, contact details, and skills for recruitment matching, screening, and authorised client submissions. I understand I may withdraw consent or request erasure at any time.'
+                    : 'I attest that the candidate has been provided the HireNestOS DPDP Act, 2023 Personal Data Protection Notice and has authorised profile creation and recruitment matching.'}
+                </span>
+              </label>
+            </div>
+
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" loading={submitting}>
+              <Button type="submit" loading={submitting} disabled={!dpdpNoticeAccepted}>
                 {isSelfOnboarding ? 'Complete profile' : 'Create candidate'}
               </Button>
             </div>

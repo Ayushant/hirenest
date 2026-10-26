@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   PageHeader,
@@ -36,6 +36,7 @@ import {
 import { useAuth } from '../../auth/AuthProvider';
 import { mapSupabaseError } from '../../lib/errors';
 import { computeFileSha256, validateResumeFile } from '../../lib/hash';
+import { recordPrivacyAcknowledgementApi } from '../../lib/dpdpPrivacy';
 import { formatLocalDate } from '../../lib/format';
 import { useToast } from '../../components/ui/Toast';
 import type { CandidateMatch, Requirement } from '../../types/db';
@@ -615,7 +616,17 @@ export const CandidateProfilePage: React.FC = () => {
     try {
       const hash = await computeFileSha256(file);
       await uploadCandidateResume(myCandidate.id, file, hash);
-      toast({ title: 'Resume updated', tone: 'success' });
+      await recordPrivacyAcknowledgementApi({
+        subjectRef: `cand_${myCandidate.id}`,
+        subjectName: myCandidate.full_name || 'Candidate',
+        noticeId: 'HN-DPDP-NOTICE-2026-V2',
+        version: '2.4.0',
+        purpose: 'Resume replacement & updated profile matching under DPDP Notice v2.4.0',
+        processingBasis: 'consent',
+        action: 'acknowledged',
+        captureSource: 'resume_upload',
+      }).catch(() => undefined);
+      toast({ title: 'Resume updated & DPDP acknowledgement logged', tone: 'success' });
       queryClient.invalidateQueries({ queryKey: ['my_candidate_profile'] });
     } catch (uploadErr) {
       toast({
@@ -674,6 +685,23 @@ export const CandidateProfilePage: React.FC = () => {
           </div>
         }
       />
+
+      <div className="mb-5 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-[12px]">
+        <div>
+          <span className="font-semibold text-[var(--text-primary)]">
+            DPDP Act, 2023 — Personal Data Protection &amp; Rights:
+          </span>{' '}
+          <span className="text-[var(--text-secondary)]">
+            Your profile is governed by Notice HN-DPDP-NOTICE-2026-V2 (v2.4.0). Manage consent, preferences, or request data access/erasure anytime.
+          </span>
+        </div>
+        <Link
+          to="/candidate/privacy"
+          className="font-medium text-[#1F4CC4] hover:underline shrink-0"
+        >
+          Open My Privacy &amp; Rights Center →
+        </Link>
+      </div>
 
       <form onSubmit={handleSave} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

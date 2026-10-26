@@ -27,6 +27,7 @@ import {
   X,
   BarChart3,
   CreditCard,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -206,6 +207,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Disputes', to: '/admin/disputes', icon: Scale },
             { label: 'Settings & weights', to: '/admin/settings', icon: Settings },
             { label: 'Subscription & billing', to: '/admin/subscription', icon: CreditCard },
+            { label: 'Privacy & DPDP', to: '/admin/privacy', icon: Lock },
             { label: 'Audit log', to: '/admin/audit-logs', icon: ShieldCheck },
           ],
         };
@@ -216,6 +218,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           items: [
             ...pipelineGroup.items,
             { label: 'Subscription & billing', to: '/recruiter/subscription', icon: CreditCard },
+            { label: 'Privacy & DPDP', to: '/recruiter/privacy', icon: Lock },
           ],
         },
       ];
@@ -245,6 +248,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         to: '/client/subscription',
         icon: CreditCard,
       });
+      items.push({
+        label: 'Privacy & DPDP',
+        to: '/client/privacy',
+        icon: Lock,
+      });
       return [{ items }];
     }
 
@@ -261,6 +269,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Interviews', to: '/vendor/interviews', icon: Calendar },
             { label: 'Ratings & performance', to: '/vendor/performance', icon: BarChart3 },
             { label: 'Subscription & billing', to: '/vendor/subscription', icon: CreditCard },
+            { label: 'Privacy & DPDP', to: '/vendor/privacy', icon: Lock },
           ],
         },
       ];
@@ -274,6 +283,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Browse open jobs', to: '/candidate/browse', icon: FileSearch },
             { label: 'My applications', to: '/candidate/applications', icon: GitPullRequest },
             { label: 'My profile', to: '/candidate/profile', icon: UserCheck },
+            { label: 'Privacy & DPDP rights', to: '/candidate/privacy', icon: Lock },
           ],
         },
       ];
