@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { isSubmissionApprovedForClientVisibility } from '../lib/offerOnboarding';
 import type {
   AppRole,
   ApplyToRequirementResult,
@@ -17,6 +18,8 @@ export async function fetchSubmissions(params: {
   requirementId?: string;
   candidateId?: string;
   vendorOrgId?: string;
+  clientOrgId?: string | null;
+  enforceClientGate?: boolean;
   stage?: SubmissionStage | '';
   source?: CandidateSource | '';
   isValid?: boolean;
@@ -44,7 +47,16 @@ export async function fetchSubmissions(params: {
 
   const { data, error, count } = await query;
   if (error) throw error;
-  return { data: (data || []) as Submission[], count: count || 0 };
+  const rawList = (data || []) as Submission[];
+
+  if (params.enforceClientGate || params.clientOrgId) {
+    const filtered = rawList.filter((sub) =>
+      isSubmissionApprovedForClientVisibility(sub, params.clientOrgId)
+    );
+    return { data: filtered, count: filtered.length };
+  }
+
+  return { data: rawList, count: count || 0 };
 }
 
 export async function fetchSubmissionById(id: string): Promise<Submission | null> {
@@ -138,6 +150,12 @@ export function getAllowedTransitions(
     if (currentStage === 'interviewing') {
       return nextStages.filter((s) => s === 'offered' || s === 'rejected');
     }
+    if (currentStage === 'offered') {
+      return nextStages.filter((s) => s === 'offer_accepted' || s === 'offer_declined');
+    }
+    if (currentStage === 'offer_accepted') {
+      return nextStages.filter((s) => s === 'onboarded');
+    }
     return [];
   }
   if (role === 'vendor_admin' || role === 'vendor_recruiter' || role === 'candidate') {
@@ -153,3 +171,4 @@ export function transitionRequiresReason(targetStage: SubmissionStage): boolean 
     targetStage === 'offer_declined'
   );
 }
+

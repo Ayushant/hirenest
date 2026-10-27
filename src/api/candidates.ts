@@ -4,6 +4,12 @@ import {
   computeFineTunedCandidateMatch,
   decomposeCompoundSkills,
 } from '../lib/matchingEngine';
+import {
+  computeRequirementDuplicateGroupKey,
+  isRequirementSoftDeleted,
+  parseRequirementMeta,
+} from '../lib/enterpriseLifecycle';
+import { hydrateDeletedRequirementsFromBackend } from './requirements';
 import type {
   Candidate,
   CandidateContacts,
@@ -41,7 +47,11 @@ export async function fetchCandidates(params: {
     .range(from, to);
 
   if (params.originalSource) query = query.eq('original_source', params.originalSource);
-  if (params.ownerVendorOrgId) query = query.eq('owner_vendor_org_id', params.ownerVendorOrgId);
+  if (params.ownerVendorOrgId === '__admin__') {
+    query = query.is('owner_vendor_org_id', null);
+  } else if (params.ownerVendorOrgId) {
+    query = query.eq('owner_vendor_org_id', params.ownerVendorOrgId);
+  }
   if (params.skill?.trim()) {
     query = query.contains('skills', [params.skill.trim()]);
   }
@@ -211,6 +221,8 @@ export async function fetchMatchesForRequirement(params: {
   const from = (page - 1) * pageSize;
   const to = from + pageSize;
 
+  await hydrateDeletedRequirementsFromBackend();
+
   // Fetch requirement, existing match rows, and full candidate pool in parallel
   const [reqRes, matchesRes, candidatesRes] = await Promise.all([
     supabase
@@ -239,7 +251,7 @@ export async function fetchMatchesForRequirement(params: {
   const existingMatches = (matchesRes.data || []) as CandidateMatch[];
   const allCandidates = (candidatesRes.data || []) as Candidate[];
 
-  if (!requirement) {
+  if (!requirement || isRequirementSoftDeleted(requirement)) {
     const sortedFallback = [...existingMatches].sort((a, b) => b.final_score - a.final_score);
     return {
       data: sortedFallback.slice(from, to),
@@ -352,8 +364,6 @@ export async function fetchMatchesForRequirement(params: {
     }
   }
 
-  // Best-effort background sync of fine-tuned scores into candidate_matches table
-  // Note: final_score is a GENERATED ALWAYS AS (COALESCE(override_score, computed_score)) column in PostgreSQL
   if (updatesToSync.length > 0) {
     void Promise.allSettled(
       updatesToSync.map((u) =>
@@ -396,7 +406,9 @@ export async function fetchMatchesForCandidate(params: {
   const from = (page - 1) * pageSize;
   const to = from + pageSize;
 
-  const [candRes, matchesRes, reqsRes] = await Promise.all([
+  await hydrateDeletedRequirementsFromBackend();
+
+  const [candRes, matchesRes, reqsRes, catalogRes] = await Promise.all([
     supabase
       .from('candidates')
       .select(
@@ -414,16 +426,29 @@ export async function fetchMatchesForCandidate(params: {
       .in('status', ['open', 'pending_approval', 'draft'])
       .order('created_at', { ascending: false })
       .limit(100),
+    fetch('/api/requirements/catalog')
+      .then((r) => (r.ok ? r.json() : { requirements: [] }))
+      .catch(() => ({ requirements: [] })),
   ]);
 
   if (matchesRes.error) throw matchesRes.error;
 
   const candidate = candRes.data as Candidate | null;
   const existingMatches = (matchesRes.data || []) as CandidateMatch[];
-  const allRequirements = (reqsRes.data || []) as Requirement[];
+  const dbRequirements = (reqsRes.data || []) as Requirement[];
+  const catalogRequirements = Array.isArray(catalogRes?.requirements)
+    ? (catalogRes.requirements as Requirement[])
+    : [];
 
   if (!candidate) {
-    const sortedFallback = [...existingMatches].sort((a, b) => b.final_score - a.final_score);
+    const activeFallback = existingMatches.filter(
+      (m) =>
+        m.requirements &&
+        !isRequirementSoftDeleted(m.requirements) &&
+        m.requirements.status !== 'closed' &&
+        m.requirements.status !== 'filled'
+    );
+    const sortedFallback = [...activeFallback].sort((a, b) => b.final_score - a.final_score);
     return {
       data: sortedFallback.slice(from, to),
       count: sortedFallback.length,
@@ -435,21 +460,49 @@ export async function fetchMatchesForCandidate(params: {
     existingByReqId.set(m.requirement_id, m);
   }
 
-  const reqMap = new Map<string, Requirement>();
-  for (const r of allRequirements) {
-    // Exclude soft-deleted requirements
+  // Merge active requirements from DB and backend catalog, strictly excluding soft-deleted or closed/merged records
+  const rawActiveReqs: Requirement[] = [];
+  const seenIds = new Set<string>();
+  for (const r of [...dbRequirements, ...catalogRequirements]) {
+    if (!r || !r.id || seenIds.has(r.id)) continue;
+    if (isRequirementSoftDeleted(r)) continue;
+    if (r.status === 'closed' || r.status === 'filled' || r.status === 'on_hold') continue;
     const notesStr = String((r as unknown as Record<string, unknown>).notes || '');
     if (notesStr.includes('__HIRENEST_DELETED_META__:')) continue;
-    reqMap.set(r.id, r);
+    seenIds.add(r.id);
+    rawActiveReqs.push(r);
   }
-  for (const m of existingMatches) {
-    if (m.requirements && !reqMap.has(m.requirement_id)) {
-      reqMap.set(m.requirement_id, m.requirements);
+
+  // Deduplicate by canonical requirement group key (title + client + location + work mode)
+  // so merged/duplicate requirement rows never inflate the candidate's matching requirements count
+  const canonicalByGroupKey = new Map<string, Requirement>();
+  const sortedForDedupe = [...rawActiveReqs].sort((a, b) => {
+    // Prefer 'open' status, then richest skill set, then earliest canonical creation
+    if (a.status === 'open' && b.status !== 'open') return -1;
+    if (b.status === 'open' && a.status !== 'open') return 1;
+    const aSkills = Array.isArray(a.skills) ? a.skills.length : 0;
+    const bSkills = Array.isArray(b.skills) ? b.skills.length : 0;
+    if (bSkills !== aSkills) return bSkills - aSkills;
+    return (a.created_at || '').localeCompare(b.created_at || '');
+  });
+
+  for (const req of sortedForDedupe) {
+    const meta = parseRequirementMeta(req);
+    const groupKey = computeRequirementDuplicateGroupKey({
+      title: req.title,
+      client_org_id: req.client_org_id,
+      mappedClientOrgId: meta.mappedClientOrgId,
+      isClientMapped: meta.isClientMapped,
+      location: req.location,
+      work_mode: req.work_mode,
+    });
+    if (!canonicalByGroupKey.has(groupKey)) {
+      canonicalByGroupKey.set(groupKey, req);
     }
   }
 
   const enrichedMatches: CandidateMatch[] = [];
-  for (const req of reqMap.values()) {
+  for (const req of canonicalByGroupKey.values()) {
     const existing = existingByReqId.get(req.id);
     const fineTuned = computeFineTunedCandidateMatch(req, candidate, existing);
 

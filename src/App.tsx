@@ -74,6 +74,10 @@ import {
 } from './pages/candidate/CandidateWorkspacePages';
 import { SubscriptionPage } from './pages/subscription/SubscriptionPage';
 import { PrivacyGovernancePage } from './pages/privacy/PrivacyGovernancePage';
+import {
+  OffersManagementPage,
+  OnboardedCandidatesPage,
+} from './pages/offers/OffersAndOnboardingPages';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -148,6 +152,8 @@ function AppRoutes() {
         <Route path="candidates/:id" element={<HqCandidateDetailPage />} />
         <Route path="submissions" element={<HqSubmissionsPage />} />
         <Route path="interviews" element={<HqInterviewsPage />} />
+        <Route path="offers" element={<OffersManagementPage />} />
+        <Route path="onboarded" element={<OnboardedCandidatesPage />} />
         <Route path="duplicates" element={<HqDuplicatesPage />} />
         <Route path="vendors" element={<HqVendorPerformancePage />} />
         <Route path="vendor-performance" element={<HqVendorPerformancePage />} />
@@ -178,6 +184,8 @@ function AppRoutes() {
         <Route path="candidates/:id" element={<HqCandidateDetailPage />} />
         <Route path="submissions" element={<HqSubmissionsPage />} />
         <Route path="interviews" element={<HqInterviewsPage />} />
+        <Route path="offers" element={<OffersManagementPage />} />
+        <Route path="onboarded" element={<OnboardedCandidatesPage />} />
         <Route path="duplicates" element={<HqDuplicatesPage />} />
         <Route path="vendors" element={<HqVendorPerformancePage />} />
         <Route path="vendor-performance" element={<HqVendorPerformancePage />} />
@@ -201,6 +209,8 @@ function AppRoutes() {
         <Route path="requirements/:id" element={<ClientRequirementDetailPage />} />
         <Route path="candidates" element={<ClientCandidatesReviewPage />} />
         <Route path="interviews" element={<ClientInterviewsPage />} />
+        <Route path="offers" element={<OffersManagementPage />} />
+        <Route path="onboarded" element={<OnboardedCandidatesPage />} />
         <Route path="vendors" element={<ClientVendorSummaryPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="privacy" element={<PrivacyGovernancePage />} />
@@ -225,6 +235,8 @@ function AppRoutes() {
         <Route path="matches" element={<VendorMatchIntelligencePage />} />
         <Route path="submissions" element={<VendorSubmissionsPage />} />
         <Route path="interviews" element={<VendorInterviewsPage />} />
+        <Route path="offers" element={<OffersManagementPage />} />
+        <Route path="onboarded" element={<OnboardedCandidatesPage />} />
         <Route path="ratings" element={<VendorRatingsPage />} />
         <Route path="performance" element={<VendorRatingsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />

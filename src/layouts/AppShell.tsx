@@ -191,6 +191,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             icon: Calendar,
             badgeCount: pendingFeedbackCount || undefined,
           },
+          { label: 'Offers', to: `${basePrefix}/offers`, icon: ClipboardCheck },
+          { label: 'Onboarded', to: `${basePrefix}/onboarded`, icon: UserCheck },
           { label: 'Duplicates & ownership', to: `${basePrefix}/duplicates`, icon: Flag },
           { label: 'Vendor performance', to: `${basePrefix}/vendor-performance`, icon: BarChart3 },
         ],
@@ -235,6 +237,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           icon: Calendar,
           badgeCount: pendingFeedbackCount || undefined,
         },
+        { label: 'Offers', to: '/client/offers', icon: ClipboardCheck },
+        { label: 'Onboarded', to: '/client/onboarded', icon: UserCheck },
       ];
       if (platformSettings?.share_vendor_summary_with_clients) {
         items.push({
@@ -267,6 +271,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Match intelligence', to: '/vendor/matches', icon: Sparkles },
             { label: 'Submissions', to: '/vendor/submissions', icon: GitPullRequest },
             { label: 'Interviews', to: '/vendor/interviews', icon: Calendar },
+            { label: 'Offers', to: '/vendor/offers', icon: ClipboardCheck },
+            { label: 'Onboarded', to: '/vendor/onboarded', icon: UserCheck },
             { label: 'Ratings & performance', to: '/vendor/performance', icon: BarChart3 },
             { label: 'Subscription & billing', to: '/vendor/subscription', icon: CreditCard },
             { label: 'Privacy & DPDP', to: '/vendor/privacy', icon: Lock },

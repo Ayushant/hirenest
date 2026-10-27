@@ -61,6 +61,10 @@ import {
   formatLocalDateTime,
   formatRequirementBudgetWithSubtitle,
 } from '../../lib/format';
+import {
+  computeOfferOnboardingMetrics,
+  fetchAllOfferOnboardingRecordsApi,
+} from '../../lib/offerOnboarding';
 import { useToast } from '../../components/ui/Toast';
 import type {
   InterviewRound,
@@ -89,8 +93,31 @@ export const ClientDashboardPage: React.FC = () => {
 
   const { data: reviewSubs } = useQuery({
     queryKey: ['client_review_subs', profile?.org_id],
-    queryFn: () => fetchSubmissions({ stage: 'client_review', page: 1 }),
+    queryFn: () =>
+      fetchSubmissions({
+        stage: 'client_review',
+        page: 1,
+        clientOrgId: profile?.org_id || null,
+        enforceClientGate: true,
+      }),
     enabled: Boolean(profile?.org_id),
+  });
+
+  const { data: allClientSubs } = useQuery({
+    queryKey: ['client-dashboard-subs', profile?.org_id],
+    queryFn: () =>
+      fetchSubmissions({
+        page: 1,
+        pageSize: 250,
+        clientOrgId: profile?.org_id || null,
+        enforceClientGate: true,
+      }),
+    enabled: Boolean(profile?.org_id),
+  });
+
+  const { data: offerRecordsMap } = useQuery({
+    queryKey: ['offers-onboarding-workspace', 'client_dashboard', profile?.org_id],
+    queryFn: fetchAllOfferOnboardingRecordsApi,
   });
 
   const { data: upcomingInterviews } = useQuery({
@@ -105,17 +132,36 @@ export const ClientDashboardPage: React.FC = () => {
     enabled: Boolean(profile?.id),
   });
 
+  const offerMetrics = useMemo(
+    () =>
+      computeOfferOnboardingMetrics(
+        allClientSubs?.data || [],
+        offerRecordsMap
+      ),
+    [allClientSubs?.data, offerRecordsMap]
+  );
+
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   return (
     <div className="space-y-8">
-      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5">
-        <h1 className="type-greeting text-[var(--text-primary)]">
-          Good day, {firstName}
-        </h1>
-        <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
-          Client hiring overview and items awaiting your review.
-        </p>
+      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="type-greeting text-[var(--text-primary)]">
+            Good day, {firstName}
+          </h1>
+          <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
+            Client hiring overview, offer management, and confirmed onboarding tracker.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => navigate('/client/offers')}>
+            Offers Desk ({offerMetrics.offersIssued})
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => navigate('/client/onboarded')}>
+            Confirmed Onboarded ({offerMetrics.onboardedCandidates})
+          </Button>
+        </div>
       </div>
 
       {/* Needs attention */}
@@ -134,6 +180,32 @@ export const ClientDashboardPage: React.FC = () => {
               </div>
               <span className="font-mono tabular-nums text-[13px] font-medium text-[var(--text-primary)]">
                 {reviewSubs?.count ?? 0}
+              </span>
+            </div>
+          )}
+          {offerMetrics.pendingOffers > 0 && (
+            <div
+              onClick={() => navigate('/client/offers')}
+              className="flex h-11 items-center justify-between px-4 hover:bg-[var(--bg-hover)] cursor-pointer"
+            >
+              <div className="flex items-center gap-2 text-[13px]">
+                <Badge tone="amber">Issued offers awaiting candidate acceptance</Badge>
+              </div>
+              <span className="font-mono tabular-nums text-[13px] font-medium text-[var(--text-primary)]">
+                {offerMetrics.pendingOffers}
+              </span>
+            </div>
+          )}
+          {offerMetrics.upcomingJoiningsCount > 0 && (
+            <div
+              onClick={() => navigate('/client/onboarded')}
+              className="flex h-11 items-center justify-between px-4 hover:bg-[var(--bg-hover)] cursor-pointer"
+            >
+              <div className="flex items-center gap-2 text-[13px]">
+                <Badge tone="sky">Upcoming scheduled joining dates (Expected DOJ)</Badge>
+              </div>
+              <span className="font-mono tabular-nums text-[13px] font-medium text-[var(--text-primary)]">
+                {offerMetrics.upcomingJoiningsCount}
               </span>
             </div>
           )}
@@ -158,15 +230,18 @@ export const ClientDashboardPage: React.FC = () => {
               </span>
             </div>
           ))}
-          {(reviewSubs?.count ?? 0) === 0 && pendingFeedback.length === 0 && (
-            <div className="flex h-11 items-center px-4 text-[13px] text-[var(--text-secondary)]">
-              All candidate reviews and interview evaluations are up to date.
-            </div>
-          )}
+          {(reviewSubs?.count ?? 0) === 0 &&
+            offerMetrics.pendingOffers === 0 &&
+            offerMetrics.upcomingJoiningsCount === 0 &&
+            pendingFeedback.length === 0 && (
+              <div className="flex h-11 items-center px-4 text-[13px] text-[var(--text-secondary)]">
+                All candidate reviews, offers, and interview evaluations are up to date.
+              </div>
+            )}
         </div>
       </div>
 
-      {/* 4-Metric Strip */}
+      {/* Primary Pipeline Metric Strip */}
       <MetricStrip
         items={[
           {
@@ -175,9 +250,8 @@ export const ClientDashboardPage: React.FC = () => {
             onClick: () => navigate('/client/requirements'),
           },
           {
-            label: 'Awaiting review',
-            value: reviewSubs?.count ?? 0,
-            tone: (reviewSubs?.count ?? 0) > 0 ? 'warning' : 'default',
+            label: 'Candidates shared',
+            value: offerMetrics.candidatesShared,
             onClick: () => navigate('/client/candidates'),
           },
           {
@@ -193,6 +267,95 @@ export const ClientDashboardPage: React.FC = () => {
           },
         ]}
       />
+
+      {/* Database-Driven Offer & Onboarding Lifecycle Metrics */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Offer Management &amp; Onboarding Metrics
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={() => navigate('/client/offers')}>
+              View Offers →
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => navigate('/client/onboarded')}>
+              View Onboarded →
+            </Button>
+          </div>
+        </div>
+
+        <MetricStrip
+          items={[
+            {
+              label: 'Offers issued',
+              value: offerMetrics.offersIssued,
+              onClick: () => navigate('/client/offers'),
+            },
+            {
+              label: 'Offers accepted',
+              value: offerMetrics.offersAccepted,
+              tone: offerMetrics.offersAccepted > 0 ? 'success' : 'default',
+              onClick: () => navigate('/client/offers'),
+            },
+            {
+              label: 'Offers declined',
+              value: offerMetrics.offersDeclined,
+              tone: offerMetrics.offersDeclined > 0 ? 'danger' : 'default',
+              onClick: () => navigate('/client/offers'),
+            },
+            {
+              label: 'Pending offers',
+              value: offerMetrics.pendingOffers,
+              tone: offerMetrics.pendingOffers > 0 ? 'warning' : 'default',
+              onClick: () => navigate('/client/offers'),
+            },
+            {
+              label: 'Onboarded candidates',
+              value: offerMetrics.onboardedCandidates,
+              tone: offerMetrics.onboardedCandidates > 0 ? 'success' : 'default',
+              onClick: () => navigate('/client/onboarded'),
+            },
+            {
+              label: 'Upcoming joinings',
+              value: offerMetrics.upcomingJoiningsCount,
+              onClick: () => navigate('/client/onboarded'),
+            },
+          ]}
+        />
+
+        {offerMetrics.upcomingJoinings.length > 0 && (
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+                Upcoming Scheduled Joining Dates (Expected DOJ · Awaiting Day-1 Confirmation)
+              </span>
+              <Badge tone="sky">{offerMetrics.upcomingJoinings.length} scheduled</Badge>
+            </div>
+            <div className="divide-y divide-[var(--border)]">
+              {offerMetrics.upcomingJoinings.slice(0, 5).map(({ submission, record }) => (
+                <div
+                  key={submission.id}
+                  onClick={() => navigate('/client/onboarded')}
+                  className="py-2 flex items-center justify-between text-[13px] hover:bg-[var(--bg-hover)] px-2 rounded-[4px] cursor-pointer"
+                >
+                  <div>
+                    <span className="font-medium text-[var(--text-primary)]">
+                      {submission.candidates?.full_name || 'Candidate'}
+                    </span>
+                    <span className="text-[var(--text-secondary)]">
+                      {' '}
+                      · {submission.requirements?.title || 'Requirement'}
+                    </span>
+                  </div>
+                  <span className="font-mono tabular-nums text-[12px] text-[var(--text-primary)]">
+                    Expected DOJ: {record.expectedDoj ? formatLocalDate(record.expectedDoj) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -966,6 +1129,7 @@ export const ClientRequirementDetailPage: React.FC = () => {
 // 4. Client Candidates for Review Page
 export const ClientCandidatesReviewPage: React.FC = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [stageFilter, setStageFilter] = useState<SubmissionStage | ''>('');
@@ -987,8 +1151,15 @@ export const ClientCandidatesReviewPage: React.FC = () => {
   const [evidenceCandId, setEvidenceCandId] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['client_submissions', page, stageFilter],
-    queryFn: () => fetchSubmissions({ page, stage: stageFilter }),
+    queryKey: ['client_submissions', profile?.org_id, page, stageFilter],
+    queryFn: () =>
+      fetchSubmissions({
+        page,
+        stage: stageFilter,
+        clientOrgId: profile?.org_id || null,
+        enforceClientGate: true,
+      }),
+    enabled: Boolean(profile?.org_id),
   });
 
   const { data: matchEvidenceData } = useQuery({
@@ -1006,7 +1177,17 @@ export const ClientCandidatesReviewPage: React.FC = () => {
     <div>
       <PageHeader
         title="Candidates for review"
-        description="Evaluate shortlisted candidates shared by HireNest HQ. Contact details are managed by HireNest."
+        description="Evaluate shortlisted candidates validated and shared by HireNest HQ. Manage formal offers in Offers and confirmed joinings in Onboarded."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate('/client/offers')}>
+              Offers Desk
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/client/onboarded')}>
+              Onboarded
+            </Button>
+          </div>
+        }
       />
 
       <div className="mb-4 max-w-xs">

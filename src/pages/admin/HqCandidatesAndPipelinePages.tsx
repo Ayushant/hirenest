@@ -19,9 +19,17 @@ import {
 } from '../../components/ui/kit';
 import {
   SourceBadge,
+  VendorAssociationBadge,
   StageBadge,
   ScoreBar,
 } from '../../components/domain/DomainBadges';
+import {
+  getOrBuildValidationRecord,
+  fetchAllValidationRecordsFromBackend,
+  DECISION_GATE_LABELS,
+  DECISION_GATE_TONES,
+  type RecruiterDecisionGate,
+} from '../../lib/recruiterValidation';
 import { MatchEvidencePanel } from '../../components/domain/MatchEvidence';
 import { CandidateFormModal } from '../../components/domain/CandidateFormModal';
 import { SubmissionDetailDrawer } from '../../components/domain/SubmissionDetailDrawer';
@@ -180,7 +188,7 @@ export const HqCandidatesListPage: React.FC = () => {
               { value: '', label: 'All sources' },
               { value: 'vendor', label: 'Vendor' },
               { value: 'direct', label: 'Direct' },
-              { value: 'internal', label: 'HireNest' },
+              { value: 'internal', label: 'Admin' },
             ]}
           />
         </div>
@@ -193,6 +201,7 @@ export const HqCandidatesListPage: React.FC = () => {
             }}
             options={[
               { value: '', label: 'All vendor owners' },
+              { value: '__admin__', label: 'Admin' },
               ...(vendorsData?.data || []).map((v) => ({ value: v.id, label: v.name })),
             ]}
           />
@@ -303,7 +312,10 @@ export const HqCandidatesListPage: React.FC = () => {
                         />
                       </td>
                       <td className="text-[var(--text-secondary)]">
-                        {c.owner_vendor?.name || 'None'}
+                        <VendorAssociationBadge
+                          vendorName={c.owner_vendor?.name || c.source_vendor?.name}
+                          source={c.original_source}
+                        />
                       </td>
                       <td className="font-mono text-[12px] text-[var(--text-secondary)]">
                         <div>{maskEmail(rawContacts?.email)}</div>
@@ -412,6 +424,8 @@ export const HqCandidateDetailPage: React.FC = () => {
     queryKey: ['candidate_matches', id, matchesPage],
     queryFn: () => fetchMatchesForCandidate({ candidateId: id!, page: matchesPage }),
     enabled: Boolean(id),
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: submissionsData } = useQuery({
@@ -882,7 +896,10 @@ export const HqCandidateDetailPage: React.FC = () => {
                             <SourceBadge source={s.source} vendorName={s.organizations?.name} />
                           </td>
                           <td className="text-[var(--text-secondary)]">
-                            {s.organizations?.name || 'Direct / HireNest'}
+                            <VendorAssociationBadge
+                              vendorName={s.organizations?.name}
+                              source={s.source}
+                            />
                           </td>
                           <td>
                             <StageBadge stage={s.stage} />
@@ -941,9 +958,10 @@ export const HqCandidateDetailPage: React.FC = () => {
             </div>
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Vendor owner</span>
-              <span className="text-[var(--text-primary)] truncate">
-                {cand.owner_vendor?.name || 'None'}
-              </span>
+              <VendorAssociationBadge
+                vendorName={cand.owner_vendor?.name || cand.source_vendor?.name}
+                source={cand.original_source}
+              />
             </div>
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Experience</span>
@@ -1204,6 +1222,7 @@ export const HqSubmissionsPage: React.FC = () => {
   );
   const [source, setSource] = useState<CandidateSource | ''>('');
   const [validFilter, setValidFilter] = useState('');
+  const [decisionGateFilter, setDecisionGateFilter] = useState<RecruiterDecisionGate | ''>('');
   const [drawerSubId, setDrawerSubId] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -1220,13 +1239,30 @@ export const HqSubmissionsPage: React.FC = () => {
               ? false
               : undefined,
       }),
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
   });
+
+  useQuery({
+    queryKey: ['submission_validations_all'],
+    queryFn: fetchAllValidationRecordsFromBackend,
+    refetchInterval: 10000,
+  });
+
+  const rows = (data?.data || []).map((sub) => {
+    const validation = getOrBuildValidationRecord(sub, null);
+    return { sub, validation };
+  });
+
+  const filteredRows = decisionGateFilter
+    ? rows.filter((r) => r.validation.decision_gate === decisionGateFilter)
+    : rows;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Submissions"
-        description="All candidate applications and vendor submissions across requirements."
+        title="Submissions & Recruiter Validation"
+        description="Evidence-based recruiter validation, AI JD-to-resume gap analysis, short validation interview scoring, source-specific follow-up, and client submission governance."
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -1238,7 +1274,7 @@ export const HqSubmissionsPage: React.FC = () => {
               setPage(1);
             }}
             options={[
-              { value: '', label: 'All stages' },
+              { value: '', label: 'All pipeline stages' },
               { value: 'applied', label: 'Applied' },
               { value: 'recruiter_review', label: 'Recruiter review' },
               { value: 'client_review', label: 'Client review' },
@@ -1249,6 +1285,26 @@ export const HqSubmissionsPage: React.FC = () => {
               { value: 'onboarded', label: 'Onboarded' },
               { value: 'rejected', label: 'Rejected' },
               { value: 'withdrawn', label: 'Withdrawn' },
+            ]}
+          />
+        </div>
+        <div className="w-56">
+          <Select
+            value={decisionGateFilter}
+            onChange={(e) => {
+              setDecisionGateFilter(e.target.value as RecruiterDecisionGate | '');
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All validation gates' },
+              { value: 'matched', label: 'Matched' },
+              { value: 'recruiter_review', label: 'Recruiter Review' },
+              { value: 'validation_interview_scheduled', label: 'Validation Interview Scheduled' },
+              { value: 'interview_completed', label: 'Interview Completed' },
+              { value: 'approved_for_submission', label: 'Approved for Submission' },
+              { value: 'hold_for_clarification', label: 'Hold for Clarification' },
+              { value: 'submitted_to_client', label: 'Submitted to Client' },
+              { value: 'rejected', label: 'Rejected' },
             ]}
           />
         </div>
@@ -1263,7 +1319,7 @@ export const HqSubmissionsPage: React.FC = () => {
               { value: '', label: 'All sources' },
               { value: 'vendor', label: 'Vendor' },
               { value: 'direct', label: 'Direct' },
-              { value: 'internal', label: 'HireNest' },
+              { value: 'internal', label: 'Admin' },
             ]}
           />
         </div>
@@ -1281,7 +1337,7 @@ export const HqSubmissionsPage: React.FC = () => {
             ]}
           />
         </div>
-        {(stage || source || validFilter) && (
+        {(stage || source || validFilter || decisionGateFilter) && (
           <Button
             size="sm"
             variant="ghost"
@@ -1289,6 +1345,7 @@ export const HqSubmissionsPage: React.FC = () => {
               setStage('');
               setSource('');
               setValidFilter('');
+              setDecisionGateFilter('');
               setPage(1);
             }}
           >
@@ -1298,10 +1355,10 @@ export const HqSubmissionsPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={6} cols={6} />
+        <TableSkeleton rows={6} cols={8} />
       ) : error ? (
         <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
-      ) : !data?.data.length ? (
+      ) : !filteredRows.length ? (
         <EmptyState
           title="No submissions match your filters"
           description="Submissions are created when a direct candidate applies or a vendor/recruiter submits a candidate."
@@ -1314,55 +1371,165 @@ export const HqSubmissionsPage: React.FC = () => {
                 <tr>
                   <th>Candidate</th>
                   <th>Requirement & client</th>
-                  <th>Source</th>
-                  <th>Stage</th>
-                  <th>Compliance</th>
+                  <th>Source & vendor</th>
+                  <th>JD match & gaps</th>
+                  <th>Validation gate & rating</th>
+                  <th>Follow-up</th>
+                  <th>Stage & compliance</th>
                   <th>Submitted</th>
                 </tr>
               </thead>
               <tbody>
-                {data.data.map((sub) => (
-                  <tr
-                    key={sub.id}
-                    onClick={() => setDrawerSubId(sub.id)}
-                    className="cursor-pointer"
-                  >
-                    <td className="font-medium">
-                      {sub.candidates?.full_name || sub.candidate_id}
-                    </td>
-                    <td>
-                      <div className="text-[var(--text-primary)]">
-                        {sub.requirements?.title || sub.requirement_id}
-                      </div>
-                      <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
-                        {sub.requirements?.organizations?.name || '—'}
-                      </div>
-                    </td>
-                    <td>
-                      <SourceBadge
-                        source={sub.source}
-                        vendorName={sub.organizations?.name}
-                      />
-                    </td>
-                    <td>
-                      <StageBadge stage={sub.stage} />
-                    </td>
-                    <td>
-                      {sub.is_valid ? (
-                        <Badge tone="emerald">Valid</Badge>
-                      ) : (
-                        <Badge tone="red">Invalid</Badge>
-                      )}
-                    </td>
-                    <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
-                      {formatLocalDateTime(sub.created_at)}
-                    </td>
-                  </tr>
-                ))}
+                {filteredRows.map(({ sub, validation }) => {
+                  const matchedCount = validation.skill_evidence.filter(
+                    (s) =>
+                      s.status === 'matched_in_resume' ||
+                      s.status === 'candidate_confirmed' ||
+                      s.status === 'recruiter_verified'
+                  ).length;
+                  const gapCount = validation.skill_evidence.filter(
+                    (s) => s.status === 'not_found_in_resume' || s.status === 'unclear'
+                  ).length;
+                  const ratings = validation.validation_interview?.ratings;
+                  const avgRating = ratings
+                    ? (
+                        (ratings.communication +
+                          ratings.technical_assessment +
+                          ratings.skill_gap_validation +
+                          ratings.overall_recommendation) /
+                        4
+                      ).toFixed(1)
+                    : null;
+                  const latestFollowUp = validation.follow_up_requests[0];
+
+                  return (
+                    <tr
+                      key={sub.id}
+                      onClick={() => setDrawerSubId(sub.id)}
+                      className="cursor-pointer"
+                    >
+                      <td>
+                        <div className="font-medium text-[var(--text-primary)]">
+                          {sub.candidates?.full_name || sub.candidate_id}
+                        </div>
+                        <div className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                          Resume {validation.resume_version_used}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="text-[var(--text-primary)] font-medium">
+                          {sub.requirements?.title || sub.requirement_id}
+                        </div>
+                        <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
+                          {sub.requirements?.organizations?.name || '—'}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex flex-col items-start gap-1">
+                          <SourceBadge
+                            source={sub.source}
+                            vendorName={sub.organizations?.name}
+                          />
+                          <div className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-1">
+                            <span>Vendor:</span>
+                            <VendorAssociationBadge
+                              vendorName={sub.organizations?.name}
+                              source={sub.source}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="space-y-1">
+                          <ScoreBar score={validation.jd_match_percentage} />
+                          <div className="text-[11px] font-mono text-[var(--text-secondary)]">
+                            {matchedCount} matched ·{' '}
+                            <span
+                              className={
+                                gapCount > 0
+                                  ? 'text-[var(--status-warning)] font-semibold'
+                                  : 'text-[var(--text-tertiary)]'
+                              }
+                            >
+                              {gapCount} gap/unclear
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge tone={DECISION_GATE_TONES[validation.decision_gate]}>
+                            {DECISION_GATE_LABELS[validation.decision_gate]}
+                          </Badge>
+                          {avgRating ? (
+                            <span className="text-[11px] font-mono text-[var(--text-secondary)]">
+                              Recruiter rating: <strong>{avgRating}/5.0</strong>
+                            </span>
+                          ) : validation.validation_interview ? (
+                            <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                              Interview {validation.validation_interview.status}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-[var(--text-tertiary)]">
+                              Not interviewed yet
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        {latestFollowUp ? (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <Badge
+                              tone={
+                                latestFollowUp.status === 'verified'
+                                  ? 'emerald'
+                                  : latestFollowUp.status === 'responded'
+                                    ? 'sky'
+                                    : 'amber'
+                              }
+                            >
+                              {latestFollowUp.target === 'vendor' ? 'Vendor' : 'Candidate'} ·{' '}
+                              {latestFollowUp.status}
+                            </Badge>
+                            <span className="text-[11px] text-[var(--text-tertiary)] font-mono">
+                              {latestFollowUp.missing_skills.length} skill(s)
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-[var(--text-tertiary)]">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="flex flex-col items-start gap-1">
+                          <StageBadge stage={sub.stage} />
+                          {sub.is_valid ? (
+                            <Badge tone="emerald">Valid</Badge>
+                          ) : (
+                            <Badge tone="red">Invalid</Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                        <div>{formatLocalDateTime(sub.created_at)}</div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDrawerSubId(sub.id);
+                          }}
+                        >
+                          Validate
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
+          <Pagination page={page} totalCount={data?.count || 0} onPageChange={setPage} />
         </div>
       )}
 

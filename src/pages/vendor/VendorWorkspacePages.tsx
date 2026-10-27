@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -28,6 +28,12 @@ import { VendorPerformancePanel } from '../../components/domain/VendorScoreCard'
 import { CandidateFormModal } from '../../components/domain/CandidateFormModal';
 import { SubmissionDetailDrawer } from '../../components/domain/SubmissionDetailDrawer';
 import { DuplicateDialog } from '../../components/domain/DuplicateDialog';
+import {
+  getOrBuildValidationRecord,
+  fetchAllValidationRecordsFromBackend,
+  DECISION_GATE_LABELS,
+  DECISION_GATE_TONES,
+} from '../../lib/recruiterValidation';
 import {
   RequirementsPipelineGrid,
   PipelineQuickFilterBar,
@@ -73,6 +79,10 @@ import {
   maskEmail,
   maskPhone,
 } from '../../lib/format';
+import {
+  computeOfferOnboardingMetrics,
+  fetchAllOfferOnboardingRecordsApi,
+} from '../../lib/offerOnboarding';
 import { useToast } from '../../components/ui/Toast';
 import type {
   CandidateContacts,
@@ -90,6 +100,8 @@ export const VendorDashboardPage: React.FC = () => {
   const { data: reqsData } = useQuery({
     queryKey: ['vendor_requirements', 1, ''],
     queryFn: () => fetchRequirements({ page: 1, pageSize: 100, forVendor: true }),
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: shares = [] } = useQuery({
@@ -98,8 +110,18 @@ export const VendorDashboardPage: React.FC = () => {
   });
 
   const { data: subsData } = useQuery({
-    queryKey: ['vendor_submissions_dash', profile?.org_id],
-    queryFn: () => fetchSubmissions({ vendorOrgId: profile?.org_id || undefined, page: 1 }),
+    queryKey: ['vendor-dashboard-subs', profile?.org_id],
+    queryFn: () =>
+      fetchSubmissions({
+        vendorOrgId: profile?.org_id || undefined,
+        page: 1,
+        pageSize: 200,
+      }),
+  });
+
+  const { data: offerRecordsMap } = useQuery({
+    queryKey: ['offers-onboarding-workspace', 'vendor_dashboard', profile?.org_id],
+    queryFn: fetchAllOfferOnboardingRecordsApi,
   });
 
   const { data: interviewsData } = useQuery({
@@ -112,6 +134,11 @@ export const VendorDashboardPage: React.FC = () => {
     queryFn: () => getVendorPerformanceRpc(profile!.org_id!),
     enabled: Boolean(profile?.org_id),
   });
+
+  const offerMetrics = useMemo(
+    () => computeOfferOnboardingMetrics(subsData?.data || [], offerRecordsMap),
+    [subsData?.data, offerRecordsMap]
+  );
 
   const allRequirements = reqsData?.data || [];
   const activeShares = shares.filter((s) => !s.revoked_at);
@@ -221,6 +248,60 @@ export const VendorDashboardPage: React.FC = () => {
         ]}
       />
 
+      {/* Vendor Offer & Onboarding Tracking Strip */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Candidate Offers &amp; Joining Tracker
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate('/vendor/offers')}>
+              Offers ({offerMetrics.offersIssued})
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => navigate('/vendor/onboarded')}>
+              Onboarded ({offerMetrics.onboardedCandidates})
+            </Button>
+          </div>
+        </div>
+        <MetricStrip
+          items={[
+            {
+              label: 'Candidates shared',
+              value: offerMetrics.candidatesShared,
+              onClick: () => navigate('/vendor/submissions'),
+            },
+            {
+              label: 'Offers issued',
+              value: offerMetrics.offersIssued,
+              onClick: () => navigate('/vendor/offers'),
+            },
+            {
+              label: 'Offers accepted',
+              value: offerMetrics.offersAccepted,
+              tone: offerMetrics.offersAccepted > 0 ? 'success' : 'default',
+              onClick: () => navigate('/vendor/offers'),
+            },
+            {
+              label: 'Pending offers',
+              value: offerMetrics.pendingOffers,
+              tone: offerMetrics.pendingOffers > 0 ? 'warning' : 'default',
+              onClick: () => navigate('/vendor/offers'),
+            },
+            {
+              label: 'Confirmed onboarded',
+              value: offerMetrics.onboardedCandidates,
+              tone: offerMetrics.onboardedCandidates > 0 ? 'success' : 'default',
+              onClick: () => navigate('/vendor/onboarded'),
+            },
+            {
+              label: 'Upcoming joinings',
+              value: offerMetrics.upcomingJoiningsCount,
+              onClick: () => navigate('/vendor/onboarded'),
+            },
+          ]}
+        />
+      </div>
+
       {/* Active Requirements Pipeline on Vendor Overview Dashboard */}
       {allRequirements.length > 0 && (
         <RequirementsPipelineGrid
@@ -257,6 +338,8 @@ export const VendorRequirementsPage: React.FC = () => {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['vendor_requirements', page, search],
     queryFn: () => fetchRequirements({ page, pageSize: 100, search, forVendor: true }),
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: shares = [] } = useQuery({
@@ -1008,6 +1091,8 @@ export const VendorCandidateDetailPage: React.FC = () => {
     queryKey: ['vendor_candidate_matches', id, matchesPage],
     queryFn: () => fetchMatchesForCandidate({ candidateId: id!, page: matchesPage }),
     enabled: Boolean(id),
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: submissionsData } = useQuery({
@@ -1578,13 +1663,21 @@ export const VendorSubmissionsPage: React.FC = () => {
         stage,
       }),
     enabled: Boolean(profile?.org_id),
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
+  });
+
+  useQuery({
+    queryKey: ['submission_validations_vendor'],
+    queryFn: fetchAllValidationRecordsFromBackend,
+    refetchInterval: 10000,
   });
 
   return (
     <div>
       <PageHeader
         title="Submissions"
-        description="Track pipeline stages, scheduled interviews, and withdraw submissions with a reason."
+        description="Track pipeline stages, recruiter validation status, skill-gap clarification requests, scheduled interviews, and withdraw submissions with a reason."
       />
 
       <div className="mb-4 max-w-xs">
@@ -1609,7 +1702,7 @@ export const VendorSubmissionsPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={5} cols={5} />
+        <TableSkeleton rows={5} cols={6} />
       ) : error ? (
         <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
       ) : !data?.data.length ? (
@@ -1625,39 +1718,76 @@ export const VendorSubmissionsPage: React.FC = () => {
                 <tr>
                   <th>Candidate</th>
                   <th>Requirement</th>
+                  <th>Recruiter validation</th>
+                  <th>Follow-up / gap action</th>
                   <th>Stage</th>
                   <th>Compliance</th>
                   <th>Submitted</th>
                 </tr>
               </thead>
               <tbody>
-                {data.data.map((sub) => (
-                  <tr
-                    key={sub.id}
-                    onClick={() => setDrawerSubId(sub.id)}
-                    className="cursor-pointer"
-                  >
-                    <td className="font-medium text-[var(--text-primary)]">
-                      {sub.candidates?.full_name || sub.candidate_id}
-                    </td>
-                    <td className="text-[var(--text-secondary)]">
-                      {sub.requirements?.title || sub.requirement_id}
-                    </td>
-                    <td>
-                      <StageBadge stage={sub.stage} />
-                    </td>
-                    <td>
-                      {sub.is_valid ? (
-                        <Badge tone="success">Valid</Badge>
-                      ) : (
-                        <Badge tone="danger">Invalid: {sub.invalid_reason}</Badge>
-                      )}
-                    </td>
-                    <td className="font-mono tabular-nums text-[var(--text-secondary)]">
-                      {formatLocalDateTime(sub.created_at)}
-                    </td>
-                  </tr>
-                ))}
+                {data.data.map((sub) => {
+                  const validation = getOrBuildValidationRecord(sub, null);
+                  const latestFollowUp = validation.follow_up_requests[0];
+                  return (
+                    <tr
+                      key={sub.id}
+                      onClick={() => setDrawerSubId(sub.id)}
+                      className="cursor-pointer"
+                    >
+                      <td className="font-medium text-[var(--text-primary)]">
+                        <div>{sub.candidates?.full_name || sub.candidate_id}</div>
+                        <div className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                          JD Match {validation.jd_match_percentage}% · {validation.resume_version_used}
+                        </div>
+                      </td>
+                      <td className="text-[var(--text-secondary)]">
+                        {sub.requirements?.title || sub.requirement_id}
+                      </td>
+                      <td>
+                        <Badge tone={DECISION_GATE_TONES[validation.decision_gate]}>
+                          {DECISION_GATE_LABELS[validation.decision_gate]}
+                        </Badge>
+                      </td>
+                      <td>
+                        {latestFollowUp ? (
+                          <div className="flex items-center gap-1.5">
+                            <Badge
+                              tone={
+                                latestFollowUp.status === 'verified'
+                                  ? 'emerald'
+                                  : latestFollowUp.status === 'responded'
+                                    ? 'sky'
+                                    : 'amber'
+                              }
+                            >
+                              {latestFollowUp.status === 'requested'
+                                ? 'Clarification requested'
+                                : latestFollowUp.status === 'responded'
+                                  ? 'Response submitted'
+                                  : 'Verified'}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-[var(--text-tertiary)]">No pending requests</span>
+                        )}
+                      </td>
+                      <td>
+                        <StageBadge stage={sub.stage} />
+                      </td>
+                      <td>
+                        {sub.is_valid ? (
+                          <Badge tone="success">Valid</Badge>
+                        ) : (
+                          <Badge tone="danger">Invalid: {sub.invalid_reason}</Badge>
+                        )}
+                      </td>
+                      <td className="font-mono tabular-nums text-[var(--text-secondary)]">
+                        {formatLocalDateTime(sub.created_at)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

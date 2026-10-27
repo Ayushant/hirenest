@@ -819,6 +819,23 @@ export function evaluateRequirementAccess(params: {
   };
 }
 
+export function isRequirementVisibleToClientOrg(
+  req:
+    | (Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'> & {
+        id?: string;
+        deleted_at?: string | null;
+      })
+    | null
+    | undefined,
+  clientOrgId?: string | null
+): boolean {
+  if (!req || !clientOrgId) return false;
+  if (isRequirementSoftDeleted(req)) return false;
+  const meta = parseRequirementMeta(req);
+  if (!meta.isClientMapped || !meta.mappedClientOrgId) return false;
+  return meta.mappedClientOrgId === clientOrgId;
+}
+
 // ============================================================================
 // UPDATE 3: Trial Period, Expiry Alerts (15d, 10d, 5d, 1d) & Purchase Flow
 // ============================================================================

@@ -185,6 +185,8 @@ interface EnterpriseServerStore {
   deletionJobs: DeletionJobRecord[];
   privacyIncidents: PrivacyIncidentRecord[];
   privacyAuditEvents: PrivacyAuditEventRecord[];
+  submissionValidations: Record<string, Record<string, unknown>>;
+  offerOnboardingRecords: Record<string, Record<string, unknown>>;
 }
 
 const DATA_DIR = process.env.VERCEL
@@ -245,6 +247,8 @@ function loadEnterpriseStore(): EnterpriseServerStore {
           Array.isArray(parsed.privacyAuditEvents) && parsed.privacyAuditEvents.length > 0
             ? parsed.privacyAuditEvents
             : [...INITIAL_PRIVACY_AUDIT_EVENTS],
+        submissionValidations: parsed.submissionValidations || {},
+        offerOnboardingRecords: parsed.offerOnboardingRecords || {},
       };
     }
   } catch {
@@ -270,6 +274,8 @@ function loadEnterpriseStore(): EnterpriseServerStore {
     deletionJobs: [...INITIAL_DELETION_JOBS],
     privacyIncidents: [...INITIAL_PRIVACY_INCIDENTS],
     privacyAuditEvents: [...INITIAL_PRIVACY_AUDIT_EVENTS],
+    submissionValidations: {},
+    offerOnboardingRecords: {},
   };
 }
 
@@ -2897,6 +2903,233 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     saveEnterpriseStore(enterpriseStore);
 
     res.json({ ok: true, incident: created });
+  });
+
+  // ============================================================================
+  // Recruiter Validation & Submission Workflow Endpoints
+  // ============================================================================
+
+  app.get('/api/submissions/validation', (_req, res) => {
+    res.json({
+      ok: true,
+      records: enterpriseStore.submissionValidations || {},
+    });
+  });
+
+  app.get('/api/submissions/validation/:submissionId', (req, res) => {
+    const submissionId = String(req.params.submissionId || '').trim();
+    const record = enterpriseStore.submissionValidations?.[submissionId] || null;
+    res.json({
+      ok: true,
+      record,
+    });
+  });
+
+  app.post('/api/submissions/validation', async (req, res) => {
+    const {
+      record,
+      validation,
+      submissionId,
+      actor,
+      actorName = 'Recruiter',
+      actorRole = 'recruiter',
+      action = 'update_validation',
+    } = req.body || {};
+
+    const effectiveRecord = record || validation;
+    const subId = String(submissionId || effectiveRecord?.submissionId || '').trim();
+
+    if (!effectiveRecord || typeof effectiveRecord !== 'object' || !subId) {
+      res.status(400).json({ error: 'validation record with submissionId is required.' });
+      return;
+    }
+
+    enterpriseStore.submissionValidations[subId] = {
+      ...effectiveRecord,
+      submissionId: subId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const effectiveActorName = String(actor?.name || actorName || 'Recruiter');
+    const effectiveActorRole = String(actor?.role || actorRole || 'recruiter');
+    const effectiveAction = String(actor?.action || action || 'update_validation');
+
+    appendPrivacyAuditEvent({
+      actorRef: effectiveActorName,
+      actorRole: effectiveActorRole,
+      tenantId: 'hirenest_hq',
+      action:
+        effectiveAction === 'submit_to_client'
+          ? 'candidate_shared'
+          : 'resume_accessed',
+      resourceType: 'submission_packet',
+      resourceRef: subId,
+      purpose: `Recruiter validation workflow (${effectiveAction}) on submission ${subId.slice(0, 8)} — stage=${String(
+        effectiveRecord.validationStage || 'recruiter_review'
+      )}`,
+      outcome: 'allowed',
+    });
+
+    saveEnterpriseStore(enterpriseStore);
+    res.json({
+      ok: true,
+      record: enterpriseStore.submissionValidations[subId],
+      validation: enterpriseStore.submissionValidations[subId],
+    });
+  });
+
+  app.post('/api/submissions/validation-questions', async (req, res) => {
+    const {
+      missingSkills = [],
+      matchedSkills = [],
+      requirementTitle = 'Target Role',
+      candidateName = 'Candidate',
+    } = req.body || {};
+
+    const skillsList: string[] = Array.isArray(missingSkills) && missingSkills.length > 0
+      ? missingSkills.map(String)
+      : Array.isArray(matchedSkills)
+        ? matchedSkills.map(String)
+        : ['Core Architecture'];
+
+    const geminiKey = resolveServerGeminiApiKey();
+    if (geminiKey) {
+      try {
+        const ai = new GoogleGenAI({ apiKey: geminiKey });
+        const prompt = `Generate ${Math.min(5, Math.max(3, skillsList.length))} concise, high-signal 10-minute recruiter validation interview questions for candidate "${candidateName}" applying to "${requirementTitle}".
+Focus specifically on verifying hands-on production evidence for these missing or unclear skills: ${skillsList.join(', ')}.
+Return JSON array of objects with fields: targetSkill, question.`;
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  targetSkill: { type: Type.STRING },
+                  question: { type: Type.STRING },
+                },
+                required: ['targetSkill', 'question'],
+              },
+            },
+          },
+        });
+        const parsed = JSON.parse(response.text || '[]');
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          res.json({
+            ok: true,
+            source: 'gemini',
+            questions: parsed.map((q: { targetSkill?: string; question?: string }, idx: number) => ({
+              id: `vq_ai_${Date.now()}_${idx}`,
+              targetSkill: q.targetSkill || skillsList[idx] || 'Technical Fit',
+              question: q.question || `Describe your production experience with ${skillsList[idx] || 'this skill'}.`,
+              candidateAnswer: '',
+              recruiterNotes: '',
+              evidenceRecorded: '',
+              skillVerified: false,
+            })),
+          });
+          return;
+        }
+      } catch {
+        // Fallback to deterministic generator
+      }
+    }
+
+    res.json({
+      ok: true,
+      source: 'deterministic',
+      questions: skillsList.slice(0, 5).map((skill, idx) => ({
+        id: `vq_det_${Date.now()}_${idx}`,
+        targetSkill: skill,
+        question: `Your resume does not explicitly detail hands-on production depth with ${skill} for the ${requirementTitle} role. Can you walk through a specific project where you implemented ${skill}, your architectural decisions, and measurable results?`,
+        candidateAnswer: '',
+        recruiterNotes: '',
+        evidenceRecorded: '',
+        skillVerified: false,
+      })),
+    });
+  });
+
+  // ============================================================================
+  // Shared Offer Management & Onboarding Lifecycle Endpoints (Admin, Client, Vendor)
+  // ============================================================================
+
+  app.get('/api/offers-onboarding', (_req, res) => {
+    res.json({
+      ok: true,
+      records: enterpriseStore.offerOnboardingRecords || {},
+    });
+  });
+
+  app.get('/api/offers-onboarding/:submissionId', (req, res) => {
+    const submissionId = String(req.params.submissionId || '').trim();
+    const record = enterpriseStore.offerOnboardingRecords?.[submissionId] || null;
+    res.json({
+      ok: true,
+      record,
+    });
+  });
+
+  app.post('/api/offers-onboarding/update', async (req, res) => {
+    const { record, auditEvent, actor } = req.body || {};
+    const subId = String(record?.submissionId || '').trim();
+    if (!record || typeof record !== 'object' || !subId) {
+      res.status(400).json({ error: 'record with submissionId is required.' });
+      return;
+    }
+
+    const actorRole = String(actor?.role || 'client_manager');
+    const actorName = String(actor?.name || 'Authorised User');
+    const actorOrgId = actor?.orgId ? String(actor.orgId) : 'hirenest_hq';
+    const actionType = String(auditEvent?.action || 'update_offer_onboarding');
+
+    // Enforce server-side vendor protection: vendors can only submit vendor_report_update
+    if (
+      (actorRole === 'vendor_admin' || actorRole === 'vendor_recruiter') &&
+      actionType !== 'vendor_report_update'
+    ) {
+      res.status(403).json({
+        error:
+          'Blocked by Server RBAC Guard: Vendors can report candidate availability/acceptance/issues but cannot directly overwrite client-confirmed or Admin-verified offer/onboarding records.',
+      });
+      return;
+    }
+
+    if (!enterpriseStore.offerOnboardingRecords) {
+      enterpriseStore.offerOnboardingRecords = {};
+    }
+
+    enterpriseStore.offerOnboardingRecords[subId] = {
+      ...record,
+      submissionId: subId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    appendPrivacyAuditEvent({
+      actorRef: actorName,
+      actorRole,
+      tenantId: actorOrgId,
+      action: 'candidate_shared',
+      resourceType: 'submission_packet',
+      resourceRef: subId,
+      purpose: `Offer & Onboarding lifecycle update (${actionType}) on submission ${subId.slice(
+        0,
+        8
+      )} — lifecycleStage=${String(record.lifecycleStage || 'offer_issued')}, offerStatus=${String(
+        record.offerStatus || 'none'
+      )}, onboardingStatus=${String(record.onboardingStatus || 'not_started')}`,
+      outcome: 'completed',
+    });
+
+    saveEnterpriseStore(enterpriseStore);
+    res.json({
+      ok: true,
+      record: enterpriseStore.offerOnboardingRecords[subId],
+    });
   });
 
   app.get('/api/health', (_req, res) => {

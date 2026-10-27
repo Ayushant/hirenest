@@ -20,8 +20,10 @@ import {
 import { computeFileSha256, validateResumeFile } from '../../lib/hash';
 import { parseResumeFile } from '../../lib/resumeParser';
 import { recordPrivacyAcknowledgementApi } from '../../lib/dpdpPrivacy';
+import { getContractContactPolicy } from '../../lib/offerOnboarding';
 import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../ui/Toast';
+import type { EmploymentType } from '../../types/db';
 
 const candidateSchema = z.object({
   full_name: z.string().min(2, 'Full name is required'),
@@ -61,6 +63,7 @@ export const CandidateFormModal: React.FC<{
   defaultEmail?: string;
   defaultName?: string;
   defaultMode?: 'single' | 'bulk';
+  defaultEmploymentType?: EmploymentType;
 }> = ({
   open,
   onClose,
@@ -69,13 +72,17 @@ export const CandidateFormModal: React.FC<{
   defaultEmail = '',
   defaultName = '',
   defaultMode = 'single',
+  defaultEmploymentType = 'full_time',
 }) => {
   const { toast } = useToast();
   const [mode, setMode] = useState<'single' | 'bulk'>(defaultMode);
+  const [engagementType, setEngagementType] = useState<EmploymentType>(defaultEmploymentType);
+  const contactPolicy = getContractContactPolicy(engagementType);
 
   // Single candidate state
   const [skills, setSkills] = useState<string[]>([]);
   const [skillsError, setSkillsError] = useState<string | null>(null);
+  const [contactError, setContactError] = useState<string | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeHash, setResumeHash] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -115,11 +122,13 @@ export const CandidateFormModal: React.FC<{
   useEffect(() => {
     if (open) {
       setMode(isSelfOnboarding ? 'single' : defaultMode);
+      setEngagementType(defaultEmploymentType);
       setParsedSuccessBanner(null);
       setFileError(null);
       setSkillsError(null);
+      setContactError(null);
     }
-  }, [open, defaultMode, isSelfOnboarding]);
+  }, [open, defaultMode, isSelfOnboarding, defaultEmploymentType]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -160,11 +169,16 @@ export const CandidateFormModal: React.FC<{
       });
       setValue('summary', parsed.summary, { shouldValidate: true, shouldDirty: true });
 
-      if (parsed.email) {
-        setValue('email', parsed.email, { shouldValidate: true, shouldDirty: true });
-      }
-      if (parsed.phone) {
-        setValue('phone', parsed.phone, { shouldValidate: true, shouldDirty: true });
+      if (!contactPolicy.hideAndOmitContactFieldsByDefault) {
+        if (parsed.email) {
+          setValue('email', parsed.email, { shouldValidate: true, shouldDirty: true });
+        }
+        if (parsed.phone) {
+          setValue('phone', parsed.phone, { shouldValidate: true, shouldDirty: true });
+        }
+      } else {
+        setValue('email', '', { shouldValidate: false });
+        setValue('phone', '', { shouldValidate: false });
       }
       if (parsed.linkedin_url) {
         setValue('linkedin_url', parsed.linkedin_url, { shouldValidate: true, shouldDirty: true });
@@ -303,9 +317,10 @@ export const CandidateFormModal: React.FC<{
       );
 
       try {
+        const omitContact = contactPolicy.hideAndOmitContactFieldsByDefault;
         const dupCheck = await checkCandidateDuplicate({
-          p_email: item.email || null,
-          p_phone: item.phone || null,
+          p_email: omitContact ? null : item.email || null,
+          p_phone: omitContact ? null : item.phone || null,
           p_resume_hash: item.resumeHash || null,
         });
 
@@ -327,8 +342,8 @@ export const CandidateFormModal: React.FC<{
 
         const result = await createCandidateRpc({
           p_full_name: item.full_name.trim() || 'Candidate',
-          p_email: item.email.trim() || null,
-          p_phone: item.phone.trim() || null,
+          p_email: omitContact ? null : item.email.trim() || null,
+          p_phone: omitContact ? null : item.phone.trim() || null,
           p_linkedin_url: item.linkedin_url.trim() || null,
           p_current_title: item.current_title.trim() || 'Software Engineer',
           p_location: item.location.trim() || 'Hyderabad, India',
@@ -415,12 +430,26 @@ export const CandidateFormModal: React.FC<{
       return;
     }
     setSkillsError(null);
+
+    const omitContact = contactPolicy.hideAndOmitContactFieldsByDefault;
+    if (contactPolicy.requireCandidateEmailAndPhone && !omitContact) {
+      if (!values.email.trim() || !values.phone.trim()) {
+        setContactError(
+          'FTE Engagement Requirement: Candidate Email and Phone are required for direct Full-Time submissions.'
+        );
+        return;
+      }
+    }
+    setContactError(null);
     setSubmitting(true);
 
     try {
+      const effectiveEmail = omitContact ? null : values.email.trim() || null;
+      const effectivePhone = omitContact ? null : values.phone.trim() || null;
+
       const dupCheck = await checkCandidateDuplicate({
-        p_email: values.email || null,
-        p_phone: values.phone || null,
+        p_email: effectiveEmail,
+        p_phone: effectivePhone,
         p_resume_hash: resumeHash || null,
       });
 
@@ -433,8 +462,8 @@ export const CandidateFormModal: React.FC<{
 
       const result = await createCandidateRpc({
         p_full_name: values.full_name,
-        p_email: values.email || null,
-        p_phone: values.phone || null,
+        p_email: effectiveEmail,
+        p_phone: effectivePhone,
         p_linkedin_url: values.linkedin_url || null,
         p_current_title: values.current_title,
         p_location: values.location,
@@ -610,26 +639,85 @@ export const CandidateFormModal: React.FC<{
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Input
-                label="Email"
-                type="email"
-                placeholder="candidate@email.com"
-                {...register('email')}
-                error={errors.email?.message}
-              />
-              <Input
-                label="Phone"
-                placeholder="+91 9876543210"
-                {...register('phone')}
-                error={errors.phone?.message}
-              />
-              <Input
-                label="LinkedIn URL"
-                placeholder="https://linkedin.com/in/..."
-                {...register('linkedin_url')}
-              />
-            </div>
+            {/* Contract-Specific Contact Governance Selector (FTE vs C2C / C2H) */}
+            {!isSelfOnboarding && (
+              <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+                    Target Requirement Engagement Type (Contact Governance)
+                  </span>
+                  <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-0.5">
+                    {(
+                      [
+                        { id: 'full_time', label: 'FTE (Full-Time)' },
+                        { id: 'contract', label: 'C2C (Contract)' },
+                        { id: 'contract_to_hire', label: 'C2H (Contract-to-Hire)' },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setEngagementType(opt.id);
+                          setContactError(null);
+                          if (opt.id === 'contract' || opt.id === 'contract_to_hire') {
+                            setValue('email', '');
+                            setValue('phone', '');
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-[4px] text-[11px] font-medium transition-colors cursor-pointer ${
+                          engagementType === opt.id
+                            ? 'bg-[#1F4CC4] text-white'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[11px] leading-[16px] text-[var(--text-secondary)]">
+                  {contactPolicy.policyExplanation}
+                </p>
+              </div>
+            )}
+
+            {contactError && (
+              <div className="rounded-[6px] border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] text-[var(--status-danger)]">
+                {contactError}
+              </div>
+            )}
+
+            {contactPolicy.hideAndOmitContactFieldsByDefault && !isSelfOnboarding ? (
+              <div className="grid grid-cols-1 gap-3">
+                <Input
+                  label="LinkedIn URL (Direct candidate email & phone omitted per C2C/C2H policy)"
+                  placeholder="https://linkedin.com/in/..."
+                  {...register('linkedin_url')}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Input
+                  label="Email (Required for FTE)"
+                  type="email"
+                  placeholder="candidate@email.com"
+                  {...register('email')}
+                  error={errors.email?.message}
+                />
+                <Input
+                  label="Phone (Required for FTE)"
+                  placeholder="+91 9876543210"
+                  {...register('phone')}
+                  error={errors.phone?.message}
+                />
+                <Input
+                  label="LinkedIn URL"
+                  placeholder="https://linkedin.com/in/..."
+                  {...register('linkedin_url')}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
@@ -818,38 +906,57 @@ export const CandidateFormModal: React.FC<{
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <Input
-                          label="Email"
-                          placeholder="Optional email"
-                          value={item.email}
-                          onChange={(e) =>
-                            updateBulkItemField(item.id, 'email', e.target.value)
-                          }
-                        />
-                        <Input
-                          label="Phone"
-                          placeholder="Optional phone"
-                          value={item.phone}
-                          onChange={(e) =>
-                            updateBulkItemField(item.id, 'phone', e.target.value)
-                          }
-                        />
-                        <Input
-                          label="Skills (comma-separated)"
-                          value={item.skills.join(', ')}
-                          onChange={(e) =>
-                            updateBulkItemField(
-                              item.id,
-                              'skills',
-                              e.target.value
-                                .split(',')
-                                .map((s) => s.trim())
-                                .filter(Boolean)
-                            )
-                          }
-                        />
-                      </div>
+                      {contactPolicy.hideAndOmitContactFieldsByDefault ? (
+                        <div className="grid grid-cols-1 gap-2">
+                          <Input
+                            label="Skills (comma-separated) · Email & Phone omitted per C2C/C2H policy"
+                            value={item.skills.join(', ')}
+                            onChange={(e) =>
+                              updateBulkItemField(
+                                item.id,
+                                'skills',
+                                e.target.value
+                                  .split(',')
+                                  .map((s) => s.trim())
+                                  .filter(Boolean)
+                              )
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <Input
+                            label="Email"
+                            placeholder="Required for FTE"
+                            value={item.email}
+                            onChange={(e) =>
+                              updateBulkItemField(item.id, 'email', e.target.value)
+                            }
+                          />
+                          <Input
+                            label="Phone"
+                            placeholder="Required for FTE"
+                            value={item.phone}
+                            onChange={(e) =>
+                              updateBulkItemField(item.id, 'phone', e.target.value)
+                            }
+                          />
+                          <Input
+                            label="Skills (comma-separated)"
+                            value={item.skills.join(', ')}
+                            onChange={(e) =>
+                              updateBulkItemField(
+                                item.id,
+                                'skills',
+                                e.target.value
+                                  .split(',')
+                                  .map((s) => s.trim())
+                                  .filter(Boolean)
+                              )
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

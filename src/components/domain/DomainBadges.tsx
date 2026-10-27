@@ -13,7 +13,7 @@ import type {
   SubmissionStage,
 } from '../../types/db';
 
-// SourceBadge: soft-tint chip ("Vendor · Acme Staffing" in storm-blue, "Direct" in sky, "HireNest" in rich-blue)
+// SourceBadge: soft-tint chip ("Vendor · Acme Staffing" in storm-blue, "Direct" in sky, "Admin" in rich-blue)
 export const SourceBadge: React.FC<{
   source: CandidateSource;
   vendorName?: string | null;
@@ -28,7 +28,22 @@ export const SourceBadge: React.FC<{
   if (source === 'direct') {
     return <Badge tone="sky">Direct</Badge>;
   }
-  return <Badge tone="rich_blue">HireNest</Badge>;
+  return <Badge tone="rich_blue">Admin</Badge>;
+};
+
+export const VendorAssociationBadge: React.FC<{
+  vendorName?: string | null;
+  originalSource?: CandidateSource | null;
+  source?: CandidateSource | null;
+}> = ({ vendorName, originalSource, source }) => {
+  const effectiveSource = originalSource ?? source;
+  if (vendorName) {
+    return <Badge tone="storm_blue">{vendorName}</Badge>;
+  }
+  if (effectiveSource === 'direct') {
+    return <Badge tone="sky">Direct</Badge>;
+  }
+  return <Badge tone="rich_blue">Admin</Badge>;
 };
 
 // StageBadge: soft-tint chip + 6px dot

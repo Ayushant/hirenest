@@ -34,7 +34,7 @@ const inFlightClientCreateLocks = new Map<
   Promise<Requirement & { wasDuplicatePrevented?: boolean }>
 >();
 
-async function hydrateDeletedRequirementsFromBackend(): Promise<void> {
+export async function hydrateDeletedRequirementsFromBackend(): Promise<void> {
   try {
     const res = await fetch('/api/requirements/governance-state');
     if (!res.ok) return;
@@ -403,13 +403,21 @@ export async function fetchRequirements(params: {
     const backendCatalog = await fetchVendorCatalogFromBackend();
     const byId = new Map<string, Requirement>();
     for (const r of allRows) {
-      if (!isRequirementSoftDeleted(r)) {
+      if (!isRequirementSoftDeleted(r) && r.status !== 'closed' && r.status !== 'filled') {
         byId.set(r.id, r);
       }
     }
     for (const r of backendCatalog.requirements) {
-      if (!byId.has(r.id) && !isRequirementSoftDeleted(r)) {
-        if (!params.search?.trim() || r.title.toLowerCase().includes(params.search.trim().toLowerCase())) {
+      if (
+        !byId.has(r.id) &&
+        !isRequirementSoftDeleted(r) &&
+        r.status !== 'closed' &&
+        r.status !== 'filled'
+      ) {
+        if (
+          !params.search?.trim() ||
+          r.title.toLowerCase().includes(params.search.trim().toLowerCase())
+        ) {
           byId.set(r.id, r);
         }
       }
@@ -419,8 +427,11 @@ export async function fetchRequirements(params: {
     );
   }
 
-  const filtered = allRows.filter((req) => {
+  let filtered = allRows.filter((req) => {
     if (!params.includeDeleted && isRequirementSoftDeleted(req)) {
+      return false;
+    }
+    if (!params.includeDeleted && !params.status && req.status === 'closed') {
       return false;
     }
     const meta = parseRequirementMeta(req);
@@ -432,6 +443,36 @@ export async function fetchRequirements(params: {
     if (params.mappingFilter === 'unmapped' && meta.isClientMapped) return false;
     return true;
   });
+
+  // Deduplicate active requirements by canonical duplicate group key so merged/duplicate rows never inflate Vendor or Candidate views
+  if (!params.includeDeleted) {
+    const byGroup = new Map<string, Requirement>();
+    const sortedForCanonical = [...filtered].sort((a, b) => {
+      if (a.status === 'open' && b.status !== 'open') return -1;
+      if (b.status === 'open' && a.status !== 'open') return 1;
+      const aSkills = Array.isArray(a.skills) ? a.skills.length : 0;
+      const bSkills = Array.isArray(b.skills) ? b.skills.length : 0;
+      if (bSkills !== aSkills) return bSkills - aSkills;
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
+    for (const req of sortedForCanonical) {
+      const meta = parseRequirementMeta(req);
+      const groupKey = computeRequirementDuplicateGroupKey({
+        title: req.title,
+        client_org_id: req.client_org_id,
+        mappedClientOrgId: meta.mappedClientOrgId,
+        isClientMapped: meta.isClientMapped,
+        location: req.location,
+        work_mode: req.work_mode,
+      });
+      if (!byGroup.has(groupKey)) {
+        byGroup.set(groupKey, req);
+      }
+    }
+    filtered = Array.from(byGroup.values()).sort((a, b) =>
+      (b.created_at || '').localeCompare(a.created_at || '')
+    );
+  }
 
   const from = (page - 1) * pageSize;
   const paged = filtered.slice(from, from + pageSize);
@@ -674,8 +715,9 @@ export async function createRequirement(
       // Proceed to insert if query fails
     }
 
-    // 4. Insert the new canonical requirement
-    let { data, error } = await supabase
+    // 4. Insert the new canonical requirement using clean ISO currency code for DB check constraints
+    const safeDbCurrency = (inputMeta.baseCurrency || 'INR').split('|')[0].trim() || 'INR';
+    const { data, error } = await supabase
       .from('requirements')
       .insert({
         client_org_id: input.client_org_id,
@@ -689,36 +731,11 @@ export async function createRequirement(
         employment_type: input.employment_type,
         openings: input.openings,
         vendor_visible_budget: input.vendor_visible_budget,
-        currency: input.currency,
+        currency: safeDbCurrency,
         submission_sla_hours: input.submission_sla_hours,
       })
       .select('*, organizations:client_org_id(id, name)')
       .single();
-
-    // Fallback if database currency column has a length/check constraint restricting pipe metadata
-    if (error && input.currency.includes('|')) {
-      const retry = await supabase
-        .from('requirements')
-        .insert({
-          client_org_id: input.client_org_id,
-          title: input.title,
-          description: input.description,
-          skills: input.skills,
-          min_experience: input.min_experience,
-          max_experience: input.max_experience,
-          location: input.location,
-          work_mode: input.work_mode,
-          employment_type: input.employment_type,
-          openings: input.openings,
-          vendor_visible_budget: input.vendor_visible_budget,
-          currency: inputMeta.baseCurrency || 'INR',
-          submission_sla_hours: input.submission_sla_hours,
-        })
-        .select('*, organizations:client_org_id(id, name)')
-        .single();
-      data = retry.data;
-      error = retry.error;
-    }
 
     if (error) throw error;
     const created = { ...(data as Requirement), currency: input.currency };

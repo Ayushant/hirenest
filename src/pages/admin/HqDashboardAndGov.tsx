@@ -43,6 +43,10 @@ import {
   formatLocalDate,
   formatRequirementBudgetWithSubtitle,
 } from '../../lib/format';
+import {
+  computeOfferOnboardingMetrics,
+  fetchAllOfferOnboardingRecordsApi,
+} from '../../lib/offerOnboarding';
 import { useToast } from '../../components/ui/Toast';
 import type {
   AppRole,
@@ -72,6 +76,21 @@ export const HqDashboardPage: React.FC = () => {
     queryKey: ['requirements', 'dashboard_overview'],
     queryFn: () => fetchRequirements({ page: 1, pageSize: 20 }),
   });
+
+  const { data: allHqSubs } = useQuery({
+    queryKey: ['hq-dashboard-subs'],
+    queryFn: () => fetchSubmissions({ page: 1, pageSize: 250 }),
+  });
+
+  const { data: offerRecordsMap } = useQuery({
+    queryKey: ['offers-onboarding-workspace', 'hq_dashboard'],
+    queryFn: fetchAllOfferOnboardingRecordsApi,
+  });
+
+  const offerMetrics = computeOfferOnboardingMetrics(
+    allHqSubs?.data || [],
+    offerRecordsMap
+  );
 
   const handlePublishAllToVendors = async () => {
     setSyncingVendors(true);
@@ -232,6 +251,60 @@ export const HqDashboardPage: React.FC = () => {
           },
         ]}
       />
+
+      {/* 2B. Company-Wide Offer & Onboarding Lifecycle Metrics */}
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            Offer Management &amp; Onboarding Oversight
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate(`${prefix}/offers`)}>
+              Offers Desk ({offerMetrics.offersIssued})
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => navigate(`${prefix}/onboarded`)}>
+              Confirmed Onboarded ({offerMetrics.onboardedCandidates})
+            </Button>
+          </div>
+        </div>
+        <MetricStrip
+          items={[
+            {
+              label: 'Candidates shared',
+              value: offerMetrics.candidatesShared,
+              onClick: () => navigate(`${prefix}/submissions`),
+            },
+            {
+              label: 'Offers issued',
+              value: offerMetrics.offersIssued,
+              onClick: () => navigate(`${prefix}/offers`),
+            },
+            {
+              label: 'Offers accepted',
+              value: offerMetrics.offersAccepted,
+              tone: offerMetrics.offersAccepted > 0 ? 'success' : 'default',
+              onClick: () => navigate(`${prefix}/offers`),
+            },
+            {
+              label: 'Pending offers',
+              value: offerMetrics.pendingOffers,
+              tone: offerMetrics.pendingOffers > 0 ? 'warning' : 'default',
+              onClick: () => navigate(`${prefix}/offers`),
+            },
+            {
+              label: 'Confirmed onboarded',
+              value: offerMetrics.onboardedCandidates,
+              tone: offerMetrics.onboardedCandidates > 0 ? 'success' : 'default',
+              onClick: () => navigate(`${prefix}/onboarded`),
+            },
+            {
+              label: 'Upcoming joinings',
+              value: offerMetrics.upcomingJoiningsCount,
+              onClick: () => navigate(`${prefix}/onboarded`),
+            },
+          ]}
+        />
+      </section>
 
       {/* 3. Breakdown tables */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
