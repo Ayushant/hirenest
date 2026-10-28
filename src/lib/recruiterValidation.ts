@@ -1,6 +1,12 @@
 import type { Submission } from '../types/db';
 import type { BadgeTone } from '../components/ui/kit';
 import { computeFineTunedCandidateMatch } from './matchingEngine';
+import {
+  reviewSubmissionAssessmentRpc,
+  recordValidationInterviewRpc,
+  approveSubmissionRpc,
+  requestClarificationRpc,
+} from '../api/submissions';
 
 export type SkillEvidenceStatus =
   | 'matched'
@@ -739,7 +745,96 @@ export async function saveSubmissionValidationApi(
     // Saved in localStorage as immediate resilient store
   }
 
+  // Mirror the record into Supabase so the DB-enforced admin review gate
+  // (04_admin_review_gate.sql) reflects the UI state. Failures are logged
+  // but do not break the UI — the gate still blocks any invalid transition
+  // at the DB layer regardless.
+  await syncValidationToSupabase(normalized).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.warn('[recruiterValidation] Supabase sync failed:', err);
+  });
+
   return normalized;
+}
+
+async function syncValidationToSupabase(
+  record: SubmissionValidationRecord
+): Promise<void> {
+  const submissionId = record.submissionId;
+  const stage = record.validationStage;
+
+  // 1. Always mirror the recruiter's match-% / skill assessment.
+  const matchedSkills = (record.matchSummary?.skills || [])
+    .filter((s) => s.status === 'matched' || s.status === 'recruiter_verified')
+    .map((s) => s.skill);
+  const missingSkills = (record.matchSummary?.skills || [])
+    .filter((s) => s.status === 'not_found' || s.status === 'unclear')
+    .map((s) => s.skill);
+
+  await reviewSubmissionAssessmentRpc({
+    p_submission_id: submissionId,
+    p_patch: {
+      recruiter_match_pct: record.matchSummary?.jdMatchPercentage,
+      recruiter_matched_skills: matchedSkills,
+      recruiter_missing_skills: missingSkills,
+      recruiter_notes:
+        record.validationInterview?.ratings?.summaryNotes || record.overrideReason || null,
+    },
+    p_reason: 'Admin recruiter validation UI',
+  });
+
+  // 2. If the interview was marked completed, record it.
+  if (
+    record.validationInterview?.status === 'completed' &&
+    (stage === 'interview_completed' ||
+      stage === 'approved_for_submission' ||
+      stage === 'hold_for_clarification' ||
+      stage === 'rejected')
+  ) {
+    const ratings = record.validationInterview.ratings;
+    const recommendation: 'approve' | 'reject' | 'needs_clarification' =
+      stage === 'approved_for_submission'
+        ? 'approve'
+        : stage === 'rejected'
+          ? 'reject'
+          : 'needs_clarification';
+    await recordValidationInterviewRpc({
+      p_submission_id: submissionId,
+      p_scheduled_at: record.validationInterview.scheduledAt || new Date().toISOString(),
+      p_duration_minutes: record.validationInterview.durationMinutes || 15,
+      p_mode: 'video',
+      p_attendance: 'attended',
+      p_communication_score: ratings?.communicationRating ?? ratings?.communication ?? null,
+      p_technical_score: ratings?.technicalRating ?? ratings?.technical_assessment ?? null,
+      p_verified_skills: matchedSkills,
+      p_missing_skills: missingSkills,
+      p_notes: ratings?.summaryNotes || null,
+      p_recommendation: recommendation,
+    }).catch(() => {
+      // Idempotent-safe failure (already recorded, etc.) — do not break flow
+    });
+  }
+
+  // 3. Clarification follow-up for the vendor or candidate.
+  if (
+    stage === 'hold_for_clarification' &&
+    record.followUp?.status &&
+    record.followUp.status !== 'none' &&
+    record.followUp.status !== 'recalculated'
+  ) {
+    await requestClarificationRpc({
+      p_submission_id: submissionId,
+      p_missing_skills: record.followUp.targetSkills || [],
+      p_questions: record.followUp.recruiterInstructions || 'Clarification requested',
+    }).catch(() => {
+      // Already requested, no-op
+    });
+  }
+
+  // 4. Final approval — makes the DB gate open.
+  if (stage === 'approved_for_submission') {
+    await approveSubmissionRpc(submissionId);
+  }
 }
 
 export async function fetchAllValidationRecordsFromBackend(): Promise<
