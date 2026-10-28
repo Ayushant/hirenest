@@ -241,6 +241,13 @@ export interface CandidateMatch {
   requirements?: Requirement | null;
 }
 
+export type SubmissionValidationState =
+  | 'pending_assessment'
+  | 'pending_interview'
+  | 'pending_clarification'
+  | 'approved'
+  | 'rejected_by_recruiter';
+
 export interface Submission {
   id: string;
   requirement_id: string;
@@ -256,10 +263,70 @@ export interface Submission {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  validation_state: SubmissionValidationState;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
   candidates?: Candidate | null;
   requirements?: Requirement | null;
   organizations?: Pick<Organization, 'id' | 'name'> | null;
   submitter?: Pick<Profile, 'id' | 'full_name' | 'role'> | null;
+}
+
+export interface SubmissionAssessment {
+  id: string;
+  submission_id: string;
+  ai_match_pct: number | null;
+  ai_matched_skills: string[];
+  ai_missing_skills: string[];
+  ai_unverified_skills: string[];
+  ai_experience_gap_months: number | null;
+  ai_location_gap: string | null;
+  ai_work_mode_gap: string | null;
+  ai_evidence: Record<string, unknown>;
+  recruiter_match_pct: number | null;
+  recruiter_matched_skills: string[] | null;
+  recruiter_missing_skills: string[] | null;
+  recruiter_notes: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  model_name: string | null;
+  prompt_version: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ValidationInterview {
+  id: string;
+  submission_id: string;
+  interview_id: string;
+  attendance: 'attended' | 'no_show' | 'rescheduled';
+  communication_score: number | null;
+  technical_score: number | null;
+  verified_skills: string[];
+  missing_skills: string[];
+  notes: string | null;
+  recommendation: 'approve' | 'reject' | 'needs_clarification';
+  conducted_by: string;
+  conducted_at: string;
+}
+
+export interface SubmissionClarification {
+  id: string;
+  submission_id: string;
+  requested_by: string;
+  routed_to_vendor_org_id: string | null;
+  routed_to_candidate_id: string | null;
+  missing_skills: string[];
+  questions: string;
+  status: 'open' | 'responded' | 'resolved' | 'abandoned';
+  response: string | null;
+  updated_resume_url: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SubmissionStageHistory {

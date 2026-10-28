@@ -5,9 +5,12 @@ import type {
   ApplyToRequirementResult,
   CandidateSource,
   Submission,
+  SubmissionAssessment,
+  SubmissionClarification,
   SubmissionStage,
   SubmissionStageHistory,
   SubmitCandidateResult,
+  ValidationInterview,
 } from '../types/db';
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -172,3 +175,102 @@ export function transitionRequiresReason(targetStage: SubmissionStage): boolean 
   );
 }
 
+// ------------------------------------------------------------------
+// Admin-recruiter validation gate (04_admin_review_gate.sql)
+// ------------------------------------------------------------------
+
+export async function fetchSubmissionAssessment(
+  submissionId: string
+): Promise<SubmissionAssessment | null> {
+  const { data, error } = await supabase
+    .from('submission_assessments')
+    .select('*')
+    .eq('submission_id', submissionId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data || null) as SubmissionAssessment | null;
+}
+
+export async function fetchValidationInterview(
+  submissionId: string
+): Promise<ValidationInterview | null> {
+  const { data, error } = await supabase
+    .from('validation_interviews')
+    .select('*')
+    .eq('submission_id', submissionId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data || null) as ValidationInterview | null;
+}
+
+export async function fetchSubmissionClarifications(
+  submissionId: string
+): Promise<SubmissionClarification[]> {
+  const { data, error } = await supabase
+    .from('submission_clarifications')
+    .select('*')
+    .eq('submission_id', submissionId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as SubmissionClarification[];
+}
+
+export async function reviewSubmissionAssessmentRpc(params: {
+  p_submission_id: string;
+  p_patch: Record<string, unknown>;
+  p_reason?: string | null;
+}): Promise<void> {
+  const { error } = await supabase.rpc('review_submission_assessment', params);
+  if (error) throw error;
+}
+
+export async function recordValidationInterviewRpc(params: {
+  p_submission_id: string;
+  p_scheduled_at: string;
+  p_duration_minutes: number;
+  p_mode: string;
+  p_attendance: 'attended' | 'no_show' | 'rescheduled';
+  p_communication_score: number | null;
+  p_technical_score: number | null;
+  p_verified_skills: string[];
+  p_missing_skills: string[];
+  p_notes: string | null;
+  p_recommendation: 'approve' | 'reject' | 'needs_clarification';
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('record_validation_interview', params);
+  if (error) throw error;
+  return data as string;
+}
+
+export async function approveSubmissionRpc(submissionId: string): Promise<void> {
+  const { error } = await supabase.rpc('approve_submission', {
+    p_submission_id: submissionId,
+  });
+  if (error) throw error;
+}
+
+export async function requestClarificationRpc(params: {
+  p_submission_id: string;
+  p_missing_skills: string[];
+  p_questions: string;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('request_clarification', params);
+  if (error) throw error;
+  return data as string;
+}
+
+export async function resolveClarificationRpc(params: {
+  p_clarification_id: string;
+  p_mark_resolved?: boolean;
+}): Promise<void> {
+  const { error } = await supabase.rpc('resolve_clarification', params);
+  if (error) throw error;
+}
+
+export const VALIDATION_STATE_LABELS: Record<string, string> = {
+  pending_assessment: 'Pending Assessment Review',
+  pending_interview: 'Pending Validation Interview',
+  pending_clarification: 'Awaiting Clarification',
+  approved: 'Approved by Admin Recruiter',
+  rejected_by_recruiter: 'Rejected by Admin Recruiter',
+};
