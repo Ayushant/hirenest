@@ -289,6 +289,7 @@ export const SignUpPage: React.FC = () => {
   const { toast } = useToast();
   const { refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [signUpError, setSignUpError] = useState<string | null>(null);
 
@@ -383,9 +384,14 @@ export const SignUpPage: React.FC = () => {
         tone: 'success',
       });
 
-      navigate(getHomeRouteForRole(prof?.role, prof?.status), {
-        replace: true,
-      });
+      const returnTo = searchParams.get('returnTo');
+      if (returnTo && returnTo.startsWith('/')) {
+        navigate(returnTo, { replace: true });
+      } else {
+        navigate(getHomeRouteForRole(prof?.role, prof?.status), {
+          replace: true,
+        });
+      }
     } catch (err) {
       const msg = mapSupabaseError(err);
       setSignUpError(msg);

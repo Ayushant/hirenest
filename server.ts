@@ -3151,13 +3151,73 @@ let cachedExpressApp: express.Express | null = null;
 export async function getServerApp(): Promise<express.Express> {
   if (!cachedExpressApp) {
     cachedExpressApp = await startServer();
+    registerPublicJobOgRoute(cachedExpressApp);
   }
   return cachedExpressApp;
+}
+
+// Build per-job HTML with OpenGraph meta tags injected. Used by both the
+// standalone dev server and the Vercel serverless function so crawlers get
+// per-page tags regardless of where the app is hosted.
+async function buildJobOgHtml(slug: string, baseHtml: string): Promise<string> {
+  try {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) return baseHtml;
+    const anon = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data } = await anon.rpc('get_public_requirement', { p_slug: slug });
+    const job = Array.isArray(data) ? data[0] : data;
+    if (!job) return baseHtml;
+    const esc = (s: string) =>
+      String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    const title = `${job.title} — ${job.client_org_name || 'HireNest'}`;
+    const desc = (job.description || '').slice(0, 200);
+    const url = `/jobs/${encodeURIComponent(slug)}`;
+    const ogBlock = `
+    <title>${esc(title)}</title>
+    <meta name="description" content="${esc(desc)}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="${esc(title)}" />
+    <meta property="og:description" content="${esc(desc)}" />
+    <meta property="og:url" content="${esc(url)}" />
+    <meta property="og:site_name" content="HireNest" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${esc(title)}" />
+    <meta name="twitter:description" content="${esc(desc)}" />`;
+    return baseHtml.replace(/<title>[\s\S]*?<\/title>/i, ogBlock);
+  } catch {
+    return baseHtml;
+  }
+}
+
+function registerPublicJobOgRoute(app: express.Express): void {
+  app.get(/^\/jobs\/([^/]+)\/?$/, async (req, res, next) => {
+    try {
+      const slug = decodeURIComponent(req.params[0] || '');
+      // Prefer the built dist/index.html; fall back to source index.html for dev.
+      const distIndex = path.resolve(process.cwd(), 'dist', 'index.html');
+      const srcIndex = path.resolve(process.cwd(), 'index.html');
+      const indexPath = fs.existsSync(distIndex) ? distIndex : srcIndex;
+      if (!fs.existsSync(indexPath)) return next();
+      const raw = fs.readFileSync(indexPath, 'utf-8');
+      const withOg = await buildJobOgHtml(slug, raw);
+      res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).end(withOg);
+    } catch {
+      next();
+    }
+  });
 }
 
 async function bootStandaloneServer() {
   const app = await getServerApp();
 
+  // Note: the /jobs/:slug OG route is already registered by getServerApp().
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

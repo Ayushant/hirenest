@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { RequireRole } from './auth/RequireRole';
 import { ToastProvider } from './components/ui/Toast';
 import { AppShell } from './layouts/AppShell';
+import { PublicJobPage } from './pages/public/PublicJobPage';
 
 import {
   SetupGuideScreen,
@@ -129,6 +130,9 @@ function AppRoutes() {
       <Route path="/reset-password" element={<UpdatePasswordPage />} />
       <Route path="/pending" element={<PendingApprovalPage />} />
       <Route path="/suspended" element={<SuspendedAccessPage />} />
+
+      {/* Public shareable job pages (no auth required) */}
+      <Route path="/jobs/:slug" element={<PublicJobPage />} />
 
       {/* Admin Workspace (/admin/*) */}
       <Route

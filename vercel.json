@@ -6,6 +6,10 @@
       "destination": "/api/index"
     },
     {
+      "source": "/jobs/(.*)",
+      "destination": "/api/index"
+    },
+    {
       "source": "/((?!api/|assets/|favicon\\.ico).*)",
       "destination": "/index.html"
     }
