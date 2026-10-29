@@ -258,7 +258,7 @@ export const SubmissionDetailDrawer: React.FC<{
     const nextWarnings =
       missingNow.length > 0
         ? [
-            `${missingNow.length} JD skill(s) (${missingNow.slice(0, 4).join(', ')}) remain unverified — use validation interview or source follow-up.`,
+            `${missingNow.length} JD skill(s) (${missingNow.slice(0, 4).join(', ')}) remain unverified - use validation interview or source follow-up.`,
           ]
         : ['All JD skills verified or confirmed with evidence.'];
 
@@ -564,10 +564,10 @@ export const SubmissionDetailDrawer: React.FC<{
       valRecord.matchSummary.jdMatchPercentage
     }% (${valRecord.matchSummary.resumeVersion}). Verified skills: ${
       verifiedSkillsList.join(', ') || 'Core stack'
-    }. Recruiter ratings: Comm ${r.communicationRating || '—'}/5, Tech ${
-      r.technicalRating || '—'
-    }/5, Skill-Gap ${r.skillGapValidationRating || '—'}/5, Overall ${
-      r.overallRecommendationRating || '—'
+    }. Recruiter ratings: Comm ${r.communicationRating || '-'}/5, Tech ${
+      r.technicalRating || '-'
+    }/5, Skill-Gap ${r.skillGapValidationRating || '-'}/5, Overall ${
+      r.overallRecommendationRating || '-'
     }/5.`;
 
     const next: SubmissionValidationRecord = {
@@ -1814,7 +1814,7 @@ export const SubmissionDetailDrawer: React.FC<{
                       <div className="flex flex-wrap gap-1">
                         {valRecord.followUp.targetSkills.length === 0 ? (
                           <span className="text-[12px] text-[var(--text-tertiary)]">
-                            All skills matched — general availability check
+                            All skills matched - general availability check
                           </span>
                         ) : (
                           valRecord.followUp.targetSkills.map((sk) => (
@@ -2260,7 +2260,7 @@ export const SubmissionDetailDrawer: React.FC<{
                           Offer Date &amp; Status
                         </span>
                         <strong className="font-mono text-[var(--text-primary)]">
-                          {offerRec.offerDate || '—'}
+                          {offerRec.offerDate || '-'}
                         </strong>
                         <div className="text-[11px] text-[var(--text-secondary)]">
                           {OFFER_STATUS_LABELS[offerRec.offerStatus]}
@@ -2271,7 +2271,7 @@ export const SubmissionDetailDrawer: React.FC<{
                           Response Date
                         </span>
                         <strong className="font-mono text-[var(--text-primary)]">
-                          {offerRec.offerResponseDate || '—'}
+                          {offerRec.offerResponseDate || '-'}
                         </strong>
                       </div>
                       <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-2">

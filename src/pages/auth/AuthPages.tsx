@@ -443,7 +443,7 @@ export const SignUpPage: React.FC = () => {
           {...register('signup_intent')}
           error={errors.signup_intent?.message}
           options={[
-            { value: 'candidate', label: 'Candidate (Direct applicant — instant access)' },
+            { value: 'candidate', label: 'Candidate (Direct applicant - instant access)' },
             { value: 'vendor', label: 'Vendor agency (requires HQ approval)' },
             { value: 'client', label: 'Hiring company / Client (requires HQ approval)' },
           ]}

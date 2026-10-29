@@ -360,10 +360,10 @@ export const OrganizationOnboardingPanel: React.FC<{
                       {new Date(d.uploaded_at).toLocaleDateString()}
                     </td>
                     <td className="text-[12px] text-[var(--text-secondary)]">
-                      {d.reviewed_at ? new Date(d.reviewed_at).toLocaleDateString() : '—'}
+                      {d.reviewed_at ? new Date(d.reviewed_at).toLocaleDateString() : '-'}
                     </td>
                     <td className="text-[12px] text-[var(--text-secondary)] max-w-xs truncate">
-                      {d.review_notes || '—'}
+                      {d.review_notes || '-'}
                     </td>
                     <td>
                       <div className="flex items-center gap-1 justify-end">

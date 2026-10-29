@@ -591,9 +591,9 @@ type AiFallbackReason =
   | 'provider_timeout';
 
 const OFFLINE_AI_LABEL =
-  'Offline template — AI provider unavailable; verify every value before use';
+  'Offline template - AI provider unavailable; verify every value before use';
 const OFFLINE_SCREENING_LABEL =
-  'Offline advisory template — AI provider unavailable; recruiter must evaluate manually';
+  'Offline advisory template - AI provider unavailable; recruiter must evaluate manually';
 
 function tagTemplateResponse(
   body: Record<string, unknown>,
@@ -2290,7 +2290,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
           tagProviderResponse(
             {
               label:
-                'AI suggestion: advisory screening evaluation — recruiter review required',
+                'AI suggestion: advisory screening evaluation - recruiter review required',
               evaluation: {
                 strengths: String(parsed.strengths || '').trim(),
                 gaps: String(parsed.gaps || '').trim(),
@@ -2347,7 +2347,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   });
 
   // ==========================================================================
-  // DPDP ACT, 2023 — PRIVACY & DATA GOVERNANCE MODULE APIs
+  // DPDP ACT, 2023 - PRIVACY & DATA GOVERNANCE MODULE APIs
   // ==========================================================================
 
   function appendPrivacyAuditEvent(
@@ -2816,7 +2816,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         reason: `Blocked by Server Sharing Guard: Data Principal (${candidateRef}) withdrew consent on ${latestAck.timestamp.slice(0, 10)}. Processing and client sharing are halted.`,
         maskedPayload: {
           candidateRef,
-          candidateName: '[REDACTED — CONSENT WITHDRAWN]',
+          candidateName: '[REDACTED - CONSENT WITHDRAWN]',
           email: maskEmail(candidateEmail),
           phone: maskPhone(candidatePhone),
           contactMasked: true,
@@ -2850,7 +2850,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         reason: `Blocked by Server ABAC Tenant Guard: Role "${actorRole}" in tenant "${callerTenantId}" is not authorised to access or export candidate records owned by "${targetTenantId}".`,
         maskedPayload: {
           candidateRef,
-          candidateName: '[REDACTED — CROSS-TENANT DENIAL]',
+          candidateName: '[REDACTED - CROSS-TENANT DENIAL]',
           email: maskEmail(candidateEmail),
           phone: maskPhone(candidatePhone),
           contactMasked: true,
@@ -3051,7 +3051,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
           : 'resume_accessed',
       resourceType: 'submission_packet',
       resourceRef: subId,
-      purpose: `Recruiter validation workflow (${effectiveAction}) on submission ${subId.slice(0, 8)} — stage=${String(
+      purpose: `Recruiter validation workflow (${effectiveAction}) on submission ${subId.slice(0, 8)} - stage=${String(
         effectiveRecord.validationStage || 'recruiter_review'
       )}`,
       outcome: 'allowed',
@@ -3206,7 +3206,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
       purpose: `Offer & Onboarding lifecycle update (${actionType}) on submission ${subId.slice(
         0,
         8
-      )} — lifecycleStage=${String(record.lifecycleStage || 'offer_issued')}, offerStatus=${String(
+      )} - lifecycleStage=${String(record.lifecycleStage || 'offer_issued')}, offerStatus=${String(
         record.offerStatus || 'none'
       )}, onboardingStatus=${String(record.onboardingStatus || 'not_started')}`,
       outcome: 'completed',
@@ -3245,7 +3245,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     });
   }
 
-  // Admin review queue — all pending documents across tenants.
+  // Admin review queue - all pending documents across tenants.
   app.get('/api/admin/onboarding/pending-documents', async (req, res) => {
     const auth = await authenticateStaffingCaller(req);
     if (!auth.ok || auth.role !== 'admin') {
@@ -3441,7 +3441,7 @@ async function buildJobOgHtml(slug: string, baseHtml: string): Promise<string> {
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-    const title = `${job.title} — ${job.client_org_name || 'HireNest'}`;
+    const title = `${job.title} - ${job.client_org_name || 'HireNest'}`;
     const desc = (job.description || '').slice(0, 200);
     const url = `/jobs/${encodeURIComponent(slug)}`;
     const ogBlock = `

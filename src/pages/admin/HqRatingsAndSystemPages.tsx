@@ -113,12 +113,12 @@ export const HqVendorPerformancePage: React.FC = () => {
                         {m?.timing?.avg_response_hours !== null &&
                         m?.timing?.avg_response_hours !== undefined
                           ? `${m.timing.avg_response_hours}h`
-                          : '—'}{' '}
+                          : '-'}{' '}
                         /{' '}
                         {m?.timing?.avg_turnaround_hours !== null &&
                         m?.timing?.avg_turnaround_hours !== undefined
                           ? `${m.timing.avg_turnaround_hours}h`
-                          : '—'}
+                          : '-'}
                       </td>
                       <td className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
                         {m?.timing?.sla_compliance_90d_pct !== null &&
@@ -137,7 +137,7 @@ export const HqVendorPerformancePage: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <ScoreBar score={m?.quality?.score} size="sm" />
                             <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
-                              ({m.quality.avg_rating_1_to_5 ?? '—'}/5)
+                              ({m.quality.avg_rating_1_to_5 ?? '-'}/5)
                             </span>
                           </div>
                         )}
@@ -414,7 +414,7 @@ export const AdminFeedbackModerationPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="max-w-md text-[var(--text-secondary)] truncate">
-                      {qf.comments || '—'}
+                      {qf.comments || '-'}
                     </td>
                     <td>
                       {qf.excluded_from_score ? (
@@ -1102,7 +1102,7 @@ export const AdminAuditLogsPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="font-mono text-[12px] text-[var(--text-tertiary)]">
-                      {log.record_id ? log.record_id.slice(0, 8) : '—'}
+                      {log.record_id ? log.record_id.slice(0, 8) : '-'}
                     </td>
                     <td className="font-mono text-[12px] text-[var(--text-secondary)]">
                       {log.actor_role || 'system'}{' '}

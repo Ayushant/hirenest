@@ -626,41 +626,41 @@ export const OffersWorkspaceView: React.FC<{
         items={[
           {
             label: 'Candidates shared',
-            value: metrics?.candidatesShared ?? '—',
+            value: metrics?.candidatesShared ?? '-',
             sublabel: 'Approved for client',
           },
           {
             label: 'Offers issued',
-            value: metrics?.offersIssued ?? '—',
+            value: metrics?.offersIssued ?? '-',
             sublabel: 'Formal offers',
           },
           {
             label: 'Offers accepted',
-            value: metrics?.offersAccepted ?? '—',
+            value: metrics?.offersAccepted ?? '-',
             sublabel: 'Accepted by candidate',
             tone: 'emerald',
           },
           {
             label: 'Offers declined',
-            value: metrics?.offersDeclined ?? '—',
+            value: metrics?.offersDeclined ?? '-',
             sublabel: 'Declined / withdrawn',
             tone: 'red',
           },
           {
             label: 'Pending offers',
-            value: metrics?.pendingOffers ?? '—',
+            value: metrics?.pendingOffers ?? '-',
             sublabel: 'Awaiting response',
             tone: 'amber',
           },
           {
             label: 'Onboarded',
-            value: metrics?.onboardedCandidates ?? '—',
+            value: metrics?.onboardedCandidates ?? '-',
             sublabel: 'Confirmed Actual DOJ',
             tone: 'emerald',
           },
           {
             label: 'Upcoming joinings',
-            value: metrics?.upcomingJoiningsCount ?? '—',
+            value: metrics?.upcomingJoiningsCount ?? '-',
             sublabel: 'Scheduled Expected DOJ',
           },
         ]}
@@ -922,7 +922,7 @@ export const OffersWorkspaceView: React.FC<{
                           {submission.candidates?.full_name || 'Candidate'}
                         </button>
                         <div className="text-[12px] text-[var(--text-secondary)]">
-                          {submission.candidates?.current_title || '—'}
+                          {submission.candidates?.current_title || '-'}
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           <Badge
@@ -963,7 +963,7 @@ export const OffersWorkspaceView: React.FC<{
                           )}
                           {isClient && (
                             <span>
-                              Location: {submission.requirements?.location || '—'}
+                              Location: {submission.requirements?.location || '-'}
                             </span>
                           )}
                         </div>
@@ -1011,7 +1011,7 @@ export const OffersWorkspaceView: React.FC<{
                       {/* Offer Date & CTC */}
                       <td className="px-3 py-3 font-mono tabular-nums text-[12px]">
                         <div className="text-[var(--text-primary)]">
-                          {record.offerDate ? formatLocalDate(record.offerDate) : '—'}
+                          {record.offerDate ? formatLocalDate(record.offerDate) : '-'}
                         </div>
                         {record.offeredCtc && (
                           <div className="text-[11px] text-[var(--text-secondary)]">
@@ -1035,7 +1035,7 @@ export const OffersWorkspaceView: React.FC<{
                             ? `Responded: ${formatLocalDate(record.offerResponseDate)}`
                             : record.offerStatus === 'issued'
                               ? 'Awaiting candidate response'
-                              : '—'}
+                              : '-'}
                         </div>
                       </td>
 
@@ -1301,7 +1301,7 @@ export const OffersWorkspaceView: React.FC<{
                 }}
                 options={eligibleForNewOfferRows.map((r) => ({
                   value: r.submission.id,
-                  label: `${r.submission.candidates?.full_name || 'Candidate'} — ${
+                  label: `${r.submission.candidates?.full_name || 'Candidate'} - ${
                     r.submission.requirements?.title || 'Requirement'
                   } (${r.submission.stage})`,
                 }))}
@@ -1386,7 +1386,7 @@ export const OffersWorkspaceView: React.FC<{
                             : activeActionModal.action === 'admin_verify_or_correct'
                               ? 'Admin Verification & Record Correction'
                               : 'Vendor Candidate Offer / Joining Report'
-              } — ${activeActionModal.row.submission.candidates?.full_name || 'Candidate'}`
+              } - ${activeActionModal.row.submission.candidates?.full_name || 'Candidate'}`
             : 'Update Offer & Onboarding'
         }
         description="All updates persist to the shared lifecycle record and append an immutable audit event with actor, role, and timestamp."
@@ -1578,7 +1578,7 @@ export const OffersWorkspaceView: React.FC<{
         onClose={() => setAuditHistoryRow(null)}
         title={
           auditHistoryRow
-            ? `Offer & Onboarding Audit Trail — ${
+            ? `Offer & Onboarding Audit Trail - ${
                 auditHistoryRow.submission.candidates?.full_name || 'Candidate'
               }`
             : 'Audit Trail'
@@ -1593,7 +1593,7 @@ export const OffersWorkspaceView: React.FC<{
                   Offer Date
                 </span>
                 <strong className="font-mono text-[var(--text-primary)]">
-                  {auditHistoryRow.record.offerDate || '—'}
+                  {auditHistoryRow.record.offerDate || '-'}
                 </strong>
               </div>
               <div>
@@ -1601,7 +1601,7 @@ export const OffersWorkspaceView: React.FC<{
                   Response Date
                 </span>
                 <strong className="font-mono text-[var(--text-primary)]">
-                  {auditHistoryRow.record.offerResponseDate || '—'}
+                  {auditHistoryRow.record.offerResponseDate || '-'}
                 </strong>
               </div>
               <div>
@@ -1609,7 +1609,7 @@ export const OffersWorkspaceView: React.FC<{
                   Expected DOJ
                 </span>
                 <strong className="font-mono text-[var(--text-primary)]">
-                  {auditHistoryRow.record.expectedDoj || '—'}
+                  {auditHistoryRow.record.expectedDoj || '-'}
                 </strong>
               </div>
               <div>

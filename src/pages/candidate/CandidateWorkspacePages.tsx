@@ -188,7 +188,7 @@ export const CandidateJobsForMePage: React.FC = () => {
                         )}
                       </div>
                       <p className="text-[13px] text-[var(--text-secondary)]">
-                        {job?.location || '—'} ({job?.work_mode || '—'}) ·{' '}
+                        {job?.location || '-'} ({job?.work_mode || '-'}) ·{' '}
                         <span className="font-mono tabular-nums">
                           {job?.min_experience ?? 0}–{job?.max_experience ?? 0} yrs
                         </span>
@@ -689,7 +689,7 @@ export const CandidateProfilePage: React.FC = () => {
       <div className="mb-5 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-[12px]">
         <div>
           <span className="font-semibold text-[var(--text-primary)]">
-            DPDP Act, 2023 — Personal Data Protection &amp; Rights:
+            DPDP Act, 2023 - Personal Data Protection &amp; Rights:
           </span>{' '}
           <span className="text-[var(--text-secondary)]">
             Your profile is governed by Notice HN-DPDP-NOTICE-2026-V2 (v2.4.0). Manage consent, preferences, or request data access/erasure anytime.

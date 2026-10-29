@@ -38,9 +38,9 @@ export interface AiSuggestionResponse {
 }
 
 export const OFFLINE_AI_LABEL =
-  'Offline template — AI provider unavailable; verify every value before use';
+  'Offline template - AI provider unavailable; verify every value before use';
 export const OFFLINE_SCREENING_LABEL =
-  'Offline advisory template — AI provider unavailable; recruiter must evaluate manually';
+  'Offline advisory template - AI provider unavailable; recruiter must evaluate manually';
 
 type AiFeatureType =
   | 'suggest_skills'
@@ -261,7 +261,7 @@ export interface AiProvenance {
 }
 
 function readProvenance(res: AiSuggestionResponse): AiProvenance {
-  // Default to template/offline when the server did not tag the response — safer than claiming live AI.
+  // Default to template/offline when the server did not tag the response - safer than claiming live AI.
   return {
     source: res.source || 'template',
     ai: res.ai === true,
@@ -335,7 +335,7 @@ export async function suggestInterviewQuestions(params: {
   };
 }
 
-// 4. Interview feedback form: "Tidy my notes" — rewrites only text the user typed
+// 4. Interview feedback form: "Tidy my notes" - rewrites only text the user typed
 export async function tidyInterviewNotes(
   draftNotes: string
 ): Promise<{ label: string; text: string } & AiProvenance> {

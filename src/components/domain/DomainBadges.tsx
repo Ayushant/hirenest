@@ -107,7 +107,7 @@ export const SlaBadge: React.FC<{
         <Badge tone="danger">Late</Badge>
       );
     } catch {
-      return <Badge tone="neutral">—</Badge>;
+      return <Badge tone="neutral">-</Badge>;
     }
   }
 

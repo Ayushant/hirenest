@@ -298,11 +298,11 @@ export const HqCandidatesListPage: React.FC = () => {
                           {c.full_name}
                         </div>
                         <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
-                          {c.current_title || '—'} ·{' '}
+                          {c.current_title || '-'} ·{' '}
                           <span className="font-mono tabular-nums">
-                            {c.total_experience_years ?? '—'}y
+                            {c.total_experience_years ?? '-'}y
                           </span>{' '}
-                          · {c.location || '—'}
+                          · {c.location || '-'}
                         </div>
                       </td>
                       <td>
@@ -616,7 +616,7 @@ export const HqCandidateDetailPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title={cand.full_name}
-        description={`${cand.current_title || 'Candidate'} · ${cand.location || '—'} · ${
+        description={`${cand.current_title || 'Candidate'} · ${cand.location || '-'} · ${
           cand.total_experience_years ?? 0
         } yrs experience`}
         actions={
@@ -742,7 +742,7 @@ export const HqCandidateDetailPage: React.FC = () => {
                                 {m.requirements?.title || m.requirement_id}
                               </Link>
                               <span className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-                                {m.requirements?.organizations?.name || '—'}
+                                {m.requirements?.organizations?.name || '-'}
                               </span>
                             </div>
 
@@ -971,18 +971,18 @@ export const HqCandidateDetailPage: React.FC = () => {
             </div>
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Location</span>
-              <span className="text-[var(--text-primary)]">{cand.location || '—'}</span>
+              <span className="text-[var(--text-primary)]">{cand.location || '-'}</span>
             </div>
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Email</span>
               <span className="font-mono text-[12px] text-[var(--text-primary)] truncate">
-                {contacts?.email || '—'}
+                {contacts?.email || '-'}
               </span>
             </div>
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Phone</span>
               <span className="font-mono text-[12px] text-[var(--text-primary)]">
-                {contacts?.phone || '—'}
+                {contacts?.phone || '-'}
               </span>
             </div>
             <div className="py-2 flex justify-between gap-2">
@@ -997,7 +997,7 @@ export const HqCandidateDetailPage: React.FC = () => {
                   Open <ExternalLink className="h-3 w-3" />
                 </a>
               ) : (
-                <span className="text-[var(--text-tertiary)]">—</span>
+                <span className="text-[var(--text-tertiary)]">-</span>
               )}
             </div>
             <div className="py-2 flex justify-between gap-2">
@@ -1009,7 +1009,7 @@ export const HqCandidateDetailPage: React.FC = () => {
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Resume SHA-256</span>
               <span className="font-mono text-[12px] text-[var(--text-tertiary)]">
-                {cand.resume_hash ? cand.resume_hash.slice(0, 10) + '…' : '—'}
+                {cand.resume_hash ? cand.resume_hash.slice(0, 10) + '…' : '-'}
               </span>
             </div>
           </div>
@@ -1421,7 +1421,7 @@ export const HqSubmissionsPage: React.FC = () => {
                           {sub.requirements?.title || sub.requirement_id}
                         </div>
                         <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
-                          {sub.requirements?.organizations?.name || '—'}
+                          {sub.requirements?.organizations?.name || '-'}
                         </div>
                       </td>
                       <td>
@@ -1496,7 +1496,7 @@ export const HqSubmissionsPage: React.FC = () => {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[12px] text-[var(--text-tertiary)]">—</span>
+                          <span className="text-[12px] text-[var(--text-tertiary)]">-</span>
                         )}
                       </td>
                       <td>
@@ -1909,7 +1909,7 @@ export const HqDuplicatesPage: React.FC = () => {
                       </Link>
                     </td>
                     <td>
-                      <div>{fl.attempted_name || '—'}</div>
+                      <div>{fl.attempted_name || '-'}</div>
                       <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                         {fl.organizations?.name || 'Direct / HQ'}
                       </div>

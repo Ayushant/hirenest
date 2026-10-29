@@ -191,7 +191,7 @@ export const CandidateFormModal: React.FC<{
 
       clearErrors();
       setParsedSuccessBanner(
-        `Resume parsed — auto-filled ${parsed.full_name} (${parsed.current_title}) and ${parsed.skills.length} skill(s).`
+        `Resume parsed - auto-filled ${parsed.full_name} (${parsed.current_title}) and ${parsed.skills.length} skill(s).`
       );
     } catch {
       setFileError('Could not parse resume automatically; please review fields.');

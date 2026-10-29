@@ -691,9 +691,9 @@ export const VendorRequirementDetailPage: React.FC = () => {
                             {m.candidates?.full_name || m.candidate_id}
                           </Link>
                           <span className="text-[13px] text-[var(--text-secondary)]">
-                            {m.candidates?.current_title || '—'} ·{' '}
+                            {m.candidates?.current_title || '-'} ·{' '}
                             <span className="font-mono tabular-nums">
-                              {m.candidates?.total_experience_years ?? '—'} yrs
+                              {m.candidates?.total_experience_years ?? '-'} yrs
                             </span>
                           </span>
                         </div>
@@ -1008,11 +1008,11 @@ export const VendorCandidatePoolPage: React.FC = () => {
                           {c.full_name}
                         </div>
                         <div className="text-[12px] text-[var(--text-secondary)]">
-                          {c.current_title || '—'} ·{' '}
+                          {c.current_title || '-'} ·{' '}
                           <span className="font-mono tabular-nums">
-                            {c.total_experience_years ?? '—'} yrs
+                            {c.total_experience_years ?? '-'} yrs
                           </span>{' '}
-                          · {c.location || '—'}
+                          · {c.location || '-'}
                         </div>
                       </td>
                       <td className="font-mono text-[12px] text-[var(--text-secondary)]">
@@ -1242,7 +1242,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
     <div className="max-w-[1200px]">
       <PageHeader
         title={cand.full_name}
-        description={`${cand.current_title || 'Candidate'} · ${cand.location || '—'} · ${
+        description={`${cand.current_title || 'Candidate'} · ${cand.location || '-'} · ${
           cand.total_experience_years ?? 0
         } yrs experience`}
         actions={
@@ -1319,7 +1319,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
                                 {m.requirements?.title || m.requirement_id}
                               </Link>
                               <span className="text-[13px] text-[var(--text-secondary)]">
-                                {m.requirements?.location || '—'} ({m.requirements?.work_mode || '—'})
+                                {m.requirements?.location || '-'} ({m.requirements?.work_mode || '-'})
                               </span>
                               {existingSub ? (
                                 <StageBadge stage={existingSub.stage} />
@@ -1490,25 +1490,25 @@ export const VendorCandidateDetailPage: React.FC = () => {
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">Email</dt>
               <dd className="font-mono text-[12px] text-[var(--text-primary)]">
-                {contacts?.email || '—'}
+                {contacts?.email || '-'}
               </dd>
             </div>
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">Phone</dt>
               <dd className="font-mono text-[12px] text-[var(--text-primary)]">
-                {contacts?.phone || '—'}
+                {contacts?.phone || '-'}
               </dd>
             </div>
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">LinkedIn</dt>
               <dd className="truncate max-w-[180px] text-[12px] text-[var(--text-secondary)]">
-                {contacts?.linkedin_url || '—'}
+                {contacts?.linkedin_url || '-'}
               </dd>
             </div>
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">Resume SHA-256</dt>
               <dd className="font-mono text-[12px] text-[var(--text-tertiary)]">
-                {cand.resume_hash ? cand.resume_hash.slice(0, 10) : '—'}
+                {cand.resume_hash ? cand.resume_hash.slice(0, 10) : '-'}
               </dd>
             </div>
           </dl>
@@ -2138,9 +2138,9 @@ export const VendorMatchIntelligencePage: React.FC = () => {
                           {m.candidates?.full_name || m.candidate_id}
                         </Link>
                         <span className="text-[12px] text-[var(--text-secondary)]">
-                          {m.candidates?.current_title || '—'} ·{' '}
+                          {m.candidates?.current_title || '-'} ·{' '}
                           <span className="font-mono tabular-nums">
-                            {m.candidates?.total_experience_years ?? '—'} yrs
+                            {m.candidates?.total_experience_years ?? '-'} yrs
                           </span>
                         </span>
                       </div>

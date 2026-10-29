@@ -117,7 +117,7 @@ export function parseHintsFromFileName(fileName: string): {
 
   // Split on hyphen / en-dash / pipe
   const dashParts = cleaned
-    .split(/\s*[-–—|]\s*/)
+    .split(/\s*[-–|]\s*/)
     .map((p) => p.trim())
     .filter(Boolean);
 
@@ -325,7 +325,7 @@ export function extractStructuredFieldsFromText(
 
   // 8. Summary
   const summary =
-    `${full_name} — ${current_title} with ${total_experience_years}+ years of experience in ${skills
+    `${full_name} - ${current_title} with ${total_experience_years}+ years of experience in ${skills
       .slice(0, 5)
       .join(', ')}.`;
 

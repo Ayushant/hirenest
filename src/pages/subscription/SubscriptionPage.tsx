@@ -242,7 +242,7 @@ export const SubscriptionPage: React.FC = () => {
           <div className="space-y-1 max-w-2xl">
             <div className="flex items-center gap-2 text-[14px] leading-[20px] font-semibold text-[var(--status-danger)]">
               <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>Trial expired — Workspace is in restricted read-only state</span>
+              <span>Trial expired - Workspace is in restricted read-only state</span>
             </div>
             <p className="text-[13px] leading-[20px] text-[var(--text-primary)]">
               {entitlements.restrictionReason} All existing requirements, candidates, and audit logs
@@ -305,7 +305,7 @@ export const SubscriptionPage: React.FC = () => {
               {isPaidActive
                 ? `Paid · ${subscription.billingCycle}`
                 : isExpired
-                  ? 'Expired — Read-only mode'
+                  ? 'Expired - Read-only mode'
                   : `Trialing · ${daysRemaining} days left`}
             </Badge>
             {!isPaidActive && (
@@ -336,7 +336,7 @@ export const SubscriptionPage: React.FC = () => {
             <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
               {subscription.paidActivatedAt
                 ? formatLocalDateTime(subscription.paidActivatedAt)
-                : '—'}
+                : '-'}
             </span>
           </div>
           <div>

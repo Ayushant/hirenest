@@ -861,7 +861,7 @@ export const ScreeningInterviewRunnerModal: React.FC<{
     try {
       const modalityNote =
         mode === 'ai_text'
-          ? 'MODALITY: ai_text (Structured Text Capture — Written communication evaluated; speech/voice prosody not claimed).'
+          ? 'MODALITY: ai_text (Structured Text Capture - Written communication evaluated; speech/voice prosody not claimed).'
           : `MODALITY: ${mode} (Live Screening Capture).`;
 
       const qaTranscript = qaList

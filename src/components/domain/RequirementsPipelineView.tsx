@@ -231,7 +231,7 @@ export const RequirementsPipelineGrid: React.FC<{
                 : (req.location || req.work_mode).toUpperCase();
 
             const budgetText =
-              budgetInfo.formatted && budgetInfo.formatted !== '—'
+              budgetInfo.formatted && budgetInfo.formatted !== '-'
                 ? budgetInfo.formatted.toUpperCase()
                 : 'COMPETITIVE';
 

@@ -158,7 +158,7 @@ export function buildSanitizedWhatsAppMessage(params: {
   const modeLabel =
     requirement.work_mode.charAt(0).toUpperCase() + requirement.work_mode.slice(1);
   const budgetLine =
-    budgetInfo.formatted && budgetInfo.formatted !== '—'
+    budgetInfo.formatted && budgetInfo.formatted !== '-'
       ? `${budgetInfo.formatted}${budgetInfo.subtitle ? ` (${budgetInfo.subtitle})` : ''}`
       : 'As per market standards';
 

@@ -349,7 +349,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
     <Dialog
       open={open}
       onClose={onClose}
-      title={`Share Requirement — ${requirement.title}`}
+      title={`Share Requirement - ${requirement.title}`}
       description="Every shared requirement originates from HireNestOS, recipients respond through the platform, and your team can track what was shared, with whom, and what happened next."
       maxWidth="max-w-[760px]"
     >
@@ -979,7 +979,7 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="space-y-0.5">
               <div className="flex items-center gap-2 text-[13px] font-semibold text-[var(--text-primary)]">
                 <FileText className="h-4 w-4 text-emerald-600" />
-                <span>Vendor Response — Submit Candidate Profiles</span>
+                <span>Vendor Response - Submit Candidate Profiles</span>
               </div>
               <div className="text-[12px] text-[var(--text-secondary)]">
                 <span className="font-mono font-semibold">{summary.vendorShareCount}</span> vendor(s) shared ·{' '}
@@ -1000,7 +1000,7 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="space-y-0.5">
               <div className="flex items-center gap-2 text-[13px] font-semibold text-[var(--text-primary)]">
                 <Users className="h-4 w-4 text-amber-600" />
-                <span>Candidate Response — Apply for Requirement</span>
+                <span>Candidate Response - Apply for Requirement</span>
               </div>
               <div className="text-[12px] text-[var(--text-secondary)]">
                 Job board: <strong>{requirement.is_public ? 'Public (Active)' : 'Private'}</strong> ·{' '}

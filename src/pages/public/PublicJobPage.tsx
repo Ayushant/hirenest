@@ -66,7 +66,7 @@ export const PublicJobPage: React.FC = () => {
 
   useEffect(() => {
     if (!job) return;
-    document.title = `${job.title} — ${job.client_org_name || 'HireNest'}`;
+    document.title = `${job.title} - ${job.client_org_name || 'HireNest'}`;
     const metaDescription = document.querySelector('meta[name="description"]');
     const desc = (job.description || '').slice(0, 160);
     if (metaDescription) metaDescription.setAttribute('content', desc);
@@ -114,7 +114,7 @@ export const PublicJobPage: React.FC = () => {
 
   const whatsAppHref = useMemo(() => {
     if (!job) return '#';
-    const text = `${job.title} at ${job.client_org_name || 'HireNest'} — ${window.location.href}`;
+    const text = `${job.title} at ${job.client_org_name || 'HireNest'} - ${window.location.href}`;
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }, [job]);
 
@@ -240,7 +240,7 @@ export const PublicJobPage: React.FC = () => {
 
           <p className="text-xs sm:text-sm pt-1" style={{ color: 'var(--text-tertiary)' }}>
             {session
-              ? 'You are signed in — Apply Now will submit your application.'
+              ? 'You are signed in - Apply Now will submit your application.'
               : 'Sign up or sign in to complete your application.'}
           </p>
         </header>
@@ -254,8 +254,8 @@ export const PublicJobPage: React.FC = () => {
             Overview
           </h2>
           <Card className="divide-y sm:divide-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-4">
-            <OverviewCell icon={<MapPin className="w-4 h-4" />} label="Location" value={job.location || '—'} />
-            <OverviewCell icon={<Building2 className="w-4 h-4" />} label="Work mode" value={job.work_mode ? WORK_MODE_LABEL[job.work_mode] : '—'} />
+            <OverviewCell icon={<MapPin className="w-4 h-4" />} label="Location" value={job.location || '-'} />
+            <OverviewCell icon={<Building2 className="w-4 h-4" />} label="Work mode" value={job.work_mode ? WORK_MODE_LABEL[job.work_mode] : '-'} />
             <OverviewCell icon={<Clock className="w-4 h-4" />} label="Experience" value={formatExperience(job.min_experience, job.max_experience)} />
             <OverviewCell icon={<Briefcase className="w-4 h-4" />} label="Job type" value={EMPLOYMENT_LABEL[job.employment_type || ''] || 'Full-time'} />
             <OverviewCell icon={<Users className="w-4 h-4" />} label="Openings" value={`${job.openings}`} />

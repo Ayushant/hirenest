@@ -181,7 +181,7 @@ export const MatchEvidencePanel: React.FC<{
             <tr className="bg-[var(--bg-subtle)] font-semibold">
               <td className="py-2 px-3.5 text-[var(--text-primary)]">Total</td>
               <td className="py-2 px-3.5 text-right font-mono tabular-nums text-[var(--text-secondary)]">
-                —
+                -
               </td>
               <td className="py-2 px-3.5 text-right font-mono tabular-nums text-[var(--text-primary)]">
                 100%

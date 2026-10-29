@@ -589,7 +589,7 @@ export const AdminApprovalsPage: React.FC = () => {
                       <Badge tone="amber">{u.requested_role || 'pending'}</Badge>
                     </td>
                     <td className="text-[var(--text-secondary)]">
-                      {u.requested_company || '—'}
+                      {u.requested_company || '-'}
                     </td>
                     <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                       {formatLocalDate(u.created_at)}
@@ -900,10 +900,10 @@ export const AdminOrganizationsPage: React.FC = () => {
                       {org.sla_tier}
                     </td>
                     <td className="text-[var(--text-secondary)]">
-                      {org.industry || '—'} {org.domain ? `· ${org.domain}` : ''}
+                      {org.industry || '-'} {org.domain ? `· ${org.domain}` : ''}
                     </td>
                     <td className="text-[var(--text-secondary)]">
-                      {org.contact_name || '—'}{' '}
+                      {org.contact_name || '-'}{' '}
                       {org.contact_email ? `(${org.contact_email})` : ''}
                     </td>
                     <td
@@ -1191,7 +1191,7 @@ export const AdminOrganizationDetailPage: React.FC = () => {
                       {c.full_name}
                     </Link>
                     <span className="text-[var(--text-secondary)]">
-                      {c.current_title || '—'}
+                      {c.current_title || '-'}
                     </span>
                   </div>
                 ))}
@@ -1410,7 +1410,7 @@ export const AdminUsersPage: React.FC = () => {
               <tbody>
                 {data.data.map((u) => {
                   const orgName =
-                    orgsData?.data.find((o) => o.id === u.org_id)?.name || '—';
+                    orgsData?.data.find((o) => o.id === u.org_id)?.name || '-';
                   return (
                     <tr key={u.id}>
                       <td className="font-medium">{u.full_name}</td>

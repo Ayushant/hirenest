@@ -674,7 +674,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 />
                 {subscriptionData.subscription.subscriptionStatus === 'expired' ? (
                   <span>
-                    Trial expired — Workspace is in restricted read-only state. Existing data is preserved.
+                    Trial expired - Workspace is in restricted read-only state. Existing data is preserved.
                   </span>
                 ) : subscriptionData.daysRemaining === 1 ? (
                   <span>

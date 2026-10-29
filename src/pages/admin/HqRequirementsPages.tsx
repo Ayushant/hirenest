@@ -1736,9 +1736,9 @@ export const HqRequirementDetailPage: React.FC = () => {
                                 {cand?.full_name || m.candidate_id}
                               </Link>
                               <span className="text-[13px] leading-[20px] text-[var(--text-secondary)] truncate">
-                                {cand?.current_title || '—'} ·{' '}
+                                {cand?.current_title || '-'} ·{' '}
                                 <span className="font-mono tabular-nums">
-                                  {cand?.total_experience_years ?? '—'}y
+                                  {cand?.total_experience_years ?? '-'}y
                                 </span>
                               </span>
                               {cand && (
@@ -2074,7 +2074,7 @@ export const HqRequirementDetailPage: React.FC = () => {
               <span className="text-[var(--text-secondary)]">Client mapping</span>
               {formatRequirementBudgetWithSubtitle(req).isClientMapped ? (
                 <span className="font-medium text-[var(--text-primary)] truncate">
-                  Mapped · {req.organizations?.name || '—'}
+                  Mapped · {req.organizations?.name || '-'}
                 </span>
               ) : (
                 <Badge tone="amber">Unmapped (Internal)</Badge>
@@ -2140,7 +2140,7 @@ export const HqRequirementDetailPage: React.FC = () => {
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Financial notes</span>
               <span className="text-right text-[12px] text-[var(--text-primary)] max-w-[180px] break-words">
-                {financials?.notes || '—'}
+                {financials?.notes || '-'}
               </span>
             </div>
             {isAdmin && (
@@ -2152,7 +2152,7 @@ export const HqRequirementDetailPage: React.FC = () => {
                     ? margins.margin_type === 'percentage'
                       ? `${margins.platform_margin}%`
                       : formatFinancialAmount(margins.platform_margin, req)
-                    : '—'}
+                    : '-'}
                 </span>
               </div>
             )}

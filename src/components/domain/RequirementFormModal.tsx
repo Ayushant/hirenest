@@ -527,7 +527,7 @@ export const RequirementFormModal: React.FC<{
         title: isEditing
           ? 'Requirement updated'
           : savedReq.wasDuplicatePrevented
-            ? 'Duplicate prevented — existing requirement retained'
+            ? 'Duplicate prevented - existing requirement retained'
             : 'Requirement created',
         description: savedReq.wasDuplicatePrevented
           ? `An identical active requirement (${savedReq.title}) already exists for this client and location. Linked to canonical ID ${savedReq.id.slice(0, 8).toUpperCase()}.`
@@ -882,7 +882,7 @@ export const RequirementFormModal: React.FC<{
           />
         </div>
 
-        {/* Budget Unit Selection (LPA — annual / LPM — monthly) & Financial Governance */}
+        {/* Budget Unit Selection (LPA - annual / LPM - monthly) & Financial Governance */}
         <div className="pt-3 border-t border-[var(--border)] space-y-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
@@ -921,7 +921,7 @@ export const RequirementFormModal: React.FC<{
             </div>
           </div>
 
-          {/* Budget Unit Selector: LPA — annual vs LPM — monthly */}
+          {/* Budget Unit Selector: LPA - annual vs LPM - monthly */}
           <div className="space-y-1.5">
             <label className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               Budget unit

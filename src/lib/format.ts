@@ -7,25 +7,25 @@ import {
 } from './enterpriseLifecycle';
 
 export function formatLocalDateTime(isoString: string | null | undefined): string {
-  if (!isoString) return '—';
+  if (!isoString) return '-';
   try {
     return format(parseISO(isoString), 'dd MMM, HH:mm');
   } catch {
-    return '—';
+    return '-';
   }
 }
 
 export function formatLocalDate(isoString: string | null | undefined): string {
-  if (!isoString) return '—';
+  if (!isoString) return '-';
   try {
     return format(parseISO(isoString), 'dd MMM yyyy');
   } catch {
-    return '—';
+    return '-';
   }
 }
 
 export function formatRelativeTime(isoString: string | null | undefined): string {
-  if (!isoString) return '—';
+  if (!isoString) return '-';
   try {
     const date = parseISO(isoString);
     const now = new Date();
@@ -36,7 +36,7 @@ export function formatRelativeTime(isoString: string | null | undefined): string
     if (hours < 24) return `${hours}h ago`;
     return format(date, 'dd MMM');
   } catch {
-    return '—';
+    return '-';
   }
 }
 
@@ -50,7 +50,7 @@ export function formatRelativeTime(isoString: string | null | undefined): string
  * - For legacy records without a unit field, it renders standard currency formatting.
  */
 export function formatCurrency(amount: number | null | undefined, currency = 'INR'): string {
-  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return '—';
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return '-';
   const rawCurrency = currency || 'INR';
   if (rawCurrency.includes('|')) {
     const meta = parseRequirementMeta(rawCurrency, amount);
@@ -100,7 +100,7 @@ export function formatFinancialAmount(
     | string
     | null
 ): string {
-  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return '—';
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return '-';
   const meta = parseRequirementMeta(reqOrCurrency, amount);
   const symbol = meta.baseCurrency.toUpperCase() === 'USD' ? '$' : '₹';
   if (meta.budgetUnit) {
@@ -141,7 +141,7 @@ export function formatRequirementBudgetWithSubtitle(
  * Masks email in list views (e.g. ra***@gmail.com) per Section 10.
  */
 export function maskEmail(email: string | null | undefined): string {
-  if (!email) return '—';
+  if (!email) return '-';
   const [local, domain] = email.split('@');
   if (!local || !domain) return '***';
   const prefix = local.slice(0, Math.min(2, local.length));
@@ -152,7 +152,7 @@ export function maskEmail(email: string | null | undefined): string {
  * Masks phone in list views (e.g. +91 ******3210) per Section 10.
  */
 export function maskPhone(phone: string | null | undefined): string {
-  if (!phone) return '—';
+  if (!phone) return '-';
   const clean = phone.trim();
   if (clean.length <= 4) return '****';
   const last4 = clean.slice(-4);
@@ -178,7 +178,7 @@ export function formatSlaCountdown(dueAtIso: string | null | undefined): {
     }
     return { label: `Due in ${hours}h ${remMins}m`, tone: 'emerald' };
   } catch {
-    return { label: '—', tone: 'emerald' };
+    return { label: '-', tone: 'emerald' };
   }
 }
 

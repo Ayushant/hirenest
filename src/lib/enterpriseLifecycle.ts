@@ -373,13 +373,13 @@ export const BUDGET_UNIT_METADATA: Record<
 > = {
   LPA: {
     code: 'LPA',
-    selectorLabel: 'LPA — annual',
+    selectorLabel: 'LPA - annual',
     fullLabel: 'Lakhs per annum',
     shortSuffix: 'LPA',
   },
   LPM: {
     code: 'LPM',
-    selectorLabel: 'LPM — monthly',
+    selectorLabel: 'LPM - monthly',
     fullLabel: 'Lakhs per month',
     shortSuffix: 'LPM',
   },
@@ -643,7 +643,7 @@ export function formatBudgetDisplay(params: {
   if (!budgetUnit) {
     const rawAmount = budgetMax ?? budgetMin;
     if (rawAmount === null || rawAmount === undefined) {
-      return { formatted: '—', subtitle: null, unit: null };
+      return { formatted: '-', subtitle: null, unit: null };
     }
     try {
       const legacyFormatted = new Intl.NumberFormat('en-IN', {
@@ -666,7 +666,7 @@ export function formatBudgetDisplay(params: {
   const hasMax = budgetMax !== null && budgetMax !== undefined && !Number.isNaN(budgetMax);
 
   if (!hasMin && !hasMax) {
-    return { formatted: '—', subtitle: unitInfo.fullLabel, unit: budgetUnit };
+    return { formatted: '-', subtitle: unitInfo.fullLabel, unit: budgetUnit };
   }
 
   if (
@@ -923,7 +923,7 @@ export const REMINDER_MILESTONE_SPECS: Record<
     milestone: '10d',
     daysRemaining: 10,
     badgeLabel: '10 days remaining',
-    title: '10 days remaining — continue with a paid plan',
+    title: '10 days remaining - continue with a paid plan',
     message:
       'Continue uninterrupted access to deterministic candidate matching, vendor SLA tracking, and structured interview rubrics with a paid plan.',
     urgency: 'info',

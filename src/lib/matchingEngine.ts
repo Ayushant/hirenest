@@ -18,7 +18,7 @@ function normalizeText(input: string): string {
 export function formatAtomicSkillLabel(raw: string): string {
   const trimmed = raw
     .trim()
-    .replace(/^[•·\-–—*]+\s*/, '')
+    .replace(/^[•·\-–*]+\s*/, '')
     .replace(/[.;:,]+$/, '')
     .trim();
   if (!trimmed) return '';

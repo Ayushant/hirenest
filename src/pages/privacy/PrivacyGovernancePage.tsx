@@ -442,7 +442,7 @@ export const PrivacyGovernancePage: React.FC = () => {
               AIKIND PRIVATE LIMITED · HIRENESTOS · DPDP ACT, 2023 &amp; RULES, 2025
             </div>
             <div className="text-[13px] leading-[18px] font-medium text-[var(--text-primary)] truncate">
-              Privacy &amp; Data Governance Operating System — Incremental Controls on Supabase &amp; AI Gateway
+              Privacy &amp; Data Governance Operating System - Incremental Controls on Supabase &amp; AI Gateway
             </div>
           </div>
         </div>
@@ -594,7 +594,7 @@ export const PrivacyGovernancePage: React.FC = () => {
               <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
                 <div>
                   <h3 className="text-[14px] leading-[20px] font-semibold text-[var(--text-primary)]">
-                    AIKIND Private Limited — Technical &amp; Engineering Responsibilities
+                    AIKIND Private Limited - Technical &amp; Engineering Responsibilities
                   </h3>
                   <p className="text-[12px] text-[var(--text-secondary)]">
                     Platform engineering, server-side enforcement, deletion automation &amp; audit logging
@@ -637,7 +637,7 @@ export const PrivacyGovernancePage: React.FC = () => {
               <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
                 <div>
                   <h3 className="text-[14px] leading-[20px] font-semibold text-[var(--text-primary)]">
-                    HireNest Workforce — Business, Legal &amp; Operational Responsibilities
+                    HireNest Workforce - Business, Legal &amp; Operational Responsibilities
                   </h3>
                   <p className="text-[12px] text-[var(--text-secondary)]">
                     Data Fiduciary / Processor determination, notice approval, grievance desk &amp; counsel sign-off

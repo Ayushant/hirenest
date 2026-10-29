@@ -1,6 +1,6 @@
 // ============================================================================
 // AIKIND PRIVATE LIMITED × HIRENESTOS
-// DPDP Act, 2023 & DPDP Rules, 2025 — Privacy & Data Governance Module
+// DPDP Act, 2023 & DPDP Rules, 2025 - Privacy & Data Governance Module
 // ============================================================================
 
 export type LegalBasisType =

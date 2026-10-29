@@ -70,32 +70,32 @@ export const VALIDATION_STAGE_ORDER: ValidationDecisionStage[] = [
 
 export const RATING_CRITERIA_GUIDE = {
   communication: {
-    1: '1 — Poor: Unclear expression; unable to explain work history',
-    2: '2 — Below expectations: Hesitant or fragmented responses',
-    3: '3 — Satisfactory: Clear explanation of role and responsibilities',
-    4: '4 — Strong: Articulate, structured client-ready communication',
-    5: '5 — Exceptional: Executive-grade clarity and stakeholder presence',
+    1: '1 - Poor: Unclear expression; unable to explain work history',
+    2: '2 - Below expectations: Hesitant or fragmented responses',
+    3: '3 - Satisfactory: Clear explanation of role and responsibilities',
+    4: '4 - Strong: Articulate, structured client-ready communication',
+    5: '5 - Exceptional: Executive-grade clarity and stakeholder presence',
   },
   technical: {
-    1: '1 — Poor: Cannot explain core JD concepts or listed project stack',
-    2: '2 — Basic: Surface familiarity only; lacks hands-on depth',
-    3: '3 — Competent: Solid hands-on execution on mandatory JD skills',
-    4: '4 — Advanced: Production architecture & troubleshooting depth',
-    5: '5 — Expert: Deep domain mastery across mandatory & preferred stack',
+    1: '1 - Poor: Cannot explain core JD concepts or listed project stack',
+    2: '2 - Basic: Surface familiarity only; lacks hands-on depth',
+    3: '3 - Competent: Solid hands-on execution on mandatory JD skills',
+    4: '4 - Advanced: Production architecture & troubleshooting depth',
+    5: '5 - Expert: Deep domain mastery across mandatory & preferred stack',
   },
   skillGap: {
-    1: '1 — Unresolved: Missing mandatory skills confirmed absent',
-    2: '2 — Partial: Significant gaps remain on mandatory JD skills',
-    3: '3 — Acceptable: Unclear skills clarified with workable proficiency',
-    4: '4 — Verified: Missing resume skills proven via live technical answers',
-    5: '5 — Complete: All JD gaps resolved with strong project evidence',
+    1: '1 - Unresolved: Missing mandatory skills confirmed absent',
+    2: '2 - Partial: Significant gaps remain on mandatory JD skills',
+    3: '3 - Acceptable: Unclear skills clarified with workable proficiency',
+    4: '4 - Verified: Missing resume skills proven via live technical answers',
+    5: '5 - Complete: All JD gaps resolved with strong project evidence',
   },
   overall: {
-    1: '1 — Do Not Submit: Reject candidate for this requirement',
-    2: '2 — Hold: Requires updated resume or vendor/candidate clarification',
-    3: '3 — Conditional Approve: Proceed with disclosed skill limitations',
-    4: '4 — Recommended: Strong validated fit for client submission',
-    5: '5 — Top Priority Submit: Immediate client presentation recommended',
+    1: '1 - Do Not Submit: Reject candidate for this requirement',
+    2: '2 - Hold: Requires updated resume or vendor/candidate clarification',
+    3: '3 - Conditional Approve: Proceed with disclosed skill limitations',
+    4: '4 - Recommended: Strong validated fit for client submission',
+    5: '5 - Top Priority Submit: Immediate client presentation recommended',
   },
 };
 
@@ -486,7 +486,7 @@ export function buildSubmissionValidationRecord(
       resumeSection: partialInSummary ? 'Work History (Partial Mention)' : 'Not Found in Resume',
       evidenceSnippet: partialInSummary
         ? `Adjacent terminology detected in summary, but direct hands-on proficiency in "${sk}" is unclear.`
-        : `No explicit mention of "${sk}" in resume text. Not definitive proof of absence — validate in interview or follow-up.`,
+        : `No explicit mention of "${sk}" in resume text. Not definitive proof of absence - validate in interview or follow-up.`,
     };
   });
 
@@ -747,7 +747,7 @@ export async function saveSubmissionValidationApi(
 
   // Mirror the record into Supabase so the DB-enforced admin review gate
   // (04_admin_review_gate.sql) reflects the UI state. Failures are logged
-  // but do not break the UI — the gate still blocks any invalid transition
+  // but do not break the UI - the gate still blocks any invalid transition
   // at the DB layer regardless.
   await syncValidationToSupabase(normalized).catch((err) => {
     // eslint-disable-next-line no-console
@@ -811,7 +811,7 @@ async function syncValidationToSupabase(
       p_notes: ratings?.summaryNotes || null,
       p_recommendation: recommendation,
     }).catch(() => {
-      // Idempotent-safe failure (already recorded, etc.) — do not break flow
+      // Idempotent-safe failure (already recorded, etc.) - do not break flow
     });
   }
 
@@ -831,7 +831,7 @@ async function syncValidationToSupabase(
     });
   }
 
-  // 4. Final approval — makes the DB gate open.
+  // 4. Final approval - makes the DB gate open.
   if (stage === 'approved_for_submission') {
     await approveSubmissionRpc(submissionId);
   }

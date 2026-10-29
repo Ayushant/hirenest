@@ -348,7 +348,7 @@ export const ClientDashboardPage: React.FC = () => {
                     </span>
                   </div>
                   <span className="font-mono tabular-nums text-[12px] text-[var(--text-primary)]">
-                    Expected DOJ: {record.expectedDoj ? formatLocalDate(record.expectedDoj) : '—'}
+                    Expected DOJ: {record.expectedDoj ? formatLocalDate(record.expectedDoj) : '-'}
                   </span>
                 </div>
               ))}
@@ -1024,7 +1024,7 @@ export const ClientRequirementDetailPage: React.FC = () => {
                       Internal financial notes
                     </div>
                     <div className="mt-1 text-[13px] text-[var(--text-primary)] break-words">
-                      {financials?.notes || '—'}
+                      {financials?.notes || '-'}
                     </div>
                   </div>
                 </div>
@@ -1065,7 +1065,7 @@ export const ClientRequirementDetailPage: React.FC = () => {
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">Financial notes</dt>
               <dd className="text-right text-[var(--text-primary)] max-w-[180px] break-words">
-                {financials?.notes || '—'}
+                {financials?.notes || '-'}
               </dd>
             </div>
             <div className="py-2 flex justify-between gap-2">
@@ -1236,9 +1236,9 @@ export const ClientCandidatesReviewPage: React.FC = () => {
                       />
                     </div>
                     <p className="text-[13px] text-[var(--text-secondary)]">
-                      {sub.candidates?.current_title || '—'} ·{' '}
+                      {sub.candidates?.current_title || '-'} ·{' '}
                       <span className="font-mono tabular-nums">
-                        {sub.candidates?.total_experience_years ?? '—'} yrs
+                        {sub.candidates?.total_experience_years ?? '-'} yrs
                       </span>{' '}
                       · Requirement:{' '}
                       <span className="text-[var(--text-primary)] font-medium">
