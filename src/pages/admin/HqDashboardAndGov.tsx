@@ -17,6 +17,7 @@ import {
   Dialog,
 } from '../../components/ui/kit';
 import { VendorPerformancePanel } from '../../components/domain/VendorScoreCard';
+import { OrganizationOnboardingPanel } from '../../components/domain/OrganizationOnboardingPanel';
 import {
   fetchAdminDashboardSummary,
   fetchProfiles,
@@ -1068,6 +1069,8 @@ export const AdminOrganizationDetailPage: React.FC = () => {
         title={org.name}
         description={`${org.type} organization · Status: ${org.status.replace('_', ' ')} · SLA tier: ${org.sla_tier}`}
       />
+
+      {org.type !== 'internal' && <OrganizationOnboardingPanel orgId={org.id} isAdmin />}
 
       {org.type === 'vendor' && vendorPerf && (
         <section className="space-y-3">

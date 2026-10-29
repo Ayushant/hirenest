@@ -75,6 +75,7 @@ import {
 } from './pages/candidate/CandidateWorkspacePages';
 import { SubscriptionPage } from './pages/subscription/SubscriptionPage';
 import { PrivacyGovernancePage } from './pages/privacy/PrivacyGovernancePage';
+import { CompliancePage } from './pages/workspace/CompliancePage';
 import {
   OffersManagementPage,
   OnboardedCandidatesPage,
@@ -218,6 +219,7 @@ function AppRoutes() {
         <Route path="vendors" element={<ClientVendorSummaryPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="privacy" element={<PrivacyGovernancePage />} />
+        <Route path="compliance" element={<CompliancePage />} />
       </Route>
 
       {/* Vendor Workspace (/vendor/*) */}
@@ -245,6 +247,7 @@ function AppRoutes() {
         <Route path="performance" element={<VendorRatingsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="privacy" element={<PrivacyGovernancePage />} />
+        <Route path="compliance" element={<CompliancePage />} />
       </Route>
 
       {/* Candidate Workspace (/candidate/*) */}

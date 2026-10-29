@@ -177,7 +177,11 @@ export const RequirementFormModal: React.FC<{
 
   const [aiSkillSuggestions, setAiSkillSuggestions] = useState<string[]>([]);
   const [aiImprovedJd, setAiImprovedJd] = useState<string | null>(null);
-  const [aiLabel, setAiLabel] = useState<string>('Suggestion: review before use');
+  const [aiMeta, setAiMeta] = useState<{
+    label: string;
+    source: 'provider' | 'template';
+    reason: string | null;
+  }>({ label: 'Suggestion: review before use', source: 'provider', reason: null });
   const [aiLoading, setAiLoading] = useState<'skills' | 'jd' | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -340,7 +344,7 @@ export const RequirementFormModal: React.FC<{
         title,
         description,
       });
-      setAiLabel(res.label);
+      setAiMeta({ label: res.label, source: res.source, reason: res.reason });
       setAiSkillSuggestions(res.skills);
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'AI assistant unavailable right now');
@@ -358,7 +362,7 @@ export const RequirementFormModal: React.FC<{
         description,
         skills,
       });
-      setAiLabel(res.label);
+      setAiMeta({ label: res.label, source: res.source, reason: res.reason });
       setAiImprovedJd(res.text);
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'AI assistant unavailable right now');
@@ -709,7 +713,9 @@ export const RequirementFormModal: React.FC<{
           {aiImprovedJd && (
             <div className="rounded-[6px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] p-3 space-y-2">
               <AiSuggestionBanner
-                label={aiLabel}
+                label={aiMeta.label}
+                source={aiMeta.source}
+                reason={aiMeta.reason}
                 onUse={() => {
                   setDescription(aiImprovedJd);
                   setFieldErrors((prev) => ({ ...prev, description: undefined }));
@@ -742,7 +748,9 @@ export const RequirementFormModal: React.FC<{
           {aiSkillSuggestions.length > 0 && (
             <div className="rounded-[6px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] p-3 space-y-2">
               <AiSuggestionBanner
-                label={aiLabel}
+                label={aiMeta.label}
+                source={aiMeta.source}
+                reason={aiMeta.reason}
                 onUse={() => {
                   const merged = [...skills];
                   for (const s of aiSkillSuggestions) {

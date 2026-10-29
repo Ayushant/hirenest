@@ -257,6 +257,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         to: '/client/privacy',
         icon: Lock,
       });
+      items.push({
+        label: 'Compliance & NDA',
+        to: '/client/compliance',
+        icon: ShieldCheck,
+      });
       return [{ items }];
     }
 
@@ -276,6 +281,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Ratings & performance', to: '/vendor/performance', icon: BarChart3 },
             { label: 'Subscription & billing', to: '/vendor/subscription', icon: CreditCard },
             { label: 'Privacy & DPDP', to: '/vendor/privacy', icon: Lock },
+            { label: 'Compliance & NDA', to: '/vendor/compliance', icon: ShieldCheck },
           ],
         },
       ];

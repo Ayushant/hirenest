@@ -79,7 +79,11 @@ export const ScheduleInterviewModal: React.FC<{
   const [aiQuestions, setAiQuestions] = useState<
     Array<{ topic: string; question: string; whatToLookFor: string }>
   >([]);
-  const [aiLabel, setAiLabel] = useState('Suggestion: review before use');
+  const [aiMeta, setAiMeta] = useState<{
+    label: string;
+    source: 'provider' | 'template';
+    reason: string | null;
+  }>({ label: 'Suggestion: review before use', source: 'provider', reason: null });
 
   const {
     register,
@@ -112,7 +116,7 @@ export const ScheduleInterviewModal: React.FC<{
         current_title: candidateCurrentTitle,
         round_type: roundType,
       });
-      setAiLabel(res.label);
+      setAiMeta({ label: res.label, source: res.source, reason: res.reason });
       setAiQuestions(res.questions);
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'AI assistant unavailable right now');
@@ -232,7 +236,9 @@ export const ScheduleInterviewModal: React.FC<{
           {aiQuestions.length > 0 && (
             <div className="rounded-[6px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] p-3 space-y-2">
               <AiSuggestionBanner
-                label={aiLabel}
+                label={aiMeta.label}
+                source={aiMeta.source}
+                reason={aiMeta.reason}
                 onDismiss={() => setAiQuestions([])}
               />
               <div className="space-y-2 max-h-56 overflow-y-auto">
@@ -305,7 +311,11 @@ export const InterviewFeedbackModal: React.FC<{
 
   const [aiTidying, setAiTidying] = useState(false);
   const [aiSuggestedNotes, setAiSuggestedNotes] = useState<string | null>(null);
-  const [aiLabel, setAiLabel] = useState('Suggestion: review before use');
+  const [aiMeta, setAiMeta] = useState<{
+    label: string;
+    source: 'provider' | 'template';
+    reason: string | null;
+  }>({ label: 'Suggestion: review before use', source: 'provider', reason: null });
   const [aiError, setAiError] = useState<string | null>(null);
 
   const handleTidyNotes = async () => {
@@ -313,7 +323,7 @@ export const InterviewFeedbackModal: React.FC<{
     setAiError(null);
     try {
       const res = await tidyInterviewNotes(feedback);
-      setAiLabel(res.label);
+      setAiMeta({ label: res.label, source: res.source, reason: res.reason });
       setAiSuggestedNotes(res.text);
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'AI assistant unavailable right now');
@@ -509,7 +519,9 @@ export const InterviewFeedbackModal: React.FC<{
           {aiSuggestedNotes && (
             <div className="rounded-[6px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] p-3 space-y-2">
               <AiSuggestionBanner
-                label={aiLabel}
+                label={aiMeta.label}
+                source={aiMeta.source}
+                reason={aiMeta.reason}
                 onUse={() => {
                   setFeedback(aiSuggestedNotes);
                   setAiSuggestedNotes(null);
@@ -747,7 +759,11 @@ export const ScreeningInterviewRunnerModal: React.FC<{
   const [aiLoading, setAiLoading] = useState(false);
   const [aiEvaluating, setAiEvaluating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [aiLabel, setAiLabel] = useState<string | null>(null);
+  const [aiMeta, setAiMeta] = useState<{
+    label: string;
+    source: 'provider' | 'template';
+    reason: string | null;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -764,7 +780,7 @@ export const ScreeningInterviewRunnerModal: React.FC<{
         current_title: candidateCurrentTitle,
         round_type: 'initial_screening',
       });
-      setAiLabel(res.label);
+      setAiMeta({ label: res.label, source: res.source, reason: res.reason });
       if (res.questions.length > 0) {
         setQaList(
           res.questions.map((q) => ({
@@ -801,7 +817,7 @@ export const ScreeningInterviewRunnerModal: React.FC<{
           response: q.response,
         })),
       });
-      setAiLabel(res.label);
+      setAiMeta({ label: res.label, source: res.source, reason: res.reason });
       if (res.evaluation) {
         setStrengths(res.evaluation.strengths || strengths);
         setGaps(res.evaluation.gaps || gaps);
@@ -950,8 +966,13 @@ export const ScreeningInterviewRunnerModal: React.FC<{
           {aiError && (
             <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">{aiError}</p>
           )}
-          {aiLabel && (
-            <AiSuggestionBanner label={aiLabel} onDismiss={() => setAiLabel(null)} />
+          {aiMeta && (
+            <AiSuggestionBanner
+              label={aiMeta.label}
+              source={aiMeta.source}
+              reason={aiMeta.reason}
+              onDismiss={() => setAiMeta(null)}
+            />
           )}
 
           <div className="space-y-3 max-h-60 overflow-y-auto pr-1">

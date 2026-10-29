@@ -11,6 +11,14 @@ export interface ScreeningEvaluationSuggestion {
   overall_rating: number;
 }
 
+export type AiSuggestionSource = 'provider' | 'template';
+export type AiFallbackReason =
+  | 'no_api_key'
+  | 'rate_limited'
+  | 'provider_error'
+  | 'provider_timeout'
+  | 'network_unreachable';
+
 export interface AiSuggestionResponse {
   label: string;
   text?: string;
@@ -21,7 +29,18 @@ export interface AiSuggestionResponse {
     whatToLookFor: string;
   }>;
   evaluation?: ScreeningEvaluationSuggestion;
+  // Provenance so the UI can honestly distinguish live-AI output from offline templates
+  source?: AiSuggestionSource;
+  ai?: boolean;
+  provider?: string | null;
+  model?: string | null;
+  reason?: AiFallbackReason | null;
 }
+
+export const OFFLINE_AI_LABEL =
+  'Offline template — AI provider unavailable; verify every value before use';
+export const OFFLINE_SCREENING_LABEL =
+  'Offline advisory template — AI provider unavailable; recruiter must evaluate manually';
 
 type AiFeatureType =
   | 'suggest_skills'
@@ -31,9 +50,24 @@ type AiFeatureType =
   | 'evaluate_screening_responses'
   | 'general_chat';
 
+function tagTemplate(
+  body: Omit<AiSuggestionResponse, 'source' | 'ai' | 'provider' | 'model' | 'reason'>,
+  reason: AiFallbackReason
+): AiSuggestionResponse {
+  return {
+    ...body,
+    source: 'template',
+    ai: false,
+    provider: null,
+    model: null,
+    reason,
+  };
+}
+
 function buildClientStaffingAiFallback(
   feature: AiFeatureType,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  reason: AiFallbackReason = 'network_unreachable'
 ): AiSuggestionResponse {
   if (feature === 'suggest_skills') {
     const text = `${String(payload.title || '')} ${String(payload.description || '')}`;
@@ -49,10 +83,7 @@ function buildClientStaffingAiFallback(
       'Stakeholder Management',
     ];
     const skills = Array.from(new Set([...detected, ...roleDefaults])).slice(0, 8);
-    return {
-      label: 'AI suggestion: review before use',
-      skills,
-    };
+    return tagTemplate({ label: OFFLINE_AI_LABEL, skills }, reason);
   }
 
   if (feature === 'improve_jd') {
@@ -65,14 +96,17 @@ function buildClientStaffingAiFallback(
       skills.length > 0
         ? skills.join(', ')
         : 'core domain engineering, production architecture, and cross-functional delivery';
-    return {
-      label: 'AI suggestion: review before use',
-      text: [
-        `Role Summary\nWe are seeking an experienced ${title} to design, build, and scale enterprise systems. ${rawDesc}`,
-        `Key Responsibilities\n- Lead end-to-end technical delivery, architecture reviews, and production reliability across ${skillLine}.\n- Collaborate with product, engineering, and business stakeholders to translate requirements into maintainable solutions.\n- Enforce code quality, observability, security standards, and SLA commitments.`,
-        `Required Qualifications\n- Proven hands-on production experience with ${skillLine}.\n- Strong debugging, analytical problem-solving, and clear written and verbal communication skills.\n- Demonstrated track record of delivering enterprise workloads on schedule.`,
-      ].join('\n\n'),
-    };
+    return tagTemplate(
+      {
+        label: OFFLINE_AI_LABEL,
+        text: [
+          `Role Summary\nWe are seeking an experienced ${title} to design, build, and scale enterprise systems. ${rawDesc}`,
+          `Key Responsibilities\n- Lead end-to-end technical delivery, architecture reviews, and production reliability across ${skillLine}.\n- Collaborate with product, engineering, and business stakeholders to translate requirements into maintainable solutions.\n- Enforce code quality, observability, security standards, and SLA commitments.`,
+          `Required Qualifications\n- Proven hands-on production experience with ${skillLine}.\n- Strong debugging, analytical problem-solving, and clear written and verbal communication skills.\n- Demonstrated track record of delivering enterprise workloads on schedule.`,
+        ].join('\n\n'),
+      },
+      reason
+    );
   }
 
   if (feature === 'suggest_interview_questions') {
@@ -112,10 +146,10 @@ function buildClientStaffingAiFallback(
         'Structured debugging methodology, ownership without blame, and clear communication.',
     });
 
-    return {
-      label: 'AI suggestion: review before use',
-      questions: questions.slice(0, 5),
-    };
+    return tagTemplate(
+      { label: OFFLINE_AI_LABEL, questions: questions.slice(0, 5) },
+      reason
+    );
   }
 
   if (feature === 'tidy_feedback_notes') {
@@ -125,13 +159,16 @@ function buildClientStaffingAiFallback(
       .map((s) => s.trim())
       .filter(Boolean)
       .map((s) => s.charAt(0).toUpperCase() + s.slice(1));
-    return {
-      label: 'AI suggestion: review before use',
-      text:
-        sentences.length > 0
-          ? `Interview Evaluation Summary: ${sentences.join('. ')}.`
-          : draft,
-    };
+    return tagTemplate(
+      {
+        label: OFFLINE_AI_LABEL,
+        text:
+          sentences.length > 0
+            ? `Interview Evaluation Summary: ${sentences.join('. ')}.`
+            : draft,
+      },
+      reason
+    );
   }
 
   if (feature === 'evaluate_screening_responses') {
@@ -148,30 +185,36 @@ function buildClientStaffingAiFallback(
     const commRating = avgLen >= 100 ? 4 : avgLen >= 40 ? 3 : 2;
     const overallRating = Math.round((skillRating + commRating) / 2);
 
-    return {
-      label: 'AI suggestion: advisory screening evaluation — recruiter review required',
-      evaluation: {
-        strengths:
-          answered.length > 0
-            ? `Provided structured responses across ${answered.length} screening topics (${answered.map((q) => q.topic || 'Core skill').join(', ')}).`
-            : 'Initial screening responses recorded.',
-        gaps:
-          answered.length < qaPairs.length
-            ? `${qaPairs.length - answered.length} question(s) require deeper live technical probing during the next interview round.`
-            : 'Verify production scale, system concurrency, and hands-on code depth in the technical round.',
-        followUps: `Probe production architecture trade-offs and hands-on implementation metrics for ${reqTitle}.`,
-        summary: `Candidate completed ${answered.length}/${qaPairs.length} first-round screening questions for ${reqTitle}. Role-skill evidence and communication clarity were evaluated on separate axes.`,
-        skill_rating: skillRating,
-        communication_rating: commRating,
-        overall_rating: overallRating,
+    return tagTemplate(
+      {
+        label: OFFLINE_SCREENING_LABEL,
+        evaluation: {
+          strengths:
+            answered.length > 0
+              ? `Provided structured responses across ${answered.length} screening topics (${answered.map((q) => q.topic || 'Core skill').join(', ')}).`
+              : 'Initial screening responses recorded.',
+          gaps:
+            answered.length < qaPairs.length
+              ? `${qaPairs.length - answered.length} question(s) require deeper live technical probing during the next interview round.`
+              : 'Verify production scale, system concurrency, and hands-on code depth in the technical round.',
+          followUps: `Probe production architecture trade-offs and hands-on implementation metrics for ${reqTitle}.`,
+          summary: `Candidate completed ${answered.length}/${qaPairs.length} first-round screening questions for ${reqTitle}. Role-skill evidence and communication clarity were evaluated on separate axes.`,
+          skill_rating: skillRating,
+          communication_rating: commRating,
+          overall_rating: overallRating,
+        },
       },
-    };
+      reason
+    );
   }
 
-  return {
-    label: 'AI suggestion: review before use',
-    text: `HireNestOS Staffing Operations Guide:\n1. Job Descriptions: Define clear atomic skills, experience bounds, work mode, and LPA/LPM budget range.\n2. 4-Dimension Matching: Scores combine Skills (40%), Experience (25%), Domain (20%), and Seniority (15%). Missing resume evidence is marked Unproven (verify in screening) rather than missing.\n3. Interviews & SLA: Acknowledge shared requirements within SLA, use structured competency rubrics, and rate JD skill alignment separately from communication.`,
-  };
+  return tagTemplate(
+    {
+      label: OFFLINE_AI_LABEL,
+      text: `HireNestOS Staffing Operations Guide:\n1. Job Descriptions: Define clear atomic skills, experience bounds, work mode, and LPA/LPM budget range.\n2. 4-Dimension Matching: Scores combine Skills (40%), Experience (25%), Domain (20%), and Seniority (15%). Missing resume evidence is marked Unproven (verify in screening) rather than missing.\n3. Interviews & SLA: Acknowledge shared requirements within SLA, use structured competency rubrics, and rate JD skill alignment separately from communication.`,
+    },
+    reason
+  );
 }
 
 async function callGuardedGemini(
@@ -199,25 +242,47 @@ async function callGuardedGemini(
         return (await response.json()) as AiSuggestionResponse;
       }
     }
+    // HTTP error: distinguish rate limit vs other provider errors so the UI can show an honest reason
+    if (response.status === 429) {
+      return buildClientStaffingAiFallback(feature, payload, 'rate_limited');
+    }
+    return buildClientStaffingAiFallback(feature, payload, 'provider_error');
   } catch {
-    // Fall back to deterministic client staffing engine if network or serverless route is unreachable
+    // Network/serverless unreachable: tag as such instead of impersonating live AI
+    return buildClientStaffingAiFallback(feature, payload, 'network_unreachable');
   }
+}
 
-  return buildClientStaffingAiFallback(feature, payload);
+export interface AiProvenance {
+  source: AiSuggestionSource;
+  ai: boolean;
+  provider: string | null;
+  reason: AiFallbackReason | null;
+}
+
+function readProvenance(res: AiSuggestionResponse): AiProvenance {
+  // Default to template/offline when the server did not tag the response — safer than claiming live AI.
+  return {
+    source: res.source || 'template',
+    ai: res.ai === true,
+    provider: res.provider ?? null,
+    reason: res.reason ?? null,
+  };
 }
 
 // 1. Requirement form: "Suggest skills" from JD text
 export async function suggestSkillsFromJd(params: {
   title: string;
   description: string;
-}): Promise<{ label: string; skills: string[] }> {
+}): Promise<{ label: string; skills: string[] } & AiProvenance> {
   const res = await callGuardedGemini('suggest_skills', {
     title: params.title,
     description: params.description,
   });
   return {
-    label: res.label || 'AI suggestion: review before use',
+    label: res.label || OFFLINE_AI_LABEL,
     skills: res.skills || [],
+    ...readProvenance(res),
   };
 }
 
@@ -226,15 +291,16 @@ export async function improveJdWording(params: {
   title: string;
   description: string;
   skills: string[];
-}): Promise<{ label: string; text: string }> {
+}): Promise<{ label: string; text: string } & AiProvenance> {
   const res = await callGuardedGemini('improve_jd', {
     title: params.title,
     description: params.description,
     skills: params.skills,
   });
   return {
-    label: res.label || 'AI suggestion: review before use',
+    label: res.label || OFFLINE_AI_LABEL,
     text: res.text || '',
+    ...readProvenance(res),
   };
 }
 
@@ -247,10 +313,12 @@ export async function suggestInterviewQuestions(params: {
   total_experience_years: number | null;
   current_title: string | null;
   round_type: string;
-}): Promise<{
-  label: string;
-  questions: Array<{ topic: string; question: string; whatToLookFor: string }>;
-}> {
+}): Promise<
+  {
+    label: string;
+    questions: Array<{ topic: string; question: string; whatToLookFor: string }>;
+  } & AiProvenance
+> {
   const res = await callGuardedGemini('suggest_interview_questions', {
     requirement_title: params.requirement_title,
     requirement_description: params.requirement_description,
@@ -261,22 +329,23 @@ export async function suggestInterviewQuestions(params: {
     round_type: params.round_type,
   });
   return {
-    label: res.label || 'AI suggestion: review before use',
+    label: res.label || OFFLINE_AI_LABEL,
     questions: res.questions || [],
+    ...readProvenance(res),
   };
 }
 
 // 4. Interview feedback form: "Tidy my notes" — rewrites only text the user typed
-export async function tidyInterviewNotes(draftNotes: string): Promise<{
-  label: string;
-  text: string;
-}> {
+export async function tidyInterviewNotes(
+  draftNotes: string
+): Promise<{ label: string; text: string } & AiProvenance> {
   const res = await callGuardedGemini('tidy_feedback_notes', {
     draft_notes: draftNotes,
   });
   return {
-    label: res.label || 'AI suggestion: review before use',
+    label: res.label || OFFLINE_AI_LABEL,
     text: res.text || '',
+    ...readProvenance(res),
   };
 }
 
@@ -286,10 +355,9 @@ export async function evaluateScreeningResponses(params: {
   requirement_skills: string[];
   mode: string;
   qa_pairs: Array<{ topic: string; question: string; response: string }>;
-}): Promise<{
-  label: string;
-  evaluation: ScreeningEvaluationSuggestion;
-}> {
+}): Promise<
+  { label: string; evaluation: ScreeningEvaluationSuggestion } & AiProvenance
+> {
   const res = await callGuardedGemini('evaluate_screening_responses', {
     requirement_title: params.requirement_title,
     requirement_skills: params.requirement_skills,
@@ -297,9 +365,7 @@ export async function evaluateScreeningResponses(params: {
     qa_pairs: params.qa_pairs,
   });
   return {
-    label:
-      res.label ||
-      'AI suggestion: advisory screening evaluation — recruiter review required',
+    label: res.label || OFFLINE_SCREENING_LABEL,
     evaluation: res.evaluation || {
       strengths: 'Responses captured for screening topics.',
       gaps: 'Verify hands-on production depth in the next technical round.',
@@ -309,16 +375,18 @@ export async function evaluateScreeningResponses(params: {
       communication_rating: 3,
       overall_rating: 3,
     },
+    ...readProvenance(res),
   };
 }
 
 // 6. AI drawer: general staffing help chat (no candidate records sent)
 export async function sendGeneralStaffingChat(
   messages: Array<{ role: 'user' | 'assistant'; text: string }>
-): Promise<{ label: string; text: string }> {
+): Promise<{ label: string; text: string } & AiProvenance> {
   const res = await callGuardedGemini('general_chat', { messages });
   return {
-    label: res.label || 'AI suggestion: review before use',
+    label: res.label || OFFLINE_AI_LABEL,
     text: res.text || '',
+    ...readProvenance(res),
   };
 }

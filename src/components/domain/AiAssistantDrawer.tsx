@@ -8,6 +8,8 @@ interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
   label?: string;
+  source?: 'provider' | 'template';
+  reason?: string | null;
 }
 
 const STARTER_PROMPTS = [
@@ -58,6 +60,8 @@ export const AiAssistantDrawer: React.FC<{
           role: 'assistant',
           text: response.text,
           label: response.label || 'Suggestion: review before use',
+          source: response.source,
+          reason: response.reason,
         },
       ]);
     } catch (err) {
@@ -120,7 +124,13 @@ export const AiAssistantDrawer: React.FC<{
               <div className="flex items-center justify-between text-[12px] leading-[16px] font-medium text-[var(--text-tertiary)]">
                 <span>{turn.role === 'user' ? 'You' : 'Assistant'}</span>
               </div>
-              {turn.role === 'assistant' && <AiSuggestionBanner label={turn.label} />}
+              {turn.role === 'assistant' && (
+                <AiSuggestionBanner
+                  label={turn.label}
+                  source={turn.source}
+                  reason={turn.reason}
+                />
+              )}
               <p className="whitespace-pre-line text-[var(--text-primary)]">
                 {turn.text}
               </p>

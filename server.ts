@@ -550,12 +550,12 @@ function getGenAIClient(): GoogleGenAI | null {
 
 async function generateWithFallback(
   ai: GoogleGenAI,
-  preferredModel: 'gemini-3.1-flash-lite' | 'gemini-3.8-flash',
+  preferredModel: 'gemini-2.5-flash-lite' | 'gemini-2.5-flash',
   contents: string,
   systemInstruction: string,
   jsonSchema?: Record<string, unknown>
 ): Promise<string> {
-  const modelsToTry = [preferredModel, 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = [preferredModel, 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
   const uniqueModels = Array.from(new Set(modelsToTry));
 
   let lastErr: unknown = null;
@@ -584,10 +584,48 @@ async function generateWithFallback(
   throw lastErr || new Error('AI_UNAVAILABLE');
 }
 
+type AiFallbackReason =
+  | 'no_api_key'
+  | 'rate_limited'
+  | 'provider_error'
+  | 'provider_timeout';
+
+const OFFLINE_AI_LABEL =
+  'Offline template — AI provider unavailable; verify every value before use';
+const OFFLINE_SCREENING_LABEL =
+  'Offline advisory template — AI provider unavailable; recruiter must evaluate manually';
+
+function tagTemplateResponse(
+  body: Record<string, unknown>,
+  reason: AiFallbackReason
+): Record<string, unknown> {
+  return {
+    ...body,
+    source: 'template',
+    ai: false,
+    provider: null,
+    reason,
+  };
+}
+
+function tagProviderResponse(
+  body: Record<string, unknown>,
+  model: string
+): Record<string, unknown> {
+  return {
+    ...body,
+    source: 'provider',
+    ai: true,
+    provider: 'gemini',
+    model,
+  };
+}
+
 function buildServerStaffingAiFallback(
   feature: string,
   payload: Record<string, unknown>,
-  callerRole: string
+  callerRole: string,
+  reason: AiFallbackReason = 'provider_error'
 ): Record<string, unknown> {
   if (feature === 'suggest_skills') {
     const text = `${String(payload.title || '')} ${String(payload.description || '')}`;
@@ -603,10 +641,13 @@ function buildServerStaffingAiFallback(
       'Stakeholder Management',
     ];
     const merged = Array.from(new Set([...detected, ...roleFallbacks])).slice(0, 8);
-    return {
-      label: 'AI suggestion: review before use',
-      skills: merged,
-    };
+    return tagTemplateResponse(
+      {
+        label: OFFLINE_AI_LABEL,
+        skills: merged,
+      },
+      reason
+    );
   }
 
   if (feature === 'improve_jd') {
@@ -624,10 +665,13 @@ function buildServerStaffingAiFallback(
       `Key Responsibilities\n- Lead end-to-end technical delivery, architecture reviews, and production reliability across ${skillLine}.\n- Collaborate with product, engineering, and business stakeholders to translate requirements into maintainable solutions.\n- Enforce code quality, observability, security standards, and SLA commitments.`,
       `Required Qualifications\n- Proven hands-on production experience with ${skillLine}.\n- Strong debugging, analytical problem-solving, and clear written and verbal communication skills.\n- Demonstrated track record of delivering enterprise workloads on schedule.`,
     ].join('\n\n');
-    return {
-      label: 'AI suggestion: review before use',
-      text: structured,
-    };
+    return tagTemplateResponse(
+      {
+        label: OFFLINE_AI_LABEL,
+        text: structured,
+      },
+      reason
+    );
   }
 
   if (feature === 'suggest_interview_questions') {
@@ -663,10 +707,13 @@ function buildServerStaffingAiFallback(
       whatToLookFor: 'Structured debugging methodology, ownership without blame, and clear communication.',
     });
 
-    return {
-      label: 'AI suggestion: review before use',
-      questions: questions.slice(0, 5),
-    };
+    return tagTemplateResponse(
+      {
+        label: OFFLINE_AI_LABEL,
+        questions: questions.slice(0, 5),
+      },
+      reason
+    );
   }
 
   if (feature === 'tidy_feedback_notes') {
@@ -680,10 +727,13 @@ function buildServerStaffingAiFallback(
       sentences.length > 0
         ? `Interview Evaluation Summary: ${sentences.join('. ')}.`
         : draft;
-    return {
-      label: 'AI suggestion: review before use',
-      text: cleaned,
-    };
+    return tagTemplateResponse(
+      {
+        label: OFFLINE_AI_LABEL,
+        text: cleaned,
+      },
+      reason
+    );
   }
 
   if (feature === 'evaluate_screening_responses') {
@@ -700,30 +750,36 @@ function buildServerStaffingAiFallback(
     const commRating = avgLen >= 100 ? 4 : avgLen >= 40 ? 3 : 2;
     const overallRating = Math.round((skillRating + commRating) / 2);
 
-    return {
-      label: 'AI suggestion: advisory screening evaluation — recruiter review required',
-      evaluation: {
-        strengths:
-          answered.length > 0
-            ? `Provided structured responses across ${answered.length} screening topics (${answered.map((q) => q.topic || 'Core skill').join(', ')}).`
-            : 'Initial screening responses recorded.',
-        gaps:
-          answered.length < qaPairs.length
-            ? `${qaPairs.length - answered.length} question(s) require deeper live technical probing during the next interview round.`
-            : 'Verify production scale, system concurrency, and hands-on code depth in the technical round.',
-        followUps: `Probe production architecture trade-offs and hands-on implementation metrics for ${reqTitle}.`,
-        summary: `Candidate completed ${answered.length}/${qaPairs.length} first-round screening questions for ${reqTitle}. Role-skill evidence and communication clarity were evaluated on separate axes.`,
-        skill_rating: skillRating,
-        communication_rating: commRating,
-        overall_rating: overallRating,
+    return tagTemplateResponse(
+      {
+        label: OFFLINE_SCREENING_LABEL,
+        evaluation: {
+          strengths:
+            answered.length > 0
+              ? `Provided structured responses across ${answered.length} screening topics (${answered.map((q) => q.topic || 'Core skill').join(', ')}).`
+              : 'Initial screening responses recorded.',
+          gaps:
+            answered.length < qaPairs.length
+              ? `${qaPairs.length - answered.length} question(s) require deeper live technical probing during the next interview round.`
+              : 'Verify production scale, system concurrency, and hands-on code depth in the technical round.',
+          followUps: `Probe production architecture trade-offs and hands-on implementation metrics for ${reqTitle}.`,
+          summary: `Candidate completed ${answered.length}/${qaPairs.length} first-round screening questions for ${reqTitle}. Role-skill evidence and communication clarity were evaluated on separate axes.`,
+          skill_rating: skillRating,
+          communication_rating: commRating,
+          overall_rating: overallRating,
+        },
       },
-    };
+      reason
+    );
   }
 
-  return {
-    label: 'AI suggestion: review before use',
-    text: `HireNestOS Staffing Operations Guide (${callerRole}):\n1. For Job Descriptions: Define clear must-have atomic skills, experience range, work mode, and LPA/LPM budget range.\n2. For 4-Dimension Matching: Scores combine Skills (40%), Experience (25%), Domain (20%), and Seniority (15%). Missing resume text is marked as Unproven (to be verified in screening), not proof of a missing skill.\n3. For Interviews & SLA: Acknowledge shared requirements promptly, use structured competency rubrics, and rate JD skill alignment and communication separately.`,
-  };
+  return tagTemplateResponse(
+    {
+      label: OFFLINE_AI_LABEL,
+      text: `HireNestOS Staffing Operations Guide (${callerRole}):\n1. For Job Descriptions: Define clear must-have atomic skills, experience range, work mode, and LPA/LPM budget range.\n2. For 4-Dimension Matching: Scores combine Skills (40%), Experience (25%), Domain (20%), and Seniority (15%). Missing resume text is marked as Unproven (to be verified in screening), not proof of a missing skill.\n3. For Interviews & SLA: Acknowledge shared requirements promptly, use structured competency rubrics, and rate JD skill alignment and communication separately.`,
+    },
+    reason
+  );
 }
 
 async function authenticateStaffingCaller(req: express.Request): Promise<
@@ -975,7 +1031,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
           });
 
           let rawJson = '';
-          for (const modelName of ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest']) {
+          for (const modelName of ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest']) {
             try {
               const response = await ai.models.generateContent({
                 model: modelName,
@@ -2004,13 +2060,13 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     const rate = checkUserRateLimit(callerUserId);
     res.setHeader('X-RateLimit-Remaining', String(rate.remaining));
     if (!rate.allowed) {
-      res.json(buildServerStaffingAiFallback(feature, payload, callerRole));
+      res.json(buildServerStaffingAiFallback(feature, payload, callerRole, 'rate_limited'));
       return;
     }
 
     const ai = getGenAIClient();
     if (!ai) {
-      res.json(buildServerStaffingAiFallback(feature, payload, callerRole));
+      res.json(buildServerStaffingAiFallback(feature, payload, callerRole, 'no_api_key'));
       return;
     }
 
@@ -2024,7 +2080,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         }
         const rawJson = await generateWithFallback(
           ai,
-          'gemini-3.1-flash-lite',
+          'gemini-2.5-flash-lite',
           `Requirement Title: ${title}\nJob Description:\n${description}`,
           'You are an enterprise technical recruiter assistant. Extract 5 to 10 concise, standardized technical or domain skill tags from the job description. Return JSON only.',
           {
@@ -2043,10 +2099,15 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         const cleanSkills = Array.isArray(parsed.skills)
           ? parsed.skills.map((s) => String(s).trim()).filter(Boolean).slice(0, 12)
           : [];
-        res.json({
-          label: 'AI suggestion: review before use',
-          skills: cleanSkills,
-        });
+        res.json(
+          tagProviderResponse(
+            {
+              label: 'AI suggestion: review before use',
+              skills: cleanSkills,
+            },
+            'gemini-2.5-flash-lite'
+          )
+        );
         return;
       }
 
@@ -2062,14 +2123,19 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         }
         const text = await generateWithFallback(
           ai,
-          'gemini-3.8-flash',
+          'gemini-2.5-flash',
           `Requirement Title: ${title}\nRequired Skills: ${skills}\nDraft Description:\n${description}`,
           'You are an enterprise staffing editor. Rewrite the job description into clear, structured, plain-text sections (Role Summary, Key Responsibilities, Required Qualifications) without markdown bolding or PII. Keep all factual requirements intact and concise.'
         );
-        res.json({
-          label: 'AI suggestion: review before use',
-          text: text.trim(),
-        });
+        res.json(
+          tagProviderResponse(
+            {
+              label: 'AI suggestion: review before use',
+              text: text.trim(),
+            },
+            'gemini-2.5-flash'
+          )
+        );
         return;
       }
 
@@ -2101,7 +2167,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
         const rawJson = await generateWithFallback(
           ai,
-          'gemini-3.8-flash',
+          'gemini-2.5-flash',
           prompt,
           'You are a structured interview architect. Generate 5 targeted, competency-based interview questions tailored to the requirement skills, the interview round, and any unproven skill gaps. Do not score the candidate.',
           {
@@ -2126,10 +2192,15 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         const parsed = JSON.parse(rawJson.trim()) as {
           questions?: Array<{ topic: string; question: string; whatToLookFor: string }>;
         };
-        res.json({
-          label: 'AI suggestion: review before use',
-          questions: Array.isArray(parsed.questions) ? parsed.questions.slice(0, 6) : [],
-        });
+        res.json(
+          tagProviderResponse(
+            {
+              label: 'AI suggestion: review before use',
+              questions: Array.isArray(parsed.questions) ? parsed.questions.slice(0, 6) : [],
+            },
+            'gemini-2.5-flash'
+          )
+        );
         return;
       }
 
@@ -2141,14 +2212,19 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         }
         const text = await generateWithFallback(
           ai,
-          'gemini-3.1-flash-lite',
+          'gemini-2.5-flash-lite',
           `Raw Interviewer Notes:\n${draftNotes}`,
           'Rewrite ONLY the interviewer notes provided into clear, objective, professional sentences suitable for an enterprise interview record. Do NOT invent observations, do NOT add a hire/reject decision, and do NOT include any candidate names or PII. Return plain text only.'
         );
-        res.json({
-          label: 'AI suggestion: review before use',
-          text: text.trim(),
-        });
+        res.json(
+          tagProviderResponse(
+            {
+              label: 'AI suggestion: review before use',
+              text: text.trim(),
+            },
+            'gemini-2.5-flash-lite'
+          )
+        );
         return;
       }
 
@@ -2171,7 +2247,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
         const rawJson = await generateWithFallback(
           ai,
-          'gemini-3.8-flash',
+          'gemini-2.5-flash',
           `Requirement: ${reqTitle}\nRequired Skills: ${reqSkills.join(', ')}\nCapture Modality: ${modality}\n\nCaptured Screening Q&A:\n${formattedQa}`,
           'You are an enterprise first-round screening evaluator. Evaluate the candidate responses against the requirement skills. Assess technical/JD skill evidence separately from communication clarity (if modality is ai_text, evaluate written clarity only and never claim voice/speech prosody). Provide advisory ratings (1 to 5 integers) and concise evidence.',
           {
@@ -2210,18 +2286,24 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         const clampRating = (n: unknown, def = 3) =>
           Math.max(1, Math.min(5, Math.round(Number(n) || def)));
 
-        res.json({
-          label: 'AI suggestion: advisory screening evaluation — recruiter review required',
-          evaluation: {
-            strengths: String(parsed.strengths || '').trim(),
-            gaps: String(parsed.gaps || '').trim(),
-            followUps: String(parsed.followUps || '').trim(),
-            summary: String(parsed.summary || '').trim(),
-            skill_rating: clampRating(parsed.skill_rating, 3),
-            communication_rating: clampRating(parsed.communication_rating, 3),
-            overall_rating: clampRating(parsed.overall_rating, 3),
-          },
-        });
+        res.json(
+          tagProviderResponse(
+            {
+              label:
+                'AI suggestion: advisory screening evaluation — recruiter review required',
+              evaluation: {
+                strengths: String(parsed.strengths || '').trim(),
+                gaps: String(parsed.gaps || '').trim(),
+                followUps: String(parsed.followUps || '').trim(),
+                summary: String(parsed.summary || '').trim(),
+                skill_rating: clampRating(parsed.skill_rating, 3),
+                communication_rating: clampRating(parsed.communication_rating, 3),
+                overall_rating: clampRating(parsed.overall_rating, 3),
+              },
+            },
+            'gemini-2.5-flash'
+          )
+        );
         return;
       }
 
@@ -2242,20 +2324,25 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
         const text = await generateWithFallback(
           ai,
-          'gemini-3.8-flash',
+          'gemini-2.5-flash',
           sanitizedHistory,
           `You are the HireNestOS Staffing Operations Guide for role "${callerRole}". Provide concise, practical guidance on staffing workflows, writing clear job descriptions, conducting structured competency interviews, and SLA best practices. Never evaluate specific candidates, never compute scores, never decide disputes, and remind users not to paste personal contact details.`
         );
-        res.json({
-          label: 'AI suggestion: review before use',
-          text: text.trim(),
-        });
+        res.json(
+          tagProviderResponse(
+            {
+              label: 'AI suggestion: review before use',
+              text: text.trim(),
+            },
+            'gemini-2.5-flash'
+          )
+        );
         return;
       }
 
       res.status(400).json({ error: 'Unsupported suggestion feature.' });
     } catch {
-      res.json(buildServerStaffingAiFallback(feature, payload, callerRole));
+      res.json(buildServerStaffingAiFallback(feature, payload, callerRole, 'provider_error'));
     }
   });
 
@@ -3132,12 +3219,190 @@ Return JSON array of objects with fields: targetSkill, question.`;
     });
   });
 
+  // ==========================================================================
+  // ONBOARDING: NDA + organization document review (brief §5)
+  // All writes go through SECURITY DEFINER RPCs that enforce role + tenant,
+  // so these endpoints are thin pass-throughs that forward the caller's JWT.
+  // ==========================================================================
+
+  function buildAuthedSupabase(req: express.Request) {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey || supabaseUrl === 'https://your-project-id.supabase.co') {
+      return null;
+    }
+    const authHeader = req.headers.authorization;
+    const token =
+      authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.slice('Bearer '.length).trim()
+        : '';
+    if (!token || token === 'workspace_active_session') {
+      return null;
+    }
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+  }
+
+  // Admin review queue — all pending documents across tenants.
+  app.get('/api/admin/onboarding/pending-documents', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok || auth.role !== 'admin') {
+      res.status(403).json({ error: 'Admin role required.' });
+      return;
+    }
+    const sb = buildAuthedSupabase(req);
+    if (!sb) {
+      res.status(503).json({ error: 'Supabase not configured on this server.' });
+      return;
+    }
+    const { data, error } = await sb.rpc('admin_list_pending_documents');
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.json({ documents: data || [] });
+  });
+
+  // Full onboarding snapshot for one organization (admin or own-org member).
+  app.get('/api/organizations/:orgId/onboarding', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) {
+      res.status(401).json({ error: 'Not authenticated.' });
+      return;
+    }
+    const sb = buildAuthedSupabase(req);
+    if (!sb) {
+      res.status(503).json({ error: 'Supabase not configured on this server.' });
+      return;
+    }
+    const { data, error } = await sb.rpc('get_organization_onboarding', {
+      p_org_id: req.params.orgId,
+    });
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.json(data || null);
+  });
+
+  // Record a document the client just uploaded to Supabase Storage.
+  app.post('/api/organizations/:orgId/documents', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) {
+      res.status(401).json({ error: 'Not authenticated.' });
+      return;
+    }
+    const { kind, storage_path, original_name, mime_type, size_bytes } = (req.body ||
+      {}) as {
+      kind?: string;
+      storage_path?: string;
+      original_name?: string;
+      mime_type?: string;
+      size_bytes?: number;
+    };
+    if (!kind || !storage_path) {
+      res.status(400).json({ error: 'kind and storage_path are required.' });
+      return;
+    }
+    const sb = buildAuthedSupabase(req);
+    if (!sb) {
+      res.status(503).json({ error: 'Supabase not configured on this server.' });
+      return;
+    }
+    const { data, error } = await sb.rpc('record_organization_document', {
+      p_org_id: req.params.orgId,
+      p_kind: kind,
+      p_storage_path: storage_path,
+      p_original_name: original_name ?? null,
+      p_mime_type: mime_type ?? null,
+      p_size_bytes: typeof size_bytes === 'number' ? size_bytes : null,
+    });
+    if (error) {
+      res.status(error.message.toLowerCase().includes('not authorized') ? 403 : 500).json({
+        error: error.message,
+      });
+      return;
+    }
+    res.json({ document_id: data });
+  });
+
+  // Admin decision on a single document.
+  app.post('/api/admin/documents/:documentId/review', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok || auth.role !== 'admin') {
+      res.status(403).json({ error: 'Admin role required.' });
+      return;
+    }
+    const { decision, notes } = (req.body || {}) as { decision?: string; notes?: string };
+    if (!decision) {
+      res.status(400).json({ error: 'decision is required.' });
+      return;
+    }
+    const sb = buildAuthedSupabase(req);
+    if (!sb) {
+      res.status(503).json({ error: 'Supabase not configured on this server.' });
+      return;
+    }
+    const { data, error } = await sb.rpc('admin_review_document', {
+      p_document_id: req.params.documentId,
+      p_decision: decision,
+      p_notes: notes ?? null,
+    });
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.json({ document: data });
+  });
+
+  // Admin NDA status update for an organization.
+  app.post('/api/admin/organizations/:orgId/nda', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok || auth.role !== 'admin') {
+      res.status(403).json({ error: 'Admin role required.' });
+      return;
+    }
+    const { status, nda_version, executed_at, evidence_doc_id, notes } = (req.body ||
+      {}) as {
+      status?: string;
+      nda_version?: string | null;
+      executed_at?: string | null;
+      evidence_doc_id?: string | null;
+      notes?: string | null;
+    };
+    if (!status) {
+      res.status(400).json({ error: 'status is required.' });
+      return;
+    }
+    const sb = buildAuthedSupabase(req);
+    if (!sb) {
+      res.status(503).json({ error: 'Supabase not configured on this server.' });
+      return;
+    }
+    const { data, error } = await sb.rpc('admin_update_nda_status', {
+      p_org_id: req.params.orgId,
+      p_status: status,
+      p_nda_version: nda_version ?? null,
+      p_executed_at: executed_at ?? null,
+      p_evidence_doc_id: evidence_doc_id ?? null,
+      p_notes: notes ?? null,
+    });
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    res.json({ nda: data });
+  });
+
   app.get('/api/health', (_req, res) => {
     res.json({
       ok: true,
       service: 'HireNestOS Enterprise API',
       geminiConfigured: Boolean(resolveServerGeminiApiKey()),
       dpdpGovernanceEnabled: true,
+      ndaGateEnabled: true,
       runtime: process.env.VERCEL ? 'vercel_serverless' : 'node_server',
       timestamp: new Date().toISOString(),
     });

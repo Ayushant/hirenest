@@ -185,30 +185,62 @@ export const NotEnoughData: React.FC<{
   </span>
 );
 
-// AI Attribution Header: "Suggestion: review before use" with Use / Dismiss ghost buttons
+// AI Attribution Header: distinguishes live-AI provider output from offline template fallbacks.
+// Honesty rule: when source === 'template' we show an unambiguous Offline chip and never relabel
+// a template response as a live AI suggestion.
 export const AiSuggestionBanner: React.FC<{
   label?: string;
+  source?: 'provider' | 'template';
+  reason?: string | null;
   onUse?: () => void;
   onDismiss?: () => void;
-}> = ({ label = 'Suggestion: review before use', onUse, onDismiss }) => (
-  <div className="flex items-center justify-between gap-2 text-[12px] leading-[16px] text-[var(--text-secondary)]">
-    <span className="font-medium text-[var(--text-secondary)]">
-      {label === 'AI suggestion: review before use' ? 'Suggestion: review before use' : label}
-    </span>
-    <div className="flex items-center gap-1">
-      {onUse && (
-        <Button type="button" size="sm" variant="ghost" onClick={onUse}>
-          Use
-        </Button>
-      )}
-      {onDismiss && (
-        <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
-          Dismiss
-        </Button>
-      )}
+}> = ({ label = 'Suggestion: review before use', source = 'provider', reason, onUse, onDismiss }) => {
+  const isOffline = source === 'template';
+  const displayLabel = isOffline
+    ? label
+    : label === 'AI suggestion: review before use'
+      ? 'Suggestion: review before use'
+      : label;
+  const reasonLabel = isOffline
+    ? reason === 'rate_limited'
+      ? 'rate-limited'
+      : reason === 'no_api_key'
+        ? 'provider not configured'
+        : reason === 'network_unreachable'
+          ? 'offline'
+          : 'provider unavailable'
+    : null;
+  return (
+    <div className="flex items-center justify-between gap-2 text-[12px] leading-[16px] text-[var(--text-secondary)]">
+      <div className="flex items-center gap-2 min-w-0">
+        {isOffline && (
+          <span
+            className="shrink-0 inline-flex items-center gap-1 rounded-[4px] border border-[var(--border)] bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]"
+            title={reasonLabel ? `Offline fallback: ${reasonLabel}` : 'Offline fallback'}
+          >
+            <span aria-hidden="true">●</span>
+            Offline
+          </span>
+        )}
+        <span className="font-medium text-[var(--text-secondary)] truncate">
+          {displayLabel}
+        </span>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {onUse && (
+          <Button type="button" size="sm" variant="ghost" onClick={onUse}>
+            Use
+          </Button>
+        )}
+        {onDismiss && (
+          <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
+            Dismiss
+          </Button>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Phase 2 Note (Ollama local runtime)
 export const Phase2ComingSoonCard: React.FC<{
