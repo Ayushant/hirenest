@@ -312,34 +312,24 @@ export async function fetchSubscriptionNotifications(orgId: string): Promise<Exp
         urgency: 'critical',
         sentAt: new Date().toISOString(),
       });
-    } else if (sub.daysRemaining <= 5) {
+    } else if (sub.daysRemaining <= 3) {
       notifications.push({
-        id: `notif_${orgId}_5_days`,
+        id: `notif_${orgId}_3_days`,
         organizationId: orgId,
-        milestone: '5_days',
-        title: `${sub.daysRemaining} days remaining in trial`,
+        milestone: '3_days',
+        title: `${sub.daysRemaining} days left in trial`,
         message: 'Your trial period is nearing its end. Review plan options and activate your subscription to ensure uninterrupted candidate submission and interview workflows.',
         urgency: 'high',
         sentAt: new Date().toISOString(),
       });
-    } else if (sub.daysRemaining <= 10) {
+    } else if (sub.daysRemaining <= 7) {
       notifications.push({
-        id: `notif_${orgId}_10_days`,
+        id: `notif_${orgId}_7_days`,
         organizationId: orgId,
-        milestone: '10_days',
-        title: '10 days remaining in your trial',
+        milestone: '7_days',
+        title: '7 days left in your trial',
         message: 'Continue benefiting from 5-axis vendor scorecards, automated SLA monitoring, and deterministic candidate matching by selecting an annual or monthly plan.',
         urgency: 'medium',
-        sentAt: new Date().toISOString(),
-      });
-    } else if (sub.daysRemaining <= 15) {
-      notifications.push({
-        id: `notif_${orgId}_15_days`,
-        organizationId: orgId,
-        milestone: '15_days',
-        title: 'Trial reminder: 15 days remaining',
-        message: 'Explore our plan options to choose the right tier for your organization before your trial ends.',
-        urgency: 'low',
         sentAt: new Date().toISOString(),
       });
     }

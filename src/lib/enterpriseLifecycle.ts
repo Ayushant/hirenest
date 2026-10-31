@@ -837,13 +837,15 @@ export function isRequirementVisibleToClientOrg(
 }
 
 // ============================================================================
-// UPDATE 3: Trial Period, Expiry Alerts (15d, 10d, 5d, 1d) & Purchase Flow
+// UPDATE 3: Trial Period, Expiry Alerts (7d, 3d, 1d) & Purchase Flow
 // ============================================================================
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'expired' | 'past_due' | 'canceled';
 export type PlanId = 'free_trial' | 'growth' | 'scale' | 'enterprise';
 export type BillingCycle = 'monthly' | 'annual';
-export type ReminderMilestone = '15d' | '10d' | '5d' | '1d';
+export type ReminderMilestone = '7d' | '3d' | '1d';
+
+export const DEFAULT_TRIAL_DURATION_DAYS = 14;
 
 export interface SubscriptionPlanDefinition {
   id: Exclude<PlanId, 'free_trial'>;
@@ -911,30 +913,21 @@ export const REMINDER_MILESTONE_SPECS: Record<
     urgency: 'info' | 'warning' | 'danger';
   }
 > = {
-  '15d': {
-    milestone: '15d',
-    daysRemaining: 15,
-    badgeLabel: '15 days remaining',
-    title: '15 days remaining in your HireNestOS trial',
+  '7d': {
+    milestone: '7d',
+    daysRemaining: 7,
+    badgeLabel: '7 days left',
+    title: '7 days left in your HireNestOS trial',
     message: 'Early reminder to review plans and upgrade before your trial period concludes.',
     urgency: 'info',
   },
-  '10d': {
-    milestone: '10d',
-    daysRemaining: 10,
-    badgeLabel: '10 days remaining',
-    title: '10 days remaining - continue with a paid plan',
+  '3d': {
+    milestone: '3d',
+    daysRemaining: 3,
+    badgeLabel: '3 days left',
+    title: '3 days left - continue with a paid plan',
     message:
       'Continue uninterrupted access to deterministic candidate matching, vendor SLA tracking, and structured interview rubrics with a paid plan.',
-    urgency: 'info',
-  },
-  '5d': {
-    milestone: '5d',
-    daysRemaining: 5,
-    badgeLabel: '5 days remaining',
-    title: 'Urgent: 5 days remaining in your trial',
-    message:
-      'Your workspace trial ends in 5 days. Upgrade now to avoid restrictions on creating new requirements and submitting candidates.',
     urgency: 'warning',
   },
   '1d': {
@@ -981,9 +974,8 @@ export function computeServerTrialDaysRemaining(
 }
 
 export function getMilestoneForDaysRemaining(daysRemaining: number): ReminderMilestone | null {
-  if (daysRemaining === 15) return '15d';
-  if (daysRemaining === 10) return '10d';
-  if (daysRemaining === 5) return '5d';
+  if (daysRemaining === 7) return '7d';
+  if (daysRemaining === 3) return '3d';
   if (daysRemaining === 1) return '1d';
   return null;
 }

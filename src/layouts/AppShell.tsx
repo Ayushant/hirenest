@@ -684,7 +684,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                   <span>
                     Free Trial active:{' '}
                     <span className="font-mono tabular-nums font-semibold">
-                      {subscriptionData.daysRemaining} days remaining
+                      {subscriptionData.daysRemaining}{' '}
+                      {subscriptionData.daysRemaining === 1 ? 'day' : 'days'} left
                     </span>
                     {subscriptionData.reminders[0]
                       ? ` · ${subscriptionData.reminders[0].message}`

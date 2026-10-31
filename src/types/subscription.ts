@@ -57,7 +57,7 @@ export interface OrganizationSubscription {
 export interface ExpiryReminderNotification {
   id: string;
   organizationId: string;
-  milestone: '15_days' | '10_days' | '5_days' | '1_day' | 'expired';
+  milestone: '7_days' | '3_days' | '1_day' | 'expired';
   title: string;
   message: string;
   urgency: 'low' | 'medium' | 'high' | 'critical';

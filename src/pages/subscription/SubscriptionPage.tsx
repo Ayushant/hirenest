@@ -71,7 +71,7 @@ export const SubscriptionPage: React.FC = () => {
   const [latestReceipt, setLatestReceipt] = useState<PaymentReceiptDto | null>(null);
 
   // Admin Trial Configuration state
-  const [trialDurationInput, setTrialDurationInput] = useState<number>(15);
+  const [trialDurationInput, setTrialDurationInput] = useState<number>(14);
   const [configuringTrial, setConfiguringTrial] = useState(false);
   const [runningReminderJob, setRunningReminderJob] = useState(false);
 
@@ -100,7 +100,7 @@ export const SubscriptionPage: React.FC = () => {
 
   const currentPlanLabel =
     subscription.planId === 'free_trial'
-      ? 'Free Trial (15-Day Enterprise Evaluation)'
+      ? 'Free Trial (14-Day Enterprise Evaluation)'
       : plans.find((p) => p.id === subscription.planId)?.name || subscription.planId;
 
   const refreshSubscriptionState = () => {
@@ -350,7 +350,7 @@ export const SubscriptionPage: React.FC = () => {
         </div>
       </div>
 
-      {/* B. Automated Expiry Notifications (15d, 10d, 5d, Last day) */}
+      {/* B. Automated Expiry Notifications (7d, 3d, Last day) */}
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -372,8 +372,8 @@ export const SubscriptionPage: React.FC = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {(['15d', '10d', '5d', '1d'] as const).map((mKey) => {
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {(['7d', '3d', '1d'] as const).map((mKey) => {
             const spec = REMINDER_MILESTONE_SPECS[mKey];
             const deliveredRecord = reminders.find((r) => r.milestone === mKey);
             const isCurrentWindow = !isPaidActive && !isExpired && daysRemaining === spec.daysRemaining;
@@ -708,25 +708,17 @@ export const SubscriptionPage: React.FC = () => {
                 size="sm"
                 variant="outline"
                 disabled={configuringTrial}
-                onClick={() => handleActivateOrSimulateTrial(15)}
+                onClick={() => handleActivateOrSimulateTrial(7)}
               >
-                Set 15 days remaining
+                Set 7 days left
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 disabled={configuringTrial}
-                onClick={() => handleActivateOrSimulateTrial(10)}
+                onClick={() => handleActivateOrSimulateTrial(3)}
               >
-                Set 10 days remaining
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={configuringTrial}
-                onClick={() => handleActivateOrSimulateTrial(5)}
-              >
-                Set 5 days remaining
+                Set 3 days left
               </Button>
               <Button
                 size="sm"
@@ -734,7 +726,7 @@ export const SubscriptionPage: React.FC = () => {
                 disabled={configuringTrial}
                 onClick={() => handleActivateOrSimulateTrial(1)}
               >
-                Set Last day (1d remaining)
+                Set Last day (1d left)
               </Button>
               <Button
                 size="sm"

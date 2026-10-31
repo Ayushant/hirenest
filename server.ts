@@ -315,10 +315,10 @@ function ensureAccountSubscription(
     return existing;
   }
 
-  // Default 15-day active trial calculated from authoritative server timestamp
+  // Default 14-day active trial calculated from authoritative server timestamp
   const now = new Date();
   const startedAt = now.toISOString();
-  const endsAt = new Date(now.getTime() + 15 * 86_400_000).toISOString();
+  const endsAt = new Date(now.getTime() + 14 * 86_400_000).toISOString();
 
   const created: AccountSubscriptionRecord = {
     accountId,
@@ -326,7 +326,7 @@ function ensureAccountSubscription(
     planId: 'free_trial',
     billingCycle: 'annual',
     subscriptionStatus: 'trialing',
-    trialDurationDays: 15,
+    trialDurationDays: 14,
     trialStartedAt: startedAt,
     trialEndsAt: endsAt,
     paidActivatedAt: null,
@@ -340,7 +340,7 @@ function ensureAccountSubscription(
 
 /**
  * Evaluates authoritative server-side subscription state, transitions expired trials,
- * and runs idempotent milestone reminder evaluation (`15d`, `10d`, `5d`, `1d`).
+ * and runs idempotent milestone reminder evaluation (`7d`, `3d`, `1d`).
  */
 export function evaluateAccountSubscriptionLifecycle(
   accountId: string,
@@ -1773,7 +1773,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   app.post('/api/subscriptions/trial/activate', async (req, res) => {
     const ctx = await resolveAccountContext(req);
     const {
-      trialDurationDays = 15,
+      trialDurationDays = 14,
       simulateDaysRemaining,
       accountName,
     } = req.body as {
@@ -1782,12 +1782,12 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       accountName?: string;
     };
 
-    const duration = Math.max(1, Math.min(90, Number(trialDurationDays) || 15));
+    const duration = Math.max(1, Math.min(90, Number(trialDurationDays) || 14));
     const now = new Date();
     let startedAtMs = now.getTime();
     let endsAtMs = startedAtMs + duration * 86_400_000;
 
-    // Allow Admin to configure or test exact remaining-day milestones (15, 10, 5, 1, or 0 for expired)
+    // Allow Admin to configure or test exact remaining-day milestones (7, 3, 1, or 0 for expired)
     if (
       simulateDaysRemaining !== undefined &&
       simulateDaysRemaining !== null &&
