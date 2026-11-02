@@ -12,7 +12,7 @@ update public.profiles
    set role   = 'admin',
        status = 'active',
        org_id = (select id from public.organizations where type = 'internal')
- where email = 'REPLACE_WITH_YOUR_EMAIL@example.com';
+ where email = 'hireatkind@gmail.com';
 
 -- Should return exactly one row with role = admin.
 select id, email, role, status from public.profiles where role = 'admin';

@@ -3434,17 +3434,79 @@ Return JSON array of objects with fields: targetSkill, question.`;
   // Early Access Applications (public submit + admin manage)
   // ====================================================================
 
+  function buildAnonSupabase() {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey || supabaseUrl === 'https://your-project-id.supabase.co') {
+      return null;
+    }
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
   let earlyAccessCounter = enterpriseStore.earlyAccessApplications.length;
 
-  app.post('/api/early-access/submit', (req, res) => {
+  app.post('/api/early-access/submit', async (req, res) => {
     const b = req.body as Record<string, unknown>;
     if (!b.contactName || !b.businessEmail || !b.companyName || !b.privacyConsent) {
       res.status(400).json({ error: 'contactName, businessEmail, companyName and privacyConsent are required.' });
       return;
     }
 
+    const email = String(b.businessEmail).toLowerCase().trim();
+    const modules = Array.isArray(b.interestedModules) ? b.interestedModules.map(String) : [];
+
+    const sb = buildAnonSupabase();
+    if (sb) {
+      try {
+        const { data: existing } = await sb
+          .from('early_access_applications')
+          .select('application_id')
+          .eq('business_email', email)
+          .maybeSingle();
+        if (existing) {
+          res.status(409).json({
+            error: 'An application with this email already exists.',
+            applicationId: existing.application_id,
+          });
+          return;
+        }
+
+        const { count } = await sb.from('early_access_applications').select('id', { count: 'exact', head: true });
+        const appId = `EA-${String((count || 0) + 1).padStart(5, '0')}`;
+
+        const { error: insertErr } = await sb.from('early_access_applications').insert({
+          application_id: appId,
+          contact_name: String(b.contactName).trim(),
+          designation: String(b.designation || '').trim(),
+          business_email: email,
+          phone: String(b.phone || '').trim(),
+          company_name: String(b.companyName).trim(),
+          company_website: String(b.companyWebsite || '').trim(),
+          business_type: String(b.businessType || 'other'),
+          country: String(b.country || 'India'),
+          company_size: String(b.companySize || '1-10'),
+          recruitment_team_size: String(b.recruitmentTeamSize || '').trim(),
+          business_requirements: String(b.businessRequirements || '').trim(),
+          interested_modules: modules,
+          current_challenges: String(b.currentChallenges || '').trim(),
+          linkedin_url: String(b.linkedinUrl || '').trim(),
+          comments: String(b.comments || '').trim(),
+          privacy_consent: Boolean(b.privacyConsent),
+        });
+
+        if (insertErr) throw insertErr;
+        res.status(201).json({ success: true, applicationId: appId });
+        return;
+      } catch (err) {
+        console.error('[early-access] Supabase insert failed, falling back to JSON store:', err);
+      }
+    }
+
+    // JSON file fallback
     const duplicate = enterpriseStore.earlyAccessApplications.find(
-      (a) => a.businessEmail.toLowerCase() === String(b.businessEmail).toLowerCase().trim()
+      (a) => a.businessEmail.toLowerCase() === email
     );
     if (duplicate) {
       res.status(409).json({
@@ -3462,7 +3524,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
       applicationId: appId,
       contactName: String(b.contactName).trim(),
       designation: String(b.designation || '').trim(),
-      businessEmail: String(b.businessEmail).toLowerCase().trim(),
+      businessEmail: email,
       phone: String(b.phone || '').trim(),
       companyName: String(b.companyName).trim(),
       companyWebsite: String(b.companyWebsite || '').trim(),
@@ -3471,7 +3533,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
       companySize: String(b.companySize || '1-10'),
       recruitmentTeamSize: String(b.recruitmentTeamSize || '').trim(),
       businessRequirements: String(b.businessRequirements || '').trim(),
-      interestedModules: Array.isArray(b.interestedModules) ? b.interestedModules.map(String) : [],
+      interestedModules: modules,
       currentChallenges: String(b.currentChallenges || '').trim(),
       linkedinUrl: String(b.linkedinUrl || '').trim(),
       comments: String(b.comments || '').trim(),
@@ -3492,20 +3554,89 @@ Return JSON array of objects with fields: targetSkill, question.`;
     res.status(201).json({ success: true, applicationId: appId });
   });
 
-  app.get('/api/early-access/applications', (req, res) => {
+  app.get('/api/early-access/applications', async (req, res) => {
     const statusFilter = req.query.status as string | undefined;
+
+    const sb = buildAuthedSupabase(req);
+    if (sb) {
+      try {
+        let query = sb.from('early_access_applications').select('*').order('submitted_at', { ascending: false });
+        if (statusFilter) query = query.eq('status', statusFilter);
+        const { data, error: fetchErr } = await query;
+        if (fetchErr) throw fetchErr;
+
+        const mapped = (data || []).map((r: Record<string, unknown>) => ({
+          id: r.id,
+          applicationId: r.application_id,
+          contactName: r.contact_name,
+          designation: r.designation || '',
+          businessEmail: r.business_email,
+          phone: r.phone || '',
+          companyName: r.company_name,
+          companyWebsite: r.company_website || '',
+          businessType: r.business_type,
+          country: r.country,
+          companySize: r.company_size,
+          recruitmentTeamSize: r.recruitment_team_size || '',
+          businessRequirements: r.business_requirements || '',
+          interestedModules: r.interested_modules || [],
+          currentChallenges: r.current_challenges || '',
+          linkedinUrl: r.linkedin_url || '',
+          comments: r.comments || '',
+          privacyConsent: r.privacy_consent,
+          status: r.status,
+          assignedTo: r.assigned_to || null,
+          adminNotes: r.admin_notes || '',
+          followUpDate: r.follow_up_date || null,
+          invitationSentAt: r.invitation_sent_at || null,
+          registeredAt: r.registered_at || null,
+          trialActivatedAt: r.trial_activated_at || null,
+          paidConvertedAt: r.paid_converted_at || null,
+          submittedAt: r.submitted_at,
+          updatedAt: r.updated_at,
+        }));
+        res.json(mapped);
+        return;
+      } catch (err) {
+        console.error('[early-access] Supabase fetch failed, falling back:', err);
+      }
+    }
+
     let apps = [...enterpriseStore.earlyAccessApplications].reverse();
     if (statusFilter) apps = apps.filter((a) => a.status === statusFilter);
     res.json(apps);
   });
 
-  app.patch('/api/early-access/applications/:id', (req, res) => {
-    const app_ = enterpriseStore.earlyAccessApplications.find((a) => a.id === req.params.id);
+  app.patch('/api/early-access/applications/:id', async (req, res) => {
+    const b = req.body as Record<string, unknown>;
+    const updates: Record<string, unknown> = {};
+    if (b.status !== undefined) updates.status = String(b.status);
+    if (b.assignedTo !== undefined) updates.assigned_to = b.assignedTo ? String(b.assignedTo) : null;
+    if (b.adminNotes !== undefined) updates.admin_notes = String(b.adminNotes);
+    if (b.followUpDate !== undefined) updates.follow_up_date = b.followUpDate ? String(b.followUpDate) : null;
+
+    const sb = buildAuthedSupabase(req);
+    if (sb) {
+      try {
+        const { data, error: updateErr } = await sb
+          .from('early_access_applications')
+          .update(updates)
+          .eq('application_id', req.params.id)
+          .select()
+          .single();
+        if (updateErr) throw updateErr;
+        res.json(data);
+        return;
+      } catch (err) {
+        console.error('[early-access] Supabase update failed, falling back:', err);
+      }
+    }
+
+    const app_ = enterpriseStore.earlyAccessApplications.find((a) => a.applicationId === req.params.id);
     if (!app_) {
       res.status(404).json({ error: 'Application not found.' });
       return;
     }
-    const b = req.body as Record<string, unknown>;
     if (b.status !== undefined) app_.status = String(b.status);
     if (b.assignedTo !== undefined) app_.assignedTo = b.assignedTo ? String(b.assignedTo) : null;
     if (b.adminNotes !== undefined) app_.adminNotes = String(b.adminNotes);
@@ -3515,8 +3646,33 @@ Return JSON array of objects with fields: targetSkill, question.`;
     res.json(app_);
   });
 
-  app.post('/api/early-access/applications/:id/invite', (req, res) => {
-    const app_ = enterpriseStore.earlyAccessApplications.find((a) => a.id === req.params.id);
+  app.post('/api/early-access/applications/:id/invite', async (req, res) => {
+    const sb = buildAuthedSupabase(req);
+    if (sb) {
+      try {
+        const { data: app_ } = await sb
+          .from('early_access_applications')
+          .select('status')
+          .eq('application_id', req.params.id)
+          .single();
+        if (!app_) { res.status(404).json({ error: 'Application not found.' }); return; }
+        if (app_.status !== 'approved') {
+          res.status(400).json({ error: 'Application must be approved before sending invitation.' });
+          return;
+        }
+        const now = new Date().toISOString();
+        await sb
+          .from('early_access_applications')
+          .update({ invitation_sent_at: now })
+          .eq('application_id', req.params.id);
+        res.json({ success: true, invitationSentAt: now });
+        return;
+      } catch (err) {
+        console.error('[early-access] Supabase invite failed, falling back:', err);
+      }
+    }
+
+    const app_ = enterpriseStore.earlyAccessApplications.find((a) => a.applicationId === req.params.id);
     if (!app_) {
       res.status(404).json({ error: 'Application not found.' });
       return;

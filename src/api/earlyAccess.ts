@@ -106,6 +106,16 @@ export interface EarlyAccessSubmitPayload {
   privacyConsent: boolean;
 }
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const { supabase } = await import('../lib/supabase');
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {}
+  return {};
+}
+
 export async function submitEarlyAccessApplication(
   payload: EarlyAccessSubmitPayload
 ): Promise<{ success: boolean; applicationId: string }> {
@@ -126,7 +136,8 @@ export async function fetchEarlyAccessApplications(params?: {
 }): Promise<EarlyAccessApplication[]> {
   const url = new URL('/api/early-access/applications', window.location.origin);
   if (params?.status) url.searchParams.set('status', params.status);
-  const res = await fetch(url.toString());
+  const authHeaders = await getAuthHeaders();
+  const res = await fetch(url.toString(), { headers: authHeaders });
   if (!res.ok) throw new Error('Failed to fetch applications');
   return res.json();
 }
@@ -138,9 +149,10 @@ export async function updateEarlyAccessApplication(params: {
   adminNotes?: string;
   followUpDate?: string | null;
 }): Promise<EarlyAccessApplication> {
+  const authHeaders = await getAuthHeaders();
   const res = await fetch(`/api/early-access/applications/${params.id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
     body: JSON.stringify(params),
   });
   if (!res.ok) throw new Error('Failed to update application');
@@ -148,8 +160,10 @@ export async function updateEarlyAccessApplication(params: {
 }
 
 export async function sendEarlyAccessInvitation(id: string): Promise<void> {
+  const authHeaders = await getAuthHeaders();
   const res = await fetch(`/api/early-access/applications/${id}/invite`, {
     method: 'POST',
+    headers: authHeaders,
   });
   if (!res.ok) throw new Error('Failed to send invitation');
 }
