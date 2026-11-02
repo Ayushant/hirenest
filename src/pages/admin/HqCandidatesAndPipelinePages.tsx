@@ -404,6 +404,8 @@ export const HqCandidateDetailPage: React.FC = () => {
   const [linkedin, setLinkedin] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const [resumeViewerUrl, setResumeViewerUrl] = useState<string | null>(null);
+
   const [linkUserOpen, setLinkUserOpen] = useState(false);
   const [linkUserIdInput, setLinkUserIdInput] = useState('');
   const [linkingUser, setLinkingUser] = useState(false);
@@ -444,7 +446,7 @@ export const HqCandidateDetailPage: React.FC = () => {
     if (!cand?.resume_path) return;
     try {
       const signedUrl = await getResumeSignedUrl(cand.resume_path);
-      window.open(signedUrl, '_blank', 'noopener,noreferrer');
+      setResumeViewerUrl(signedUrl);
     } catch (err) {
       toast({
         title: 'Could not open resume',
@@ -1208,6 +1210,42 @@ export const HqCandidateDetailPage: React.FC = () => {
           </div>
         </form>
       </Dialog>
+
+      {/* Resume Viewer Modal */}
+      {resumeViewerUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-[10px] shadow-xl w-[90vw] max-w-[900px] h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">
+                Resume - {cand?.full_name}
+              </h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={resumeViewerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-7 px-2.5 rounded-[6px] border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] inline-flex items-center gap-1"
+                >
+                  Open in new tab
+                </a>
+                <button
+                  onClick={() => setResumeViewerUrl(null)}
+                  className="h-7 w-7 rounded-[6px] hover:bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)]"
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0">
+              <iframe
+                src={resumeViewerUrl}
+                title="Resume viewer"
+                className="w-full h-full rounded-b-[10px]"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

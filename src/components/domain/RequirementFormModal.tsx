@@ -16,6 +16,7 @@ import {
   upsertRequirementFinancials,
   upsertRequirementMargins,
   publishAndShareRequirementWithAllVendors,
+  ensureUnmappedClientOrg,
 } from '../../api/requirements';
 import { suggestSkillsFromJd, improveJdWording } from '../../api/ai';
 import {
@@ -437,15 +438,15 @@ export const RequirementFormModal: React.FC<{
     setSubmitting(true);
 
     try {
-      const dbClientOrgId =
+      let dbClientOrgId =
         effectiveClientOrgId ||
         initialRequirement?.client_org_id ||
         clientOrgs[0]?.id ||
         userOrgId ||
         '';
 
-      if (!dbClientOrgId) {
-        throw new Error('At least one client organization is required in the workspace.');
+      if (!dbClientOrgId || !isClientMapped) {
+        dbClientOrgId = await ensureUnmappedClientOrg();
       }
 
       const vendorVisibleNumeric =

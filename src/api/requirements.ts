@@ -28,6 +28,57 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 25;
 
+const UNMAPPED_CLIENT_ORG_NAME = 'Internal / Unmapped';
+
+let _unmappedClientOrgId: string | null = null;
+
+export async function ensureUnmappedClientOrg(): Promise<string> {
+  if (_unmappedClientOrgId) return _unmappedClientOrgId;
+
+  try {
+    const { data: existing } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('type', 'client')
+      .eq('name', UNMAPPED_CLIENT_ORG_NAME)
+      .maybeSingle();
+
+    if (existing) {
+      _unmappedClientOrgId = existing.id;
+      return existing.id;
+    }
+
+    const { data: created } = await supabase
+      .from('organizations')
+      .insert({
+        name: UNMAPPED_CLIENT_ORG_NAME,
+        type: 'client',
+        status: 'approved',
+      })
+      .select('id')
+      .single();
+
+    if (created) {
+      _unmappedClientOrgId = created.id;
+      return created.id;
+    }
+  } catch {
+    // fallback: try to find any client org
+    const { data: anyClient } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('type', 'client')
+      .limit(1)
+      .maybeSingle();
+    if (anyClient) {
+      _unmappedClientOrgId = anyClient.id;
+      return anyClient.id;
+    }
+  }
+
+  throw new Error('Could not create or find a client organization for unmapped requirements.');
+}
+
 // In-memory client-side concurrency lock keyed by requirement fingerprint so simultaneous createRequirement calls never race
 const inFlightClientCreateLocks = new Map<
   string,
