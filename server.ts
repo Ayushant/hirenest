@@ -3793,7 +3793,85 @@ async function bootStandaloneServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`HireNestOS server running on http://0.0.0.0:${PORT}`);
+    seedAdminUser();
   });
+}
+
+async function seedAdminUser() {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey || supabaseUrl === 'https://your-project-id.supabase.co') {
+    return;
+  }
+
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) return;
+
+  try {
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Check if admin profile already exists and is active admin
+    const { data: existingProfile } = await adminClient
+      .from('profiles')
+      .select('id, role, status')
+      .eq('email', ADMIN_EMAIL)
+      .maybeSingle();
+
+    if (existingProfile?.role === 'admin' && existingProfile?.status === 'active') {
+      console.log('[seed] Admin user already exists and is active.');
+      return;
+    }
+
+    // Check if auth user exists
+    const { data: userList } = await adminClient.auth.admin.listUsers();
+    const existingUser = userList?.users?.find((u) => u.email === ADMIN_EMAIL);
+
+    let userId: string;
+
+    if (existingUser) {
+      userId = existingUser.id;
+      console.log('[seed] Admin auth user already exists, ensuring profile is promoted.');
+    } else {
+      // Create the auth user
+      const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        email_confirm: true,
+        user_metadata: { full_name: 'HireNest Admin', signup_intent: 'admin' },
+      });
+      if (createErr) throw createErr;
+      userId = newUser.user.id;
+      console.log('[seed] Created admin auth user.');
+    }
+
+    // Ensure internal org exists
+    const { data: internalOrg } = await adminClient
+      .from('organizations')
+      .select('id')
+      .eq('type', 'internal')
+      .maybeSingle();
+
+    // Wait a moment for the trigger to create the profile
+    await new Promise((r) => setTimeout(r, 1000));
+
+    // Promote to admin
+    const { error: updateErr } = await adminClient
+      .from('profiles')
+      .update({
+        role: 'admin',
+        status: 'active',
+        org_id: internalOrg?.id || null,
+      })
+      .eq('email', ADMIN_EMAIL);
+
+    if (updateErr) throw updateErr;
+    console.log('[seed] Admin user promoted: ' + ADMIN_EMAIL);
+  } catch (err) {
+    console.error('[seed] Admin seed failed:', err);
+  }
 }
 
 if (!process.env.VERCEL && process.env.SKIP_SERVER_START !== '1') {
