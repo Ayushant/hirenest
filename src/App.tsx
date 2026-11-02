@@ -6,6 +6,8 @@ import { RequireRole } from './auth/RequireRole';
 import { ToastProvider } from './components/ui/Toast';
 import { AppShell } from './layouts/AppShell';
 import { PublicJobPage } from './pages/public/PublicJobPage';
+import { WelcomePage } from './pages/welcome/WelcomePage';
+import { LandingPage } from './pages/welcome/LandingPage';
 
 import {
   SetupGuideScreen,
@@ -24,6 +26,7 @@ import {
   AdminOrganizationDetailPage,
   AdminUsersPage,
 } from './pages/admin/HqDashboardAndGov';
+import { EarlyAccessDashboardPage } from './pages/admin/EarlyAccessDashboardPage';
 
 import {
   HqRequirementsListPage,
@@ -106,7 +109,7 @@ function RootRedirect() {
   }
 
   if (!session) {
-    return <Navigate to="/signin" replace />;
+    return <LandingPage />;
   }
 
   return <Navigate to={homeRoute} replace />;
@@ -125,6 +128,8 @@ function AppRoutes() {
       <Route path="/" element={<RootRedirect />} />
 
       {/* Public / Auth Screens */}
+      <Route path="/landing" element={<LandingPage />} />
+      <Route path="/welcome" element={<WelcomePage />} />
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -169,6 +174,7 @@ function AppRoutes() {
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="privacy" element={<PrivacyGovernancePage />} />
         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+        <Route path="early-access" element={<EarlyAccessDashboardPage />} />
       </Route>
 
       {/* Recruiter HQ Workspace (/recruiter/*) */}

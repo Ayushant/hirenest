@@ -165,6 +165,37 @@ export interface RequirementGovernanceAuditEntry {
   createdAt: string;
 }
 
+interface EarlyAccessRecord {
+  id: string;
+  applicationId: string;
+  contactName: string;
+  designation: string;
+  businessEmail: string;
+  phone: string;
+  companyName: string;
+  companyWebsite: string;
+  businessType: string;
+  country: string;
+  companySize: string;
+  recruitmentTeamSize: string;
+  businessRequirements: string;
+  interestedModules: string[];
+  currentChallenges: string;
+  linkedinUrl: string;
+  comments: string;
+  privacyConsent: boolean;
+  status: string;
+  assignedTo: string | null;
+  adminNotes: string;
+  followUpDate: string | null;
+  invitationSentAt: string | null;
+  registeredAt: string | null;
+  trialActivatedAt: string | null;
+  paidConvertedAt: string | null;
+  submittedAt: string;
+  updatedAt: string;
+}
+
 interface EnterpriseServerStore {
   subscriptions: Record<string, AccountSubscriptionRecord>;
   reminders: ReminderDeliveryRecord[];
@@ -187,6 +218,7 @@ interface EnterpriseServerStore {
   privacyAuditEvents: PrivacyAuditEventRecord[];
   submissionValidations: Record<string, Record<string, unknown>>;
   offerOnboardingRecords: Record<string, Record<string, unknown>>;
+  earlyAccessApplications: EarlyAccessRecord[];
 }
 
 const DATA_DIR = process.env.VERCEL
@@ -249,6 +281,7 @@ function loadEnterpriseStore(): EnterpriseServerStore {
             : [...INITIAL_PRIVACY_AUDIT_EVENTS],
         submissionValidations: parsed.submissionValidations || {},
         offerOnboardingRecords: parsed.offerOnboardingRecords || {},
+        earlyAccessApplications: Array.isArray(parsed.earlyAccessApplications) ? parsed.earlyAccessApplications : [],
       };
     }
   } catch {
@@ -276,6 +309,7 @@ function loadEnterpriseStore(): EnterpriseServerStore {
     privacyAuditEvents: [...INITIAL_PRIVACY_AUDIT_EVENTS],
     submissionValidations: {},
     offerOnboardingRecords: {},
+    earlyAccessApplications: [],
   };
 }
 
@@ -3394,6 +3428,107 @@ Return JSON array of objects with fields: targetSkill, question.`;
       return;
     }
     res.json({ nda: data });
+  });
+
+  // ====================================================================
+  // Early Access Applications (public submit + admin manage)
+  // ====================================================================
+
+  let earlyAccessCounter = enterpriseStore.earlyAccessApplications.length;
+
+  app.post('/api/early-access/submit', (req, res) => {
+    const b = req.body as Record<string, unknown>;
+    if (!b.contactName || !b.businessEmail || !b.companyName || !b.privacyConsent) {
+      res.status(400).json({ error: 'contactName, businessEmail, companyName and privacyConsent are required.' });
+      return;
+    }
+
+    const duplicate = enterpriseStore.earlyAccessApplications.find(
+      (a) => a.businessEmail.toLowerCase() === String(b.businessEmail).toLowerCase().trim()
+    );
+    if (duplicate) {
+      res.status(409).json({
+        error: 'An application with this email already exists.',
+        applicationId: duplicate.applicationId,
+      });
+      return;
+    }
+
+    earlyAccessCounter++;
+    const now = new Date().toISOString();
+    const appId = `EA-${String(earlyAccessCounter).padStart(5, '0')}`;
+    const record: EarlyAccessRecord = {
+      id: `ea_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      applicationId: appId,
+      contactName: String(b.contactName).trim(),
+      designation: String(b.designation || '').trim(),
+      businessEmail: String(b.businessEmail).toLowerCase().trim(),
+      phone: String(b.phone || '').trim(),
+      companyName: String(b.companyName).trim(),
+      companyWebsite: String(b.companyWebsite || '').trim(),
+      businessType: String(b.businessType || 'other'),
+      country: String(b.country || 'India'),
+      companySize: String(b.companySize || '1-10'),
+      recruitmentTeamSize: String(b.recruitmentTeamSize || '').trim(),
+      businessRequirements: String(b.businessRequirements || '').trim(),
+      interestedModules: Array.isArray(b.interestedModules) ? b.interestedModules.map(String) : [],
+      currentChallenges: String(b.currentChallenges || '').trim(),
+      linkedinUrl: String(b.linkedinUrl || '').trim(),
+      comments: String(b.comments || '').trim(),
+      privacyConsent: Boolean(b.privacyConsent),
+      status: 'submitted',
+      assignedTo: null,
+      adminNotes: '',
+      followUpDate: null,
+      invitationSentAt: null,
+      registeredAt: null,
+      trialActivatedAt: null,
+      paidConvertedAt: null,
+      submittedAt: now,
+      updatedAt: now,
+    };
+    enterpriseStore.earlyAccessApplications.push(record);
+    saveEnterpriseStore(enterpriseStore);
+    res.status(201).json({ success: true, applicationId: appId });
+  });
+
+  app.get('/api/early-access/applications', (req, res) => {
+    const statusFilter = req.query.status as string | undefined;
+    let apps = [...enterpriseStore.earlyAccessApplications].reverse();
+    if (statusFilter) apps = apps.filter((a) => a.status === statusFilter);
+    res.json(apps);
+  });
+
+  app.patch('/api/early-access/applications/:id', (req, res) => {
+    const app_ = enterpriseStore.earlyAccessApplications.find((a) => a.id === req.params.id);
+    if (!app_) {
+      res.status(404).json({ error: 'Application not found.' });
+      return;
+    }
+    const b = req.body as Record<string, unknown>;
+    if (b.status !== undefined) app_.status = String(b.status);
+    if (b.assignedTo !== undefined) app_.assignedTo = b.assignedTo ? String(b.assignedTo) : null;
+    if (b.adminNotes !== undefined) app_.adminNotes = String(b.adminNotes);
+    if (b.followUpDate !== undefined) app_.followUpDate = b.followUpDate ? String(b.followUpDate) : null;
+    app_.updatedAt = new Date().toISOString();
+    saveEnterpriseStore(enterpriseStore);
+    res.json(app_);
+  });
+
+  app.post('/api/early-access/applications/:id/invite', (req, res) => {
+    const app_ = enterpriseStore.earlyAccessApplications.find((a) => a.id === req.params.id);
+    if (!app_) {
+      res.status(404).json({ error: 'Application not found.' });
+      return;
+    }
+    if (app_.status !== 'approved') {
+      res.status(400).json({ error: 'Application must be approved before sending invitation.' });
+      return;
+    }
+    app_.invitationSentAt = new Date().toISOString();
+    app_.updatedAt = new Date().toISOString();
+    saveEnterpriseStore(enterpriseStore);
+    res.json({ success: true, invitationSentAt: app_.invitationSentAt });
   });
 
   app.get('/api/health', (_req, res) => {

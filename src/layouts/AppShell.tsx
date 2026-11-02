@@ -28,6 +28,7 @@ import {
   BarChart3,
   CreditCard,
   Lock,
+  Inbox,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -211,6 +212,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Subscription & billing', to: '/admin/subscription', icon: CreditCard },
             { label: 'Privacy & DPDP', to: '/admin/privacy', icon: Lock },
             { label: 'Audit log', to: '/admin/audit-logs', icon: ShieldCheck },
+            { label: 'Early access', to: '/admin/early-access', icon: Inbox },
           ],
         };
         return [pipelineGroup, govGroup];
