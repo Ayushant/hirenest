@@ -1006,6 +1006,9 @@ export const HqRequirementDetailPage: React.FC = () => {
   });
 
   const [shareRequirementModalOpen, setShareRequirementModalOpen] = useState(false);
+  const [detailDeleteOpen, setDetailDeleteOpen] = useState(false);
+  const [detailDeleteReason, setDetailDeleteReason] = useState('');
+  const [detailDeleteLoading, setDetailDeleteLoading] = useState(false);
 
   if (isLoading) {
     return <TableSkeleton rows={6} cols={5} />;
@@ -1216,10 +1219,6 @@ export const HqRequirementDetailPage: React.FC = () => {
       setSubmitLoading(false);
     }
   };
-
-  const [detailDeleteOpen, setDetailDeleteOpen] = useState(false);
-  const [detailDeleteReason, setDetailDeleteReason] = useState('');
-  const [detailDeleteLoading, setDetailDeleteLoading] = useState(false);
 
   const handlePublishAndShareAll = async () => {
     setSharingLoading(true);
