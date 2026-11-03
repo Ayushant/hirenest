@@ -649,8 +649,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </div>
         </header>
 
-        {/* Persistent Trial / Subscription Expiry Banner (Update 3) */}
+        {/* Persistent Trial / Subscription Expiry Banner (Update 3) — hidden for admin (owner) */}
         {!isCandidate &&
+          role !== 'admin' &&
           subscriptionData &&
           subscriptionData.subscription.subscriptionStatus !== 'active' && (
             <div
@@ -697,11 +698,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               </div>
               <Link
                 to={
-                  role === 'admin'
-                    ? '/admin/subscription'
-                    : role === 'recruiter'
-                      ? '/recruiter/subscription'
-                      : isClient
+                  role === 'recruiter'
+                    ? '/recruiter/subscription'
+                    : isClient
                         ? '/client/subscription'
                         : '/vendor/subscription'
                 }
