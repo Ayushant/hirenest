@@ -1006,8 +1006,27 @@ export const HqRequirementDetailPage: React.FC = () => {
 
   const [shareRequirementModalOpen, setShareRequirementModalOpen] = useState(false);
 
-  if (isLoading || !req) {
+  if (isLoading) {
     return <TableSkeleton rows={6} cols={5} />;
+  }
+
+  if (!req) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-3">
+        <div className="text-[32px]">📋</div>
+        <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">Requirement not found</h2>
+        <p className="text-[13px] text-[var(--text-secondary)] max-w-md text-center">
+          This requirement may have been deleted, or could not be loaded from the database.
+          If you just created it, the save may have failed - check the requirements list.
+        </p>
+        <button
+          onClick={() => navigate(`${prefix}/requirements`)}
+          className="mt-2 h-8 px-4 rounded-[6px] bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90"
+        >
+          Back to requirements
+        </button>
+      </div>
+    );
   }
 
   const refreshAll = () => {

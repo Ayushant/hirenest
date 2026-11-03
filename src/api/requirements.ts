@@ -36,6 +36,7 @@ export async function ensureUnmappedClientOrg(): Promise<string> {
   if (_unmappedClientOrgId) return _unmappedClientOrgId;
 
   try {
+    // Try finding existing unmapped client org
     const { data: existing } = await supabase
       .from('organizations')
       .select('id')
@@ -48,7 +49,8 @@ export async function ensureUnmappedClientOrg(): Promise<string> {
       return existing.id;
     }
 
-    const { data: created } = await supabase
+    // Try creating via Supabase (requires admin RLS)
+    const { data: created, error: createErr } = await supabase
       .from('organizations')
       .insert({
         name: UNMAPPED_CLIENT_ORG_NAME,
@@ -58,12 +60,26 @@ export async function ensureUnmappedClientOrg(): Promise<string> {
       .select('id')
       .single();
 
-    if (created) {
+    if (created && !createErr) {
       _unmappedClientOrgId = created.id;
       return created.id;
     }
+
+    // Fallback: create via server endpoint
+    const res = await fetch('/api/organizations/ensure-unmapped-client', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.id) {
+        _unmappedClientOrgId = data.id;
+        return data.id;
+      }
+    }
   } catch {
-    // fallback: try to find any client org
+    // ignore
+  }
+
+  // Last resort: find any client org
+  try {
     const { data: anyClient } = await supabase
       .from('organizations')
       .select('id')
@@ -74,6 +90,8 @@ export async function ensureUnmappedClientOrg(): Promise<string> {
       _unmappedClientOrgId = anyClient.id;
       return anyClient.id;
     }
+  } catch {
+    // ignore
   }
 
   throw new Error('Could not create or find a client organization for unmapped requirements.');
