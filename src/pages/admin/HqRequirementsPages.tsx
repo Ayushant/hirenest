@@ -950,10 +950,11 @@ export const HqRequirementDetailPage: React.FC = () => {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [dupDialogReason, setDupDialogReason] = useState<string | null>(null);
 
-  const { data: req, isLoading } = useQuery({
+  const { data: req, isLoading, error: reqError } = useQuery({
     queryKey: ['requirement_detail', id],
     queryFn: () => fetchRequirementById(id!),
     enabled: Boolean(id),
+    retry: 1,
   });
 
   const { data: financials } = useQuery({
@@ -1011,13 +1012,17 @@ export const HqRequirementDetailPage: React.FC = () => {
   }
 
   if (!req) {
+    const errorMsg = reqError instanceof Error ? reqError.message : reqError ? String(reqError) : null;
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-3">
-        <div className="text-[32px]">📋</div>
-        <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">Requirement not found</h2>
+        <div className="text-[32px]">{errorMsg ? '⚠️' : '📋'}</div>
+        <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">
+          {errorMsg ? 'Failed to load requirement' : 'Requirement not found'}
+        </h2>
         <p className="text-[13px] text-[var(--text-secondary)] max-w-md text-center">
-          This requirement may have been deleted, or could not be loaded from the database.
-          If you just created it, the save may have failed - check the requirements list.
+          {errorMsg
+            ? errorMsg
+            : 'This requirement may have been deleted, or the save may have failed. Check the requirements list.'}
         </p>
         <button
           onClick={() => navigate(`${prefix}/requirements`)}

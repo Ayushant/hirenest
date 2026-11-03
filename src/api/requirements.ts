@@ -583,11 +583,15 @@ export async function fetchRequirementById(
       options.viewerRole === 'admin' ||
       options.viewerRole === 'recruiter';
     if (isHqViewer && (req.status === 'draft' || req.status === 'pending_approval')) {
-      await publishAndShareRequirementWithAllVendors({
-        requirementId: req.id,
-        slaHours: req.submission_sla_hours,
-      });
-      req = { ...req, status: 'open' };
+      try {
+        await publishAndShareRequirementWithAllVendors({
+          requirementId: req.id,
+          slaHours: req.submission_sla_hours,
+        });
+        req = { ...req, status: 'open' };
+      } catch {
+        // Auto-publish failed (e.g. 403 RLS) — still return the requirement
+      }
     } else {
       void syncRequirementsCatalogWithBackend([req]);
     }
