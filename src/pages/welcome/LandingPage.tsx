@@ -359,7 +359,7 @@ function EarlyAccessForm() {
           <span className="text-[12px] text-[#64748B] leading-relaxed">
             I consent to HireNest Workforce Pvt Ltd collecting and processing my information as
             described in the{' '}
-            <a href="#" className="text-[#1D4ED8] hover:underline">
+            <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-[#1D4ED8] hover:underline">
               Privacy Policy
             </a>
             . I understand my data will be used to evaluate my early access application and contact me

@@ -8,6 +8,7 @@ import { AppShell } from './layouts/AppShell';
 import { PublicJobPage } from './pages/public/PublicJobPage';
 import { WelcomePage } from './pages/welcome/WelcomePage';
 import { LandingPage } from './pages/welcome/LandingPage';
+import { PrivacyPolicyPage } from './pages/welcome/PrivacyPolicyPage';
 
 import {
   SetupGuideScreen,
@@ -129,6 +130,7 @@ function AppRoutes() {
 
       {/* Public / Auth Screens */}
       <Route path="/landing" element={<LandingPage />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="/welcome" element={<WelcomePage />} />
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
