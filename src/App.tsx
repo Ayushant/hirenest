@@ -173,7 +173,6 @@ function AppRoutes() {
         <Route path="feedback-moderation" element={<AdminFeedbackModerationPage />} />
         <Route path="disputes" element={<AdminDisputesPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
-        <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="privacy" element={<PrivacyGovernancePage />} />
         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
         <Route path="early-access" element={<EarlyAccessDashboardPage />} />

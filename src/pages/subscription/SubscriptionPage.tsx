@@ -2,14 +2,11 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
-  Clock,
   CreditCard,
   ShieldCheck,
   AlertTriangle,
-  BellRing,
   Sparkles,
   Receipt,
-  RefreshCw,
 } from 'lucide-react';
 import {
   PageHeader,
@@ -24,8 +21,6 @@ import {
 } from '../../components/ui/kit';
 import {
   fetchSubscriptionDashboard,
-  activateOrConfigureTrial,
-  triggerExpiryRemindersJob,
   createSubscriptionCheckoutOrder,
   verifySubscriptionPayment,
   type PaymentReceiptDto,
@@ -33,7 +28,7 @@ import {
 import {
   type BillingCycle,
   type PlanId,
-  REMINDER_MILESTONE_SPECS,
+  SUBSCRIPTION_PLANS,
   computePlanPricingWithTax,
 } from '../../lib/enterpriseLifecycle';
 import { formatLocalDate, formatLocalDateTime } from '../../lib/format';
@@ -48,17 +43,23 @@ function formatInr(amount: number): string {
   }).format(amount);
 }
 
+const BETA_PARTNER_PRICES: Record<string, { monthly: number; annual: number }> = {
+  growth: { monthly: 2999, annual: 35988 },
+  scale: { monthly: 5999, annual: 71988 },
+  enterprise: { monthly: 19999, annual: 199990 },
+};
+
 export const SubscriptionPage: React.FC = () => {
   const { profile, organization } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const role = profile?.role || 'admin';
-  const isAdmin = role === 'admin';
+  const role = profile?.role || 'vendor_admin';
   const accountId = organization?.id || profile?.org_id || 'default_hirenest_account';
-  const accountName = organization?.name || 'HireNest Enterprise Workspace';
+  const accountName = organization?.name || 'HireNest Workspace';
 
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [showBetaPricing, setShowBetaPricing] = useState(false);
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<
     Exclude<PlanId, 'free_trial'> | null
   >(null);
@@ -66,14 +67,9 @@ export const SubscriptionPage: React.FC = () => {
   const [billingContactEmail, setBillingContactEmail] = useState<string>(
     profile?.email || 'billing@enterprise.in'
   );
-  const [gstinInput, setGstinInput] = useState<string>('29AABCH9876F1Z5');
+  const [gstinInput, setGstinInput] = useState<string>('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [latestReceipt, setLatestReceipt] = useState<PaymentReceiptDto | null>(null);
-
-  // Admin Trial Configuration state
-  const [trialDurationInput, setTrialDurationInput] = useState<number>(14);
-  const [configuringTrial, setConfiguringTrial] = useState(false);
-  const [runningReminderJob, setRunningReminderJob] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['subscription_dashboard', accountId],
@@ -93,86 +89,23 @@ export const SubscriptionPage: React.FC = () => {
     );
   }
 
-  const { subscription, daysRemaining, entitlements, reminders, receipts, plans } = data;
-  const isTrialing = subscription.subscriptionStatus === 'trialing';
+  const { subscription, daysRemaining, entitlements, receipts } = data;
   const isExpired = subscription.subscriptionStatus === 'expired';
   const isPaidActive = subscription.subscriptionStatus === 'active';
 
   const currentPlanLabel =
     subscription.planId === 'free_trial'
-      ? 'Free Trial (14-Day Enterprise Evaluation)'
-      : plans.find((p) => p.id === subscription.planId)?.name || subscription.planId;
+      ? 'Free Trial'
+      : SUBSCRIPTION_PLANS.find((p) => p.id === subscription.planId)?.name || subscription.planId;
 
   const refreshSubscriptionState = () => {
     queryClient.invalidateQueries({ queryKey: ['subscription_dashboard'] });
-  };
-
-  const handleActivateOrSimulateTrial = async (simulateDaysRemaining?: number) => {
-    setConfiguringTrial(true);
-    try {
-      const res = await activateOrConfigureTrial({
-        accountId,
-        accountName,
-        trialDurationDays: trialDurationInput,
-        simulateDaysRemaining,
-      });
-      refreshSubscriptionState();
-      const triggered = res.newlyTriggeredReminders?.[0];
-      toast({
-        title:
-          simulateDaysRemaining === 0
-            ? 'Trial expired state enforced'
-            : simulateDaysRemaining !== undefined
-              ? `Trial clock set to ${simulateDaysRemaining} day(s) remaining`
-              : `Trial activated (${trialDurationInput} days)`,
-        description: triggered
-          ? `Automated alert dispatched: "${triggered.title}"`
-          : `Status: ${res.subscription.subscriptionStatus.toUpperCase()}`,
-        tone: simulateDaysRemaining === 0 ? 'error' : 'success',
-      });
-    } catch (err) {
-      toast({
-        title: 'Trial configuration failed',
-        description: err instanceof Error ? err.message : 'Error updating trial',
-        tone: 'error',
-      });
-    } finally {
-      setConfiguringTrial(false);
-    }
-  };
-
-  const handleRunReminderScheduler = async () => {
-    setRunningReminderJob(true);
-    try {
-      const res = await triggerExpiryRemindersJob({ accountId });
-      refreshSubscriptionState();
-      toast({
-        title:
-          res.triggeredCount > 0
-            ? `Dispatched ${res.triggeredCount} expiry reminder(s)`
-            : 'Idempotent check complete (0 duplicates sent)',
-        description:
-          res.triggeredCount > 0
-            ? res.triggered.map((t) => t.title).join(' · ')
-            : 'Milestone reminder for current remaining-day window was already delivered or not due today.',
-        tone: 'info',
-      });
-    } catch (err) {
-      toast({
-        title: 'Reminder check failed',
-        description: err instanceof Error ? err.message : 'Error running reminder job',
-        tone: 'error',
-      });
-    } finally {
-      setRunningReminderJob(false);
-    }
   };
 
   const handleCompleteVerifiedCheckout = async () => {
     if (!selectedPlanForCheckout) return;
     setProcessingPayment(true);
     try {
-      // Step 1: Create server-side order with 18% GST calculation
       const orderRes = await createSubscriptionCheckoutOrder({
         accountId,
         accountName,
@@ -180,7 +113,6 @@ export const SubscriptionPage: React.FC = () => {
         billingCycle,
       });
 
-      // Step 2: Verify payment server-side using HMAC-SHA256 before marking subscription as paid
       const verifyRes = await verifySubscriptionPayment({
         accountId,
         accountName,
@@ -195,7 +127,7 @@ export const SubscriptionPage: React.FC = () => {
       refreshSubscriptionState();
 
       toast({
-        title: 'Payment verified & subscription upgraded',
+        title: 'Payment verified & subscription activated',
         description: `${verifyRes.receipt.planName} Plan (${verifyRes.receipt.billingCycle}) is now active. Invoice ${verifyRes.receipt.invoiceNumber} generated.`,
         tone: 'success',
       });
@@ -214,29 +146,33 @@ export const SubscriptionPage: React.FC = () => {
     ? computePlanPricingWithTax(selectedPlanForCheckout, billingCycle)
     : null;
 
+  const isVendor = role === 'vendor_admin' || role === 'vendor_recruiter';
+  const isClient = role === 'client_manager' || role === 'client_member';
+  const roleLabel = isVendor ? 'Vendor' : isClient ? 'Client' : 'Organisation';
+
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Subscription, trial lifecycle & billing"
-        description="Server-authoritative trial countdown, automated expiry notifications (15, 10, 5, and 1 day), and verified plan upgrades."
+        title="Plans & pricing"
+        description={`Choose the right plan for your ${roleLabel.toLowerCase()} organisation. All prices exclude 18% GST.`}
         actions={
           <div className="flex items-center gap-2">
             {!isPaidActive && (
               <Button onClick={() => setSelectedPlanForCheckout('scale')}>
                 <CreditCard className="h-3.5 w-3.5" />
-                Purchase Plan / Upgrade Now
+                Upgrade Now
               </Button>
             )}
             {isPaidActive && (
               <Button variant="outline" onClick={() => setSelectedPlanForCheckout('enterprise')}>
-                Change / Upgrade Plan
+                Change Plan
               </Button>
             )}
           </div>
         }
       />
 
-      {/* Expiry / Restricted State Alert Banner (Update 3.D) */}
+      {/* Expiry Alert Banner */}
       {isExpired && (
         <div className="rounded-[10px] border border-[var(--status-danger)] bg-[var(--status-danger-bg)] p-4 flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1 max-w-2xl">
@@ -245,17 +181,16 @@ export const SubscriptionPage: React.FC = () => {
               <span>Trial expired - Workspace is in restricted read-only state</span>
             </div>
             <p className="text-[13px] leading-[20px] text-[var(--text-primary)]">
-              {entitlements.restrictionReason} All existing requirements, candidates, and audit logs
-              remain safely preserved.
+              {entitlements.restrictionReason} All existing data remains safely preserved. Upgrade to restore full access.
             </p>
           </div>
           <Button onClick={() => setSelectedPlanForCheckout('scale')}>
-            Purchase Plan / Upgrade Now
+            Upgrade Now
           </Button>
         </div>
       )}
 
-      {/* E. Subscription Dashboard Metric Strip */}
+      {/* Current Status Strip */}
       <MetricStrip
         items={[
           {
@@ -263,282 +198,106 @@ export const SubscriptionPage: React.FC = () => {
             value: currentPlanLabel,
           },
           {
-            label: 'Subscription status',
+            label: 'Status',
             value: subscription.subscriptionStatus.toUpperCase(),
             tone: isPaidActive ? 'default' : isExpired ? 'danger' : 'warning',
           },
           {
-            label: 'Days remaining (server)',
+            label: 'Days remaining',
             value: isPaidActive ? 'Active (Paid)' : `${daysRemaining}d`,
             tone: !isPaidActive && daysRemaining <= 5 ? 'danger' : 'default',
           },
           {
             label: 'Payment status',
-            value: isPaidActive ? 'Verified · Paid' : 'Unpaid (Trial)',
+            value: isPaidActive ? 'Paid' : 'Free trial',
           },
         ]}
       />
 
-      {/* Detailed Subscription Lifecycle Card */}
-      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
-          <div>
-            <h2 className="text-[15px] leading-[22px] font-semibold text-[var(--text-primary)]">
-              Account subscription overview ({subscription.accountName})
-            </h2>
-            <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-              Remaining days are computed from authoritative server UTC timestamps; backend entitlement checks govern write access.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge
-              tone={
-                isPaidActive
-                  ? 'emerald'
-                  : isExpired
-                    ? 'danger'
-                    : daysRemaining <= 5
-                      ? 'warning'
-                      : 'neutral'
-              }
-            >
-              {isPaidActive
-                ? `Paid · ${subscription.billingCycle}`
-                : isExpired
-                  ? 'Expired - Read-only mode'
-                  : `Trialing · ${daysRemaining} days left`}
-            </Badge>
-            {!isPaidActive && (
-              <Button size="sm" onClick={() => setSelectedPlanForCheckout('scale')}>
-                Purchase Plan / Upgrade Now
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[13px] leading-[20px]">
-          <div>
-            <span className="text-[12px] text-[var(--text-tertiary)] block">Trial start date</span>
-            <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-              {formatLocalDate(subscription.trialStartedAt)}
-            </span>
-          </div>
-          <div>
-            <span className="text-[12px] text-[var(--text-tertiary)] block">Trial expiry date</span>
-            <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-              {formatLocalDate(subscription.trialEndsAt)}
-            </span>
-          </div>
-          <div>
-            <span className="text-[12px] text-[var(--text-tertiary)] block">
-               Paid activation date
-            </span>
-            <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-              {subscription.paidActivatedAt
-                ? formatLocalDateTime(subscription.paidActivatedAt)
-                : '-'}
-            </span>
-          </div>
-          <div>
-            <span className="text-[12px] text-[var(--text-tertiary)] block">Write entitlements</span>
-            <span className="font-medium text-[var(--text-primary)]">
-              {entitlements.isReadOnlyRestricted
-                ? 'Restricted (Read-only)'
-                : 'Full access enabled'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* B. Automated Expiry Notifications (7d, 3d, Last day) */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-              Automated trial expiry notifications
-            </h2>
-            <p className="mt-0.5 text-[13px] leading-[20px] text-[var(--text-secondary)]">
-              Scheduled backend job dispatches idempotent email & in-app alerts at 15, 10, 5, and 1 day remaining without duplicates.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            loading={runningReminderJob}
-            onClick={handleRunReminderScheduler}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Run scheduled reminder check now
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(['7d', '3d', '1d'] as const).map((mKey) => {
-            const spec = REMINDER_MILESTONE_SPECS[mKey];
-            const deliveredRecord = reminders.find((r) => r.milestone === mKey);
-            const isCurrentWindow = !isPaidActive && !isExpired && daysRemaining === spec.daysRemaining;
-
-            return (
-              <div
-                key={mKey}
-                className={`rounded-[10px] border p-4 flex flex-col justify-between gap-3 ${
-                  isCurrentWindow
-                    ? 'border-[var(--accent)] bg-[var(--surface)] shadow-2xs'
-                    : 'border-[var(--border)] bg-[var(--surface)]'
-                }`}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <Badge
-                      tone={
-                        spec.urgency === 'danger'
-                          ? 'danger'
-                          : spec.urgency === 'warning'
-                            ? 'warning'
-                            : 'neutral'
-                      }
-                    >
-                      {spec.badgeLabel}
-                    </Badge>
-                    {deliveredRecord ? (
-                      <span className="text-[11px] font-mono tabular-nums text-[var(--status-success)] font-medium">
-                        Delivered
-                      </span>
-                    ) : (
-                      <span className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)]">
-                        Scheduled
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[13px] leading-[18px] font-semibold text-[var(--text-primary)]">
-                    {spec.title}
-                  </div>
-                  <p className="text-[12px] leading-[18px] text-[var(--text-secondary)]">
-                    {spec.message}
-                  </p>
-                </div>
-
-                <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-2">
-                  {deliveredRecord ? (
-                    <span className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)] truncate">
-                      Sent {formatLocalDateTime(deliveredRecord.deliveredAt)}
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-[var(--text-tertiary)]">
-                      Triggers at {spec.daysRemaining}d left
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPlanForCheckout('scale')}
-                    className="text-[12px] font-medium text-[var(--accent)] hover:underline shrink-0 cursor-pointer"
-                  >
-                    Upgrade Now →
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Idempotent Reminder Delivery Log */}
-        {reminders.length > 0 && (
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-subtle)] flex items-center justify-between">
-              <span className="text-[12px] leading-[16px] font-medium text-[var(--text-primary)] flex items-center gap-1.5">
-                <BellRing className="h-3.5 w-3.5 text-[var(--accent)]" />
-                Idempotent notification delivery log ({reminders.length})
-              </span>
-              <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
-                Timezone-safe UTC deduplication active
-              </span>
-            </div>
-            <div className="divide-y divide-[var(--border)]">
-              {reminders.slice(0, 6).map((rem) => (
-                <div
-                  key={rem.id}
-                  className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-[13px]"
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        tone={
-                          rem.urgency === 'danger'
-                            ? 'danger'
-                            : rem.urgency === 'warning'
-                              ? 'warning'
-                              : 'neutral'
-                        }
-                      >
-                        {rem.daysRemaining === 1 ? 'Last day' : `${rem.daysRemaining} days remaining`}
-                      </Badge>
-                      <span className="font-medium text-[var(--text-primary)]">{rem.title}</span>
-                    </div>
-                    <p className="text-[12px] text-[var(--text-secondary)]">{rem.message}</p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)]">
-                      Key: {rem.dedupeKey} · {formatLocalDateTime(rem.deliveredAt)}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setSelectedPlanForCheckout('scale')}
-                    >
-                      Purchase Plan
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* C. Upgrade & Purchase Experience (Plans, Billing Frequency, Price, Features, 18% GST) */}
+      {/* Plans Section */}
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-              Available plans & transparent pricing
+              Available plans
             </h2>
             <p className="mt-0.5 text-[13px] leading-[20px] text-[var(--text-secondary)]">
-              Select a plan to proceed through server-verified checkout. Applicable 18% GST is calculated at checkout.
+              Prices exclude 18% GST. Annual billing is paid upfront for 12 months.
             </p>
           </div>
 
-          {/* Billing Frequency Toggle */}
-          <div className="inline-flex rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-1">
+          <div className="flex items-center gap-3">
+            {/* Beta Partner Toggle */}
             <button
               type="button"
-              onClick={() => setBillingCycle('monthly')}
-              className={`px-3 py-1.5 rounded-[6px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
-                billingCycle === 'monthly'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              onClick={() => setShowBetaPricing(!showBetaPricing)}
+              className={`px-3 py-1.5 rounded-[6px] text-[12px] leading-[16px] font-medium border transition-colors cursor-pointer ${
+                showBetaPricing
+                  ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                  : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              Monthly billing
+              <Sparkles className="h-3 w-3 inline-block mr-1 -mt-0.5" />
+              Beta Partner Pricing
             </button>
-            <button
-              type="button"
-              onClick={() => setBillingCycle('annual')}
-              className={`px-3 py-1.5 rounded-[6px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
-                billingCycle === 'annual'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              Annual billing (Save 16%)
-            </button>
+
+            {/* Billing Cycle Toggle */}
+            <div className="inline-flex rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-1">
+              <button
+                type="button"
+                onClick={() => setBillingCycle('monthly')}
+                className={`px-3 py-1.5 rounded-[6px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                  billingCycle === 'monthly'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingCycle('annual')}
+                className={`px-3 py-1.5 rounded-[6px] text-[12px] leading-[16px] font-medium transition-colors cursor-pointer ${
+                  billingCycle === 'annual'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Annual (Save ~20%)
+              </button>
+            </div>
           </div>
         </div>
 
+        {/* Beta Partner Info Banner */}
+        {showBetaPricing && (
+          <div className="rounded-[10px] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-[14px] leading-[20px] font-semibold text-[var(--text-primary)]">
+              <Sparkles className="h-4 w-4 text-[var(--accent)]" />
+              Beta Partner Programme
+            </div>
+            <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+              Founding-partner pricing for the first batch of vendors and clients. Includes a 30-day beta evaluation period.
+              Beta pricing is locked for 12 months after paid conversion. Feedback and product improvement participation expected.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {plans.map((plan) => {
+          {SUBSCRIPTION_PLANS.map((plan) => {
             const pricing = computePlanPricingWithTax(plan.id, billingCycle);
             const isCurrentPaidPlan = isPaidActive && subscription.planId === plan.id;
             const isRecommended = plan.id === 'scale';
+            const betaPrices = BETA_PARTNER_PRICES[plan.id];
+
+            const displayPrice = showBetaPricing && betaPrices
+              ? billingCycle === 'annual' ? betaPrices.annual : betaPrices.monthly
+              : pricing.baseAmountInr;
+            const displayGst = Math.round((displayPrice * 18) / 100);
+            const displayTotal = displayPrice + displayGst;
+
+            const normalPrice = pricing.baseAmountInr;
+            const hasDiscount = showBetaPricing && betaPrices && displayPrice < normalPrice;
 
             return (
               <div
@@ -555,9 +314,9 @@ export const SubscriptionPage: React.FC = () => {
                       {plan.name}
                     </h3>
                     {isCurrentPaidPlan ? (
-                      <Badge tone="emerald">Current Active Plan</Badge>
+                      <Badge tone="emerald">Current Plan</Badge>
                     ) : isRecommended ? (
-                      <Badge tone="sky">Recommended</Badge>
+                      <Badge tone="sky">Most Popular</Badge>
                     ) : null}
                   </div>
                   <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
@@ -567,16 +326,22 @@ export const SubscriptionPage: React.FC = () => {
                   <div className="pt-2 border-t border-[var(--border)]">
                     <div className="flex items-baseline gap-1.5">
                       <span className="font-mono tabular-nums text-[24px] leading-[32px] font-semibold text-[var(--text-primary)]">
-                        {formatInr(pricing.baseAmountInr)}
+                        {formatInr(displayPrice)}
                       </span>
                       <span className="text-[12px] text-[var(--text-secondary)]">
-                        / {billingCycle === 'annual' ? 'year' : 'month'} + {pricing.gstPercent}% GST
+                        / {billingCycle === 'annual' ? 'year' : 'month'}
                       </span>
                     </div>
+                    {hasDiscount && (
+                      <div className="text-[12px] text-[var(--text-tertiary)] mt-0.5 line-through">
+                        Standard: {formatInr(normalPrice)} / {billingCycle === 'annual' ? 'year' : 'month'}
+                      </div>
+                    )}
                     <div className="text-[12px] font-mono tabular-nums text-[var(--text-tertiary)] mt-0.5">
-                      Total incl. GST: {formatInr(pricing.totalAmountInr)}
-                      {billingCycle === 'annual' &&
-                        ` · Saves ${formatInr(pricing.annualSavingsInr)}/yr`}
+                      + 18% GST = {formatInr(displayTotal)} total
+                      {billingCycle === 'annual' && (
+                        <span> · {formatInr(Math.round(displayPrice / 12))}/mo equiv.</span>
+                      )}
                     </div>
                   </div>
 
@@ -600,8 +365,10 @@ export const SubscriptionPage: React.FC = () => {
                   className="w-full"
                 >
                   {isCurrentPaidPlan
-                    ? 'Active Plan'
-                    : `Purchase ${plan.name} Plan`}
+                    ? 'Current Plan'
+                    : plan.id === 'enterprise'
+                      ? 'Contact Sales'
+                      : `Choose ${plan.name}`}
                 </Button>
               </div>
             );
@@ -609,11 +376,11 @@ export const SubscriptionPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Verified Payment Receipts Ledger */}
+      {/* Payment Receipts */}
       {(receipts.length > 0 || latestReceipt) && (
         <div className="space-y-3">
           <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-            Verified payment confirmations & GST invoices
+            Payment history & GST invoices
           </h2>
           <div className="overflow-x-auto border-t border-[var(--border)] bg-[var(--surface)] rounded-[8px]">
             <table>
@@ -621,11 +388,9 @@ export const SubscriptionPage: React.FC = () => {
                 <tr>
                   <th>Invoice #</th>
                   <th>Plan & cycle</th>
-                  <th>Payment ID</th>
                   <th className="text-right">Base amount</th>
                   <th className="text-right">GST (18%)</th>
                   <th className="text-right">Total paid</th>
-                  <th>Server signature</th>
                   <th>Paid at</th>
                 </tr>
               </thead>
@@ -638,9 +403,6 @@ export const SubscriptionPage: React.FC = () => {
                     <td className="capitalize">
                       {rcpt.planName} ({rcpt.billingCycle})
                     </td>
-                    <td className="font-mono text-[12px] text-[var(--text-secondary)]">
-                      {rcpt.paymentId}
-                    </td>
                     <td className="text-right font-mono tabular-nums">
                       {formatInr(rcpt.baseAmountInr)}
                     </td>
@@ -649,9 +411,6 @@ export const SubscriptionPage: React.FC = () => {
                     </td>
                     <td className="text-right font-mono tabular-nums font-semibold text-[var(--text-primary)]">
                       {formatInr(rcpt.totalAmountInr)}
-                    </td>
-                    <td>
-                      <Badge tone="emerald">HMAC · {rcpt.verifiedSignaturePrefix}…</Badge>
                     </td>
                     <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                       {formatLocalDateTime(rcpt.paidAt)}
@@ -664,89 +423,12 @@ export const SubscriptionPage: React.FC = () => {
         </div>
       )}
 
-      {/* A. Admin Trial Configuration & Lifecycle Simulator */}
-      {isAdmin && (
-        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--bg-subtle)] p-5 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-[14px] leading-[20px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[var(--accent)]" />
-                Admin trial configuration & lifecycle testing controls
-              </h3>
-              <p className="text-[12px] leading-[18px] text-[var(--text-secondary)]">
-                Configure trial duration or test server-side milestone alerts (15d, 10d, 5d, Last day) and expiry enforcement.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="w-44">
-              <Input
-                label="Trial duration (days)"
-                type="number"
-                min={1}
-                max={90}
-                value={trialDurationInput}
-                onChange={(e) => setTrialDurationInput(Number(e.target.value) || 15)}
-              />
-            </div>
-            <Button
-              size="sm"
-              loading={configuringTrial}
-              onClick={() => handleActivateOrSimulateTrial(undefined)}
-            >
-              Activate new {trialDurationInput}-day trial
-            </Button>
-          </div>
-
-          <div className="pt-3 border-t border-[var(--border)] space-y-2">
-            <span className="text-[12px] font-medium text-[var(--text-secondary)] block">
-              Simulate server trial clock milestone (triggers automated alert & entitlement check):
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={configuringTrial}
-                onClick={() => handleActivateOrSimulateTrial(7)}
-              >
-                Set 7 days left
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={configuringTrial}
-                onClick={() => handleActivateOrSimulateTrial(3)}
-              >
-                Set 3 days left
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={configuringTrial}
-                onClick={() => handleActivateOrSimulateTrial(1)}
-              >
-                Set Last day (1d left)
-              </Button>
-              <Button
-                size="sm"
-                variant="danger"
-                disabled={configuringTrial}
-                onClick={() => handleActivateOrSimulateTrial(0)}
-              >
-                Simulate Trial Expiry (0d · Enforce Read-Only)
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Secure Payment Checkout Modal */}
+      {/* Payment Checkout Modal */}
       <Dialog
         open={Boolean(selectedPlanForCheckout && activeCheckoutPricing)}
         onClose={() => setSelectedPlanForCheckout(null)}
-        title="Complete plan purchase & server verification"
-        description="Payment signature is verified server-side before activating subscription entitlements."
+        title="Complete plan purchase"
+        description="Secure payment processed and verified server-side."
         maxWidth="max-w-[520px]"
       >
         {activeCheckoutPricing && (
@@ -756,18 +438,18 @@ export const SubscriptionPage: React.FC = () => {
                 <span className="text-[14px] font-semibold text-[var(--text-primary)]">
                   {activeCheckoutPricing.plan.name} Plan ({activeCheckoutPricing.billingCycle})
                 </span>
-                <Badge tone="sky">Server-verified checkout</Badge>
+                {showBetaPricing && <Badge tone="sky">Beta Partner</Badge>}
               </div>
               <div className="divide-y divide-[var(--border)] text-[13px] pt-1">
                 <div className="py-1.5 flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Base subscription price</span>
+                  <span className="text-[var(--text-secondary)]">Base price</span>
                   <span className="font-mono tabular-nums text-[var(--text-primary)]">
                     {formatInr(activeCheckoutPricing.baseAmountInr)}
                   </span>
                 </div>
                 <div className="py-1.5 flex justify-between">
                   <span className="text-[var(--text-secondary)]">
-                    Applicable tax (GST {activeCheckoutPricing.gstPercent}%)
+                    GST ({activeCheckoutPricing.gstPercent}%)
                   </span>
                   <span className="font-mono tabular-nums text-[var(--text-secondary)]">
                     {formatInr(activeCheckoutPricing.gstAmountInr)}
@@ -791,8 +473,8 @@ export const SubscriptionPage: React.FC = () => {
                   value: 'Corporate Card (Visa / Mastercard)',
                   label: 'Corporate Card (Visa / Mastercard)',
                 },
-                { value: 'Enterprise UPI / NEFT', label: 'Enterprise UPI / NEFT' },
-                { value: 'NetBanking Corporate Mandate', label: 'NetBanking Corporate Mandate' },
+                { value: 'UPI / NEFT', label: 'UPI / NEFT' },
+                { value: 'NetBanking', label: 'NetBanking' },
               ]}
             />
 
@@ -807,13 +489,14 @@ export const SubscriptionPage: React.FC = () => {
                 label="Company GSTIN (optional)"
                 value={gstinInput}
                 onChange={(e) => setGstinInput(e.target.value)}
+                placeholder="e.g. 29AABCH9876F1Z5"
               />
             </div>
 
             <div className="rounded-[6px] border border-[var(--border)] px-3 py-2 text-[12px] text-[var(--text-secondary)] flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-[var(--status-success)] shrink-0" />
               <span>
-                Payment gateway credentials and HMAC-SHA256 verification keys remain strictly on the server.
+                Payment is securely processed and verified server-side before activating your subscription.
               </span>
             </div>
 
@@ -822,7 +505,7 @@ export const SubscriptionPage: React.FC = () => {
                 Cancel
               </Button>
               <Button onClick={handleCompleteVerifiedCheckout} loading={processingPayment}>
-                Pay {formatInr(activeCheckoutPricing.totalAmountInr)} & Verify
+                Pay {formatInr(activeCheckoutPricing.totalAmountInr)}
               </Button>
             </div>
           </div>
@@ -833,8 +516,8 @@ export const SubscriptionPage: React.FC = () => {
       <Dialog
         open={Boolean(latestReceipt)}
         onClose={() => setLatestReceipt(null)}
-        title="Payment confirmed & subscription active"
-        description="Your payment was verified server-side and paid entitlements are now active."
+        title="Payment confirmed"
+        description="Your subscription is now active."
       >
         {latestReceipt && (
           <div className="space-y-4">
@@ -844,7 +527,7 @@ export const SubscriptionPage: React.FC = () => {
                   <Receipt className="h-4 w-4 text-[var(--status-success)]" />
                   Invoice {latestReceipt.invoiceNumber}
                 </span>
-                <Badge tone="emerald">PAID · VERIFIED</Badge>
+                <Badge tone="emerald">PAID</Badge>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-[var(--text-secondary)]">Account</span>
@@ -877,10 +560,6 @@ export const SubscriptionPage: React.FC = () => {
                 <span className="font-mono tabular-nums">
                   {formatInr(latestReceipt.totalAmountInr)}
                 </span>
-              </div>
-              <div className="flex justify-between py-1 text-[12px] text-[var(--text-tertiary)]">
-                <span>Payment ID: {latestReceipt.paymentId}</span>
-                <span>HMAC: {latestReceipt.verifiedSignaturePrefix}…</span>
               </div>
             </div>
             <div className="flex justify-end">
