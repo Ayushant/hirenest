@@ -3687,6 +3687,127 @@ Return JSON array of objects with fields: targetSkill, question.`;
     res.json({ success: true, invitationSentAt: app_.invitationSentAt });
   });
 
+  app.post('/api/sheet-sync/jobs', async (req, res) => {
+    const sharedSecret = process.env.SHEET_SYNC_SECRET;
+    if (!sharedSecret) {
+      res.status(503).json({ error: 'Sheet sync is not configured on this server.' });
+      return;
+    }
+    if (req.get('x-sheet-sync-secret') !== sharedSecret) {
+      res.status(401).json({ error: 'Invalid sync secret.' });
+      return;
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      res.status(503).json({ error: 'Supabase service role is not configured on this server.' });
+      return;
+    }
+
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (rows.length === 0) {
+      res.status(400).json({ error: 'No rows provided.' });
+      return;
+    }
+
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    try {
+      const UNMAPPED_CLIENT_ORG_NAME = 'Internal / Unmapped';
+      let { data: org } = await adminClient
+        .from('organizations')
+        .select('id')
+        .eq('type', 'client')
+        .eq('name', UNMAPPED_CLIENT_ORG_NAME)
+        .maybeSingle();
+      if (!org) {
+        const { data: createdOrg, error: orgErr } = await adminClient
+          .from('organizations')
+          .insert({ name: UNMAPPED_CLIENT_ORG_NAME, type: 'client', status: 'approved' })
+          .select('id')
+          .single();
+        if (orgErr || !createdOrg) {
+          res.status(500).json({ error: `Could not resolve client org: ${orgErr?.message}` });
+          return;
+        }
+        org = createdOrg;
+      }
+
+      const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'hireatkind@gmail.com';
+      const { data: adminProfile } = await adminClient
+        .from('profiles')
+        .select('id')
+        .eq('email', ADMIN_EMAIL)
+        .maybeSingle();
+      if (!adminProfile) {
+        res.status(500).json({ error: `Could not resolve admin profile for ${ADMIN_EMAIL}.` });
+        return;
+      }
+
+      const synced: string[] = [];
+      const skipped: Array<{ externalRef: string; reason: string }> = [];
+
+      for (const row of rows) {
+        const externalRef = String(row?.externalRef || '').trim();
+        const title = String(row?.title || '').trim();
+        const description = String(row?.description || '').trim();
+        if (!externalRef) {
+          skipped.push({ externalRef, reason: 'Missing externalRef (row id).' });
+          continue;
+        }
+        if (title.length < 3 || title.length > 200) {
+          skipped.push({ externalRef, reason: 'Title must be 3-200 characters.' });
+          continue;
+        }
+        if (description.length < 20) {
+          skipped.push({ externalRef, reason: 'Description must be at least 20 characters.' });
+          continue;
+        }
+
+        const skills = Array.isArray(row?.skills)
+          ? row.skills.map((s: unknown) => String(s).trim()).filter(Boolean)
+          : String(row?.skills || '')
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+        const { error: upsertErr } = await adminClient.from('requirements').upsert(
+          {
+            external_ref: externalRef,
+            client_org_id: org.id,
+            created_by: adminProfile.id,
+            title,
+            description,
+            skills,
+            min_experience: row?.minExperience != null ? Number(row.minExperience) : null,
+            max_experience: row?.maxExperience != null ? Number(row.maxExperience) : null,
+            location: row?.location ? String(row.location) : null,
+            work_mode: row?.workMode || null,
+            employment_type: row?.employmentType || null,
+            openings: row?.openings != null ? Number(row.openings) : 1,
+            vendor_visible_budget: row?.budget != null ? Number(row.budget) : null,
+            currency: row?.currency ? String(row.currency) : 'INR',
+            status: row?.status || 'draft',
+          },
+          { onConflict: 'external_ref' },
+        );
+
+        if (upsertErr) {
+          skipped.push({ externalRef, reason: upsertErr.message });
+        } else {
+          synced.push(externalRef);
+        }
+      }
+
+      res.json({ synced: synced.length, skipped });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Sync failed.' });
+    }
+  });
+
   app.get('/api/health', (_req, res) => {
     res.json({
       ok: true,
