@@ -212,6 +212,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Privacy & DPDP', to: '/admin/privacy', icon: Lock },
             { label: 'Audit log', to: '/admin/audit-logs', icon: ShieldCheck },
             { label: 'Early access', to: '/admin/early-access', icon: Inbox },
+            { label: 'Subscription management', to: '/admin/subscription', icon: CreditCard },
           ],
         };
         return [pipelineGroup, govGroup];

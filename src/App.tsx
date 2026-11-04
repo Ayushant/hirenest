@@ -28,6 +28,7 @@ import {
   AdminUsersPage,
 } from './pages/admin/HqDashboardAndGov';
 import { EarlyAccessDashboardPage } from './pages/admin/EarlyAccessDashboardPage';
+import { AdminSubscriptionPage } from './pages/admin/AdminSubscriptionPage';
 
 import {
   HqRequirementsListPage,
@@ -176,6 +177,7 @@ function AppRoutes() {
         <Route path="privacy" element={<PrivacyGovernancePage />} />
         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
         <Route path="early-access" element={<EarlyAccessDashboardPage />} />
+        <Route path="subscription" element={<AdminSubscriptionPage />} />
       </Route>
 
       {/* Recruiter HQ Workspace (/recruiter/*) */}
