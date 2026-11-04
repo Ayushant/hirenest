@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Check,
   Sparkles,
@@ -11,6 +11,7 @@ import {
   MetricStrip,
   Button,
   Badge,
+  TableSkeleton,
 } from '../../components/ui/kit';
 import {
   type BillingCycle,
@@ -18,6 +19,8 @@ import {
   computePlanPricingWithTax,
 } from '../../lib/enterpriseLifecycle';
 import { useAuth } from '../../auth/AuthProvider';
+import { fetchSubscriptionStatus } from '../../api/subscription';
+import type { OrganizationSubscription } from '../../types/subscription';
 
 function formatInr(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -34,15 +37,33 @@ const BETA_PARTNER_PRICES: Record<string, { monthly: number; annual: number }> =
 };
 
 export const SubscriptionPage: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, organization } = useAuth();
   const role = profile?.role || 'vendor_admin';
+  const orgId = organization?.id || profile?.org_id || 'default_hirenest_account';
 
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [showBetaPricing, setShowBetaPricing] = useState(false);
+  const [sub, setSub] = useState<OrganizationSubscription | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSubscriptionStatus(orgId)
+      .then(setSub)
+      .finally(() => setLoading(false));
+  }, [orgId]);
 
   const isVendor = role === 'vendor_admin' || role === 'vendor_recruiter';
   const isClient = role === 'client_manager' || role === 'client_member';
   const roleLabel = isVendor ? 'Vendor' : isClient ? 'Client' : 'Organisation';
+
+  const daysRemaining = sub?.daysRemaining ?? 14;
+  const isExpired = sub?.isExpired ?? false;
+  const isTrial = sub?.isTrial ?? true;
+  const statusLabel = isExpired ? 'EXPIRED' : isTrial ? 'TRIALING' : sub?.subscriptionStatus?.toUpperCase() || 'TRIALING';
+  const statusTone = isExpired ? 'danger' : isTrial && daysRemaining <= 5 ? 'danger' : isTrial ? 'warning' : 'default';
+  const planLabel = sub?.planId === 'growth' || sub?.planId === 'starter' ? 'Free Trial' : 'Free Trial';
+
+  if (loading) return <TableSkeleton rows={4} cols={3} />;
 
   return (
     <div className="space-y-8">
@@ -51,20 +72,40 @@ export const SubscriptionPage: React.FC = () => {
         description={`Explore plans for your ${roleLabel.toLowerCase()} organisation. Contact admin to activate or upgrade your subscription.`}
       />
 
+      {/* Expiry Alert */}
+      {isExpired && (
+        <div className="rounded-[10px] border border-[var(--status-danger)] bg-[var(--status-danger-bg)] p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-[var(--status-danger)] shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-[14px] leading-[20px] font-semibold text-[var(--status-danger)]">
+              Trial expired — workspace is in restricted read-only state
+            </p>
+            <p className="text-[13px] leading-[20px] text-[var(--text-primary)]">
+              Contact your platform admin to activate a paid subscription and restore full access.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Current Status Strip */}
       <MetricStrip
         items={[
           {
             label: 'Current plan',
-            value: 'Free Trial',
+            value: planLabel,
           },
           {
             label: 'Status',
-            value: 'TRIALING',
-            tone: 'warning',
+            value: statusLabel,
+            tone: statusTone as 'default' | 'danger' | 'warning',
           },
           {
-            label: 'Subscription managed by',
+            label: 'Days remaining',
+            value: isExpired ? '0 days' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`,
+            tone: isExpired ? 'danger' : daysRemaining <= 5 ? 'danger' : daysRemaining <= 7 ? 'warning' : 'default',
+          },
+          {
+            label: 'Managed by',
             value: 'Platform Admin',
           },
         ]}
