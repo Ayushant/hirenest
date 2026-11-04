@@ -19,8 +19,7 @@ import {
   computePlanPricingWithTax,
 } from '../../lib/enterpriseLifecycle';
 import { useAuth } from '../../auth/AuthProvider';
-import { fetchSubscriptionStatus } from '../../api/subscription';
-import type { OrganizationSubscription } from '../../types/subscription';
+import { supabase } from '../../lib/supabase';
 
 function formatInr(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -43,25 +42,48 @@ export const SubscriptionPage: React.FC = () => {
 
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [showBetaPricing, setShowBetaPricing] = useState(false);
-  const [sub, setSub] = useState<OrganizationSubscription | null>(null);
+  const [trialInfo, setTrialInfo] = useState<{ daysRemaining: number; isExpired: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const DEFAULT_TRIAL_DAYS = 14;
+
   useEffect(() => {
-    fetchSubscriptionStatus(orgId)
-      .then(setSub)
-      .finally(() => setLoading(false));
+    async function loadTrialStatus() {
+      try {
+        const { data } = await supabase
+          .from('organizations')
+          .select('created_at, trial_ends_at')
+          .eq('id', orgId)
+          .maybeSingle();
+
+        if (data) {
+          const now = Date.now();
+          const createdAt = new Date(data.created_at).getTime();
+          const trialEnd = data.trial_ends_at
+            ? new Date(data.trial_ends_at).getTime()
+            : createdAt + DEFAULT_TRIAL_DAYS * 86_400_000;
+          const daysRemaining = Math.max(0, Math.ceil((trialEnd - now) / 86_400_000));
+          setTrialInfo({ daysRemaining, isExpired: daysRemaining === 0 });
+        } else {
+          setTrialInfo({ daysRemaining: DEFAULT_TRIAL_DAYS, isExpired: false });
+        }
+      } catch {
+        setTrialInfo({ daysRemaining: DEFAULT_TRIAL_DAYS, isExpired: false });
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadTrialStatus();
   }, [orgId]);
 
   const isVendor = role === 'vendor_admin' || role === 'vendor_recruiter';
   const isClient = role === 'client_manager' || role === 'client_member';
   const roleLabel = isVendor ? 'Vendor' : isClient ? 'Client' : 'Organisation';
 
-  const daysRemaining = sub?.daysRemaining ?? 14;
-  const isExpired = sub?.isExpired ?? false;
-  const isTrial = sub?.isTrial ?? true;
-  const statusLabel = isExpired ? 'EXPIRED' : isTrial ? 'TRIALING' : sub?.subscriptionStatus?.toUpperCase() || 'TRIALING';
-  const statusTone = isExpired ? 'danger' : isTrial && daysRemaining <= 5 ? 'danger' : isTrial ? 'warning' : 'default';
-  const planLabel = sub?.planId === 'growth' || sub?.planId === 'starter' ? 'Free Trial' : 'Free Trial';
+  const daysRemaining = trialInfo?.daysRemaining ?? DEFAULT_TRIAL_DAYS;
+  const isExpired = trialInfo?.isExpired ?? false;
+  const statusLabel = isExpired ? 'EXPIRED' : 'TRIALING';
+  const statusTone = isExpired ? 'danger' : daysRemaining <= 5 ? 'danger' : 'warning';
 
   if (loading) return <TableSkeleton rows={4} cols={3} />;
 
@@ -92,7 +114,7 @@ export const SubscriptionPage: React.FC = () => {
         items={[
           {
             label: 'Current plan',
-            value: planLabel,
+            value: 'Free Trial',
           },
           {
             label: 'Status',

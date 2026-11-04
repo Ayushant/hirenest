@@ -1,24 +1,31 @@
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   CreditCard,
   Building2,
-  Users,
   Clock,
   Sparkles,
   AlertTriangle,
+  CalendarPlus,
 } from 'lucide-react';
 import {
   PageHeader,
   MetricStrip,
   Button,
   Badge,
+  Dialog,
+  Select,
+  TableSkeleton,
+  ErrorState,
 } from '../../components/ui/kit';
 import {
   type BillingCycle,
   SUBSCRIPTION_PLANS,
   computePlanPricingWithTax,
 } from '../../lib/enterpriseLifecycle';
+import { supabase } from '../../lib/supabase';
+import { useToast } from '../../components/ui/Toast';
 
 function formatInr(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -34,36 +41,102 @@ const BETA_PARTNER_PRICES: Record<string, { monthly: number; annual: number }> =
   enterprise: { monthly: 19999, annual: 199990 },
 };
 
+const DEFAULT_TRIAL_DAYS = 14;
+
+interface OrgRow {
+  id: string;
+  name: string;
+  type: 'vendor' | 'client' | 'internal';
+  status: string;
+  created_at: string;
+  trial_ends_at: string | null;
+}
+
+function computeTrialInfo(org: OrgRow) {
+  const now = Date.now();
+  const createdAt = new Date(org.created_at).getTime();
+  const defaultTrialEnd = createdAt + DEFAULT_TRIAL_DAYS * 86_400_000;
+  const trialEnd = org.trial_ends_at
+    ? new Date(org.trial_ends_at).getTime()
+    : defaultTrialEnd;
+
+  const daysRemaining = Math.max(0, Math.ceil((trialEnd - now) / 86_400_000));
+  const isExpired = daysRemaining === 0;
+  const trialDuration = Math.ceil((trialEnd - createdAt) / 86_400_000);
+
+  return { daysRemaining, isExpired, trialEnd, trialDuration };
+}
+
+async function fetchOrgs(): Promise<OrgRow[]> {
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('id, name, type, status, created_at, trial_ends_at')
+    .in('type', ['vendor', 'client'])
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data || []) as OrgRow[];
+}
+
+async function extendTrial(orgId: string, newEndDate: string) {
+  const { error } = await supabase
+    .from('organizations')
+    .update({ trial_ends_at: newEndDate })
+    .eq('id', orgId);
+
+  if (error) throw new Error(error.message);
+}
+
 export const AdminSubscriptionPage: React.FC = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [showBetaPricing, setShowBetaPricing] = useState(false);
+  const [extendOrgId, setExtendOrgId] = useState<string | null>(null);
+  const [extendDays, setExtendDays] = useState<string>('30');
+
+  const { data: orgs, isLoading, error, refetch } = useQuery({
+    queryKey: ['admin_org_subscriptions'],
+    queryFn: fetchOrgs,
+  });
+
+  const extendMutation = useMutation({
+    mutationFn: async ({ orgId, days }: { orgId: string; days: number }) => {
+      const org = orgs?.find((o) => o.id === orgId);
+      if (!org) throw new Error('Organisation not found');
+      const createdAt = new Date(org.created_at).getTime();
+      const newEnd = new Date(createdAt + days * 86_400_000).toISOString();
+      await extendTrial(orgId, newEnd);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin_org_subscriptions'] });
+      setExtendOrgId(null);
+      toast({ title: 'Trial extended', description: `Trial updated to ${extendDays} days.`, tone: 'success' });
+    },
+    onError: (err) => {
+      toast({ title: 'Failed to extend trial', description: err instanceof Error ? err.message : 'Unknown error', tone: 'error' });
+    },
+  });
+
+  const totalOrgs = orgs?.length ?? 0;
+  const trialOrgs = orgs?.filter((o) => !computeTrialInfo(o).isExpired).length ?? 0;
+  const expiredOrgs = orgs?.filter((o) => computeTrialInfo(o).isExpired).length ?? 0;
+  const extendOrg = orgs?.find((o) => o.id === extendOrgId);
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Subscription management"
-        description="Manage subscription plans for vendor and client organisations. You control all billing centrally."
+        description="Manage subscription plans and trial periods for vendor and client organisations."
       />
 
       {/* Overview Metrics */}
       <MetricStrip
         items={[
-          {
-            label: 'Total organisations',
-            value: '—',
-          },
-          {
-            label: 'Active subscriptions',
-            value: '0',
-          },
-          {
-            label: 'On free trial',
-            value: '—',
-          },
-          {
-            label: 'Revenue (MTD)',
-            value: '—',
-          },
+          { label: 'Total organisations', value: isLoading ? '...' : String(totalOrgs) },
+          { label: 'Active trials', value: isLoading ? '...' : String(trialOrgs) },
+          { label: 'Expired trials', value: isLoading ? '...' : String(expiredOrgs), tone: expiredOrgs > 0 ? 'danger' : 'default' },
+          { label: 'Paid subscriptions', value: '0' },
         ]}
       />
 
@@ -75,47 +148,161 @@ export const AdminSubscriptionPage: React.FC = () => {
             Centralised billing control
           </p>
           <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-            As the platform owner, you manage all subscriptions. Vendors and clients can view pricing but cannot purchase directly.
-            When payment gateway integration is live, you'll activate subscriptions for organisations from this page.
+            Vendors and clients cannot purchase directly — you manage all subscriptions centrally.
+            Default trial is {DEFAULT_TRIAL_DAYS} days from signup. You can extend trials to 30, 60, or 90 days.
           </p>
         </div>
       </div>
 
-      {/* Organisation Subscription Table (placeholder) */}
+      {/* Organisation Subscription Table */}
       <div className="space-y-3">
         <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-          Organisation subscriptions
+          Organisation trials & subscriptions
         </h2>
-        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-          <table>
-            <thead>
-              <tr>
-                <th>Organisation</th>
-                <th>Type</th>
-                <th>Current plan</th>
-                <th>Status</th>
-                <th>Trial ends</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td colSpan={6} className="text-center py-8 text-[var(--text-tertiary)]">
-                  <div className="flex flex-col items-center gap-2">
-                    <Building2 className="h-8 w-8 text-[var(--border)]" />
-                    <p className="text-[13px]">
-                      Organisation subscription data will populate here once organisations are onboarded.
-                    </p>
-                    <p className="text-[12px]">
-                      Go to <span className="font-medium text-[var(--text-secondary)]">Governance &gt; Organizations</span> to manage organisations.
-                    </p>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+
+        {isLoading ? (
+          <TableSkeleton rows={4} cols={6} />
+        ) : error ? (
+          <ErrorState
+            message={error instanceof Error ? error.message : 'Could not load organisations'}
+            onRetry={() => refetch()}
+          />
+        ) : orgs && orgs.length > 0 ? (
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Organisation</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Trial duration</th>
+                  <th>Days remaining</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orgs.map((org) => {
+                  const trial = computeTrialInfo(org);
+                  return (
+                    <tr key={org.id}>
+                      <td className="font-medium text-[var(--text-primary)]">{org.name}</td>
+                      <td>
+                        <Badge tone={org.type === 'vendor' ? 'sky' : 'indigo'}>
+                          {org.type === 'vendor' ? 'Vendor' : 'Client'}
+                        </Badge>
+                      </td>
+                      <td>
+                        {trial.isExpired ? (
+                          <Badge tone="red">Expired</Badge>
+                        ) : trial.daysRemaining <= 5 ? (
+                          <Badge tone="amber">Expiring soon</Badge>
+                        ) : (
+                          <Badge tone="emerald">Trialing</Badge>
+                        )}
+                      </td>
+                      <td className="font-mono tabular-nums text-[13px]">
+                        {trial.trialDuration} days
+                      </td>
+                      <td>
+                        <span
+                          className={`font-mono tabular-nums text-[14px] font-semibold ${
+                            trial.isExpired
+                              ? 'text-[var(--status-danger)]'
+                              : trial.daysRemaining <= 5
+                                ? 'text-[var(--status-danger)]'
+                                : trial.daysRemaining <= 7
+                                  ? 'text-[var(--status-warning)]'
+                                  : 'text-[var(--text-primary)]'
+                          }`}
+                        >
+                          {trial.daysRemaining}d
+                        </span>
+                      </td>
+                      <td>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setExtendOrgId(org.id);
+                            setExtendDays(String(Math.max(trial.trialDuration, 30)));
+                          }}
+                        >
+                          <CalendarPlus className="h-3.5 w-3.5" />
+                          Extend
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+            <Building2 className="h-8 w-8 text-[var(--border)] mx-auto mb-2" />
+            <p className="text-[13px] text-[var(--text-tertiary)]">
+              No vendor or client organisations onboarded yet.
+            </p>
+            <p className="text-[12px] text-[var(--text-tertiary)] mt-1">
+              Go to <span className="font-medium text-[var(--text-secondary)]">Governance &gt; Organizations</span> to approve organisations.
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Extend Trial Dialog */}
+      <Dialog
+        open={Boolean(extendOrgId && extendOrg)}
+        onClose={() => setExtendOrgId(null)}
+        title="Extend trial period"
+        description={extendOrg ? `Set trial duration for ${extendOrg.name}` : ''}
+        maxWidth="max-w-[420px]"
+      >
+        {extendOrg && (
+          <div className="space-y-4">
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[13px] space-y-1">
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Organisation</span>
+                <span className="font-medium text-[var(--text-primary)]">{extendOrg.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Current days remaining</span>
+                <span className="font-mono tabular-nums font-semibold text-[var(--text-primary)]">
+                  {computeTrialInfo(extendOrg).daysRemaining}d
+                </span>
+              </div>
+            </div>
+
+            <Select
+              label="New trial duration (from signup date)"
+              value={extendDays}
+              onChange={(e) => setExtendDays(e.target.value)}
+              options={[
+                { value: '14', label: '14 days (default)' },
+                { value: '30', label: '30 days' },
+                { value: '45', label: '45 days' },
+                { value: '60', label: '60 days' },
+                { value: '90', label: '90 days' },
+              ]}
+            />
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+              <Button variant="outline" onClick={() => setExtendOrgId(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() =>
+                  extendMutation.mutate({ orgId: extendOrg.id, days: Number(extendDays) })
+                }
+                loading={extendMutation.isPending}
+              >
+                <CalendarPlus className="h-3.5 w-3.5" />
+                Extend to {extendDays} days
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
 
       {/* Plan Reference Cards */}
       <div className="space-y-4">
