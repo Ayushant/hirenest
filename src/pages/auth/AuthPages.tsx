@@ -36,7 +36,7 @@ const AuthSplitLayout: React.FC<{
           <span className="text-[15px] leading-[20px] font-semibold text-white">
             HireNest
           </span>
-          <span className="text-[11px] leading-[14px] text-[#8FA6BC]">
+          <span className="text-[12px] leading-[16px] text-[#8FA6BC]">
             Hire Nest Workforce Pvt Ltd
           </span>
         </div>
@@ -83,7 +83,7 @@ const AuthSplitLayout: React.FC<{
             <div className="text-[13px] leading-[18px] font-semibold text-[var(--text-primary)]">
               HireNestOS
             </div>
-            <div className="text-[11px] leading-[15px] text-[var(--text-tertiary)] truncate">
+            <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] truncate">
               Hire Nest Workforce Private Limited
             </div>
           </div>

@@ -639,7 +639,7 @@ export const RequirementFormModal: React.FC<{
                 <div className="text-[12px] leading-[16px] font-medium text-[var(--text-primary)]">
                   Publish as Open &amp; share with vendor agencies immediately
                 </div>
-                <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                   Makes this requirement visible in Vendor Shared Requirements with SLA countdown.
                 </div>
               </div>
@@ -948,7 +948,7 @@ export const RequirementFormModal: React.FC<{
                     <div className="text-[13px] leading-[18px] font-medium text-[var(--text-primary)]">
                       {info.selectorLabel}
                     </div>
-                    <div className="text-[11px] leading-[16px] text-[var(--text-tertiary)]">
+                    <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                       {info.fullLabel}
                     </div>
                   </button>
@@ -1006,7 +1006,7 @@ export const RequirementFormModal: React.FC<{
 
             {/* Preview only card */}
             <div className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2">
-              <div className="text-[11px] leading-[14px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+              <div className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                 Preview only
               </div>
               <div className="mt-1 font-mono tabular-nums text-[15px] leading-[20px] font-semibold text-[var(--text-primary)]">

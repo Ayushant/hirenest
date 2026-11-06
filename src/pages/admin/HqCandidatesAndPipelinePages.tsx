@@ -1450,7 +1450,7 @@ export const HqSubmissionsPage: React.FC = () => {
                         <div className="font-medium text-[var(--text-primary)]">
                           {sub.candidates?.full_name || sub.candidate_id}
                         </div>
-                        <div className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                        <div className="text-[12px] font-mono text-[var(--text-tertiary)]">
                           Resume {validation.resume_version_used}
                         </div>
                       </td>
@@ -1468,7 +1468,7 @@ export const HqSubmissionsPage: React.FC = () => {
                             source={sub.source}
                             vendorName={sub.organizations?.name}
                           />
-                          <div className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-1">
+                          <div className="text-[12px] text-[var(--text-tertiary)] flex items-center gap-1">
                             <span>Vendor:</span>
                             <VendorAssociationBadge
                               vendorName={sub.organizations?.name}
@@ -1480,7 +1480,7 @@ export const HqSubmissionsPage: React.FC = () => {
                       <td>
                         <div className="space-y-1">
                           <ScoreBar score={validation.jd_match_percentage} />
-                          <div className="text-[11px] font-mono text-[var(--text-secondary)]">
+                          <div className="text-[12px] font-mono text-[var(--text-secondary)]">
                             {matchedCount} matched ·{' '}
                             <span
                               className={
@@ -1500,15 +1500,15 @@ export const HqSubmissionsPage: React.FC = () => {
                             {DECISION_GATE_LABELS[validation.decision_gate]}
                           </Badge>
                           {avgRating ? (
-                            <span className="text-[11px] font-mono text-[var(--text-secondary)]">
+                            <span className="text-[12px] font-mono text-[var(--text-secondary)]">
                               Recruiter rating: <strong>{avgRating}/5.0</strong>
                             </span>
                           ) : validation.validation_interview ? (
-                            <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                            <span className="text-[12px] font-mono text-[var(--text-tertiary)]">
                               Interview {validation.validation_interview.status}
                             </span>
                           ) : (
-                            <span className="text-[11px] text-[var(--text-tertiary)]">
+                            <span className="text-[12px] text-[var(--text-tertiary)]">
                               Not interviewed yet
                             </span>
                           )}
@@ -1529,7 +1529,7 @@ export const HqSubmissionsPage: React.FC = () => {
                               {latestFollowUp.target === 'vendor' ? 'Vendor' : 'Candidate'} ·{' '}
                               {latestFollowUp.status}
                             </Badge>
-                            <span className="text-[11px] text-[var(--text-tertiary)] font-mono">
+                            <span className="text-[12px] text-[var(--text-tertiary)] font-mono">
                               {latestFollowUp.missing_skills.length} skill(s)
                             </span>
                           </div>

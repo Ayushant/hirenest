@@ -135,7 +135,7 @@ export const MatchEvidencePanel: React.FC<{
                 className="h-full rounded-full transition-all duration-200"
               />
             </div>
-            <p className="text-[11px] leading-[15px] text-[var(--text-tertiary)]">
+            <p className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
               {dim.subtitle}
             </p>
           </div>
@@ -145,10 +145,10 @@ export const MatchEvidencePanel: React.FC<{
       {/* Weighted Calculation Table: Match Score = 0.40S + 0.25E + 0.20D + 0.15N */}
       <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
         <div className="px-3.5 py-2 border-b border-[var(--border)] bg-[var(--bg-subtle)] flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[11px] leading-[15px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+          <span className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
             Weighted Score Breakdown
           </span>
-          <span className="font-mono text-[11px] leading-[15px] text-[var(--text-secondary)]">
+          <span className="font-mono text-[12px] leading-[16px] text-[var(--text-secondary)]">
             Match Score = 0.40S + 0.25E + 0.20D + 0.15N
           </span>
         </div>

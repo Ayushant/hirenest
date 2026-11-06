@@ -100,7 +100,7 @@ export const SubscriptionPage: React.FC = () => {
           <AlertTriangle className="h-5 w-5 text-[var(--status-danger)] shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="text-[14px] leading-[20px] font-semibold text-[var(--status-danger)]">
-              Trial expired — workspace is in restricted read-only state
+              Trial expired: workspace is in restricted read-only state
             </p>
             <p className="text-[13px] leading-[20px] text-[var(--text-primary)]">
               Contact your platform admin to activate a paid subscription and restore full access.
@@ -142,7 +142,7 @@ export const SubscriptionPage: React.FC = () => {
           </p>
           <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
             To upgrade your plan, contact your HireNestOS admin. They will activate the subscription for your organisation.
-            Direct purchases are not available — all billing is handled centrally.
+            Direct purchases are not available. All billing is handled centrally.
           </p>
         </div>
       </div>

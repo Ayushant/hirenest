@@ -641,7 +641,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                       setIsMessageEdited(false);
                       setCustomMessage(autoWhatsAppMessage);
                     }}
-                    className="text-[11px] text-[#1F4CC4] hover:underline cursor-pointer"
+                    className="text-[12px] text-[#1F4CC4] hover:underline cursor-pointer"
                   >
                     Reset to default template
                   </button>
@@ -658,7 +658,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
               />
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                <span className="text-[11px] text-[var(--text-tertiary)] font-mono truncate max-w-[360px]">
+                <span className="text-[12px] text-[var(--text-tertiary)] font-mono truncate max-w-[360px]">
                   Tracked link: {shareUrl}
                 </span>
 
@@ -859,10 +859,10 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="font-semibold text-[var(--text-primary)]">
               1. Requirement Received
             </div>
-            <div className="mt-1 text-[11px] text-[var(--text-secondary)]">
+            <div className="mt-1 text-[12px] text-[var(--text-secondary)]">
               Added to HireNestOS
             </div>
-            <div className="mt-2 font-mono text-[11px] text-[#1F4CC4] font-semibold">
+            <div className="mt-2 font-mono text-[12px] text-[#1F4CC4] font-semibold">
               ✓ Recorded
             </div>
           </div>
@@ -878,10 +878,10 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="font-semibold text-[var(--text-primary)]">
               2. Requirement Approved
             </div>
-            <div className="mt-1 text-[11px] text-[var(--text-secondary)]">
+            <div className="mt-1 text-[12px] text-[var(--text-secondary)]">
               Checked &amp; opened for sharing
             </div>
-            <div className="mt-2 font-mono text-[11px] font-semibold">
+            <div className="mt-2 font-mono text-[12px] font-semibold">
               {summary.step2Approved ? '✓ Open' : `Status: ${requirement.status}`}
             </div>
           </div>
@@ -891,7 +891,7 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="font-semibold text-[var(--text-primary)]">
               3. Share Audience
             </div>
-            <div className="mt-1 text-[11px] text-[var(--text-secondary)] space-y-0.5">
+            <div className="mt-1 text-[12px] text-[var(--text-secondary)] space-y-0.5">
               <div>• Vendors: <strong className="font-mono">{summary.vendorShareCount}</strong></div>
               <div>• Direct Cand.: <strong className="font-mono">{summary.directCandidateShareCount}</strong></div>
             </div>
@@ -919,7 +919,7 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="font-semibold text-[var(--text-primary)]">
               4. Sharing Method
             </div>
-            <div className="mt-1 text-[11px] text-[var(--text-secondary)] space-y-0.5 font-mono tabular-nums">
+            <div className="mt-1 text-[12px] text-[var(--text-secondary)] space-y-0.5 font-mono tabular-nums">
               <div>WhatsApp: <strong>{summary.whatsappShareCount}</strong></div>
               <div>Copy Link: <strong>{summary.copyLinkShareCount}</strong></div>
               <div>In-app: <strong>{summary.inAppShareCount}</strong></div>
@@ -934,7 +934,7 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="font-semibold text-[var(--text-primary)]">
               5. Requirement Shared
             </div>
-            <div className="mt-1 text-[11px] text-[var(--text-secondary)]">
+            <div className="mt-1 text-[12px] text-[var(--text-secondary)]">
               Recipients &amp; activity logged
             </div>
             <div className="mt-2 font-mono tabular-nums text-[12px] font-semibold text-[var(--text-primary)]">
@@ -947,7 +947,7 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="font-semibold text-[var(--text-primary)]">
               6. Track Responses
             </div>
-            <div className="mt-1 text-[11px] text-[var(--text-secondary)] space-y-0.5 font-mono tabular-nums">
+            <div className="mt-1 text-[12px] text-[var(--text-secondary)] space-y-0.5 font-mono tabular-nums">
               <div>Vendor subs: <strong>{summary.vendorResponsesCount}</strong></div>
               <div>Cand. apps: <strong>{summary.candidateResponsesCount}</strong></div>
               <div>Follow-ups: <strong>{summary.totalFollowUpsCount}</strong></div>
@@ -962,7 +962,7 @@ export const RequirementSharingFlowPanel: React.FC<{
             <div className="font-semibold text-[var(--text-primary)]">
               7. Hiring Outcome
             </div>
-            <div className="mt-1 text-[11px] text-[var(--text-secondary)] space-y-0.5 font-mono tabular-nums">
+            <div className="mt-1 text-[12px] text-[var(--text-secondary)] space-y-0.5 font-mono tabular-nums">
               <div>Screening: <strong>{summary.screeningCount}</strong></div>
               <div>Interview: <strong>{summary.interviewCount}</strong></div>
               <div>Placement: <strong>{summary.placementCount}</strong></div>
@@ -1065,7 +1065,7 @@ export const RequirementSharingFlowPanel: React.FC<{
                         {act.recipientName}
                       </div>
                       {act.recipientContact && (
-                        <div className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                        <div className="text-[12px] font-mono text-[var(--text-tertiary)]">
                           {act.recipientContact}
                         </div>
                       )}
@@ -1111,7 +1111,7 @@ export const RequirementSharingFlowPanel: React.FC<{
                     <td className="font-mono tabular-nums text-[12px] text-[var(--text-secondary)]">
                       {act.followUpCount || 0} sent
                       {act.lastFollowUpAt && (
-                        <div className="text-[11px] text-[var(--text-tertiary)]">
+                        <div className="text-[12px] text-[var(--text-tertiary)]">
                           Last: {formatLocalDateTime(act.lastFollowUpAt)}
                         </div>
                       )}

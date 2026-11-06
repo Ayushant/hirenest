@@ -148,7 +148,7 @@ export const AdminSubscriptionPage: React.FC = () => {
             Centralised billing control
           </p>
           <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-            Vendors and clients cannot purchase directly — you manage all subscriptions centrally.
+            Vendors and clients cannot purchase directly. You manage all subscriptions centrally.
             Default trial is {DEFAULT_TRIAL_DAYS} days from signup. You can extend trials to 30, 60, or 90 days.
           </p>
         </div>

@@ -99,7 +99,7 @@ export const PipelineQuickFilterBar: React.FC<{
             key={opt.id}
             type="button"
             onClick={() => onChange(opt.id)}
-            className={`h-7 px-2.5 rounded-[6px] border text-[11px] leading-[16px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`h-7 px-2.5 rounded-[6px] border text-[12px] leading-[16px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
               isActive
                 ? 'border-[#1F4CC4] bg-[#1F4CC4] text-white shadow-2xs'
                 : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -182,7 +182,7 @@ export const RequirementsPipelineGrid: React.FC<{
           <h2 className="text-[12px] leading-[16px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
             Active Requirements Pipeline
           </h2>
-          <span className="rounded-[4px] bg-[var(--bg-subtle)] border border-[var(--border)] px-1.5 py-0.5 font-mono tabular-nums text-[11px] leading-[14px] text-[var(--text-secondary)]">
+          <span className="rounded-[4px] bg-[var(--bg-subtle)] border border-[var(--border)] px-1.5 py-0.5 font-mono tabular-nums text-[12px] leading-[16px] text-[var(--text-secondary)]">
             {filteredRequirements.length}
           </span>
         </div>
@@ -251,7 +251,7 @@ export const RequirementsPipelineGrid: React.FC<{
                       <h3 className="text-[14px] leading-[20px] font-bold uppercase tracking-[-0.01em] text-[var(--text-primary)] truncate">
                         {req.title}
                       </h3>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] leading-[14px]">
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] leading-[16px]">
                         <span className="font-mono text-[var(--text-tertiary)]">
                           ID: {shortId}
                         </span>
@@ -288,7 +288,7 @@ export const RequirementsPipelineGrid: React.FC<{
 
                 {/* Card Bottom Metadata Bar */}
                 <div className="pt-3.5 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-5 text-[11px] leading-[16px] font-semibold uppercase tracking-[0.02em] text-[var(--text-secondary)]">
+                  <div className="flex flex-wrap items-center gap-5 text-[12px] leading-[16px] font-semibold uppercase tracking-[0.02em] text-[var(--text-secondary)]">
                     <span className="inline-flex items-center gap-1.5 font-mono tabular-nums">
                       <Clock className="h-3 w-3 text-[var(--text-tertiary)]" />
                       {expText}
@@ -319,7 +319,7 @@ export const RequirementsPipelineGrid: React.FC<{
                           onShareRequirement(req);
                         }}
                         title={`Share requirement ${req.title} via WhatsApp, Link, or In-app`}
-                        className="h-7 px-2.5 rounded-[6px] border border-[#1F4CC4]/35 bg-[#1F4CC4]/10 text-[11px] font-semibold text-[#1F4CC4] hover:bg-[#1F4CC4] hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="h-7 px-2.5 rounded-[6px] border border-[#1F4CC4]/35 bg-[#1F4CC4]/10 text-[12px] font-semibold text-[#1F4CC4] hover:bg-[#1F4CC4] hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Share2 className="h-3 w-3" />
                         <span>Share Requirement</span>
@@ -333,7 +333,7 @@ export const RequirementsPipelineGrid: React.FC<{
                           onDeleteRequirement(req);
                         }}
                         title={`Delete requirement ${req.title}`}
-                        className="h-7 px-2 rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[11px] font-medium text-[var(--text-secondary)] hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-600 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        className="h-7 px-2 rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-600 inline-flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <Trash2 className="h-3 w-3" />
                         <span>Delete</span>

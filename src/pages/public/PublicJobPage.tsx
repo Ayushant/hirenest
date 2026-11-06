@@ -187,7 +187,7 @@ export const PublicJobPage: React.FC = () => {
 
           {job.client_org_name && (
             <div className="flex items-center gap-2 text-base sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
-              <Building2 className="w-5 h-5" />
+              <Building2 className="w-5 h-5" aria-hidden="true" />
               {job.client_org_name}
             </div>
           )}
@@ -195,33 +195,33 @@ export const PublicJobPage: React.FC = () => {
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm sm:text-base pt-1" style={{ color: 'var(--text-secondary)' }}>
             {job.location && (
               <span className="inline-flex items-center gap-1.5">
-                <MapPin className="w-4 h-4" />
+                <MapPin className="w-4 h-4" aria-hidden="true" />
                 {job.location}
                 {job.work_mode ? ` · ${WORK_MODE_LABEL[job.work_mode]}` : ''}
               </span>
             )}
             <span className="inline-flex items-center gap-1.5">
-              <Clock className="w-4 h-4" />
+              <Clock className="w-4 h-4" aria-hidden="true" />
               {formatExperience(job.min_experience, job.max_experience)}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Briefcase className="w-4 h-4" />
+              <Briefcase className="w-4 h-4" aria-hidden="true" />
               {EMPLOYMENT_LABEL[job.employment_type || ''] || 'Full-time'}
             </span>
           </div>
 
           {/* CTAs */}
           <div className="flex flex-wrap gap-3 pt-5">
-            <Button size="lg" className="w-full sm:w-auto" onClick={() => setApplyOpen(true)}>
+            <Button size="lg" className="h-11 w-full sm:w-auto" onClick={() => setApplyOpen(true)}>
               Apply Now
             </Button>
-            <Button size="lg" variant="secondary" onClick={handleShare} className="flex-1 sm:flex-none">
-              <Share2 className="w-4 h-4 mr-2" />
+            <Button size="lg" variant="secondary" onClick={handleShare} className="h-11 flex-1 sm:flex-none">
+              <Share2 className="w-4 h-4 mr-2" aria-hidden="true" />
               Share
             </Button>
             <a href={whatsAppHref} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
-              <Button size="lg" variant="secondary" className="w-full">
-                <MessageCircle className="w-4 h-4 mr-2" />
+              <Button size="lg" variant="secondary" className="h-11 w-full">
+                <MessageCircle className="w-4 h-4 mr-2" aria-hidden="true" />
                 WhatsApp
               </Button>
             </a>
@@ -310,7 +310,7 @@ export const PublicJobPage: React.FC = () => {
               Create a free candidate account to apply in minutes.
             </div>
           </div>
-          <Button size="lg" className="w-full sm:w-auto" onClick={() => setApplyOpen(true)}>
+          <Button size="lg" className="h-11 w-full sm:w-auto" onClick={() => setApplyOpen(true)}>
             Apply Now
           </Button>
         </section>
@@ -345,7 +345,7 @@ const OverviewCell: React.FC<{
       className="flex items-center gap-2 text-xs uppercase tracking-wider"
       style={{ color: 'var(--text-tertiary)' }}
     >
-      {icon}
+      <span aria-hidden="true">{icon}</span>
       {label}
     </div>
     <div className="mt-1.5 text-base font-medium">{value}</div>
@@ -519,6 +519,8 @@ const ApplyModal: React.FC<{
         <div className="space-y-4">
           {error && (
             <div
+              role="alert"
+              aria-live="polite"
               className="text-xs rounded-md px-3 py-2"
               style={{
                 background: 'var(--status-danger-bg, #FEF2F2)',
@@ -572,7 +574,7 @@ const ApplyModal: React.FC<{
               </Button>
               <button
                 type="button"
-                className="w-full text-xs text-center"
+                className="w-full py-2 text-xs text-center"
                 style={{ color: 'var(--text-tertiary)' }}
                 onClick={() => setStep('choice')}
               >
@@ -619,7 +621,7 @@ const ApplyModal: React.FC<{
               </Button>
               <button
                 type="button"
-                className="w-full text-xs text-center"
+                className="w-full py-2 text-xs text-center"
                 style={{ color: 'var(--text-tertiary)' }}
                 onClick={() => setStep('choice')}
               >

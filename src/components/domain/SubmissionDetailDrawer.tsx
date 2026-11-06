@@ -970,24 +970,24 @@ export const SubmissionDetailDrawer: React.FC<{
             {/* Dual Score Strip: AI JD Match vs Recruiter Assessment Score (Kept Strictly Separate) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[var(--border)]">
               <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
-                <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                <div className="text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                   AI JD Match Score
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-2">
                   <span className="font-mono tabular-nums text-[18px] font-semibold text-[var(--text-primary)]">
                     {valRecord.matchSummary.jdMatchPercentage}%
                   </span>
-                  <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                  <span className="text-[12px] font-mono text-[var(--text-tertiary)]">
                     {valRecord.matchSummary.resumeVersion}
                   </span>
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                <div className="text-[12px] text-[var(--text-secondary)] truncate">
                   {valRecord.matchSummary.scoreCalculationVersion}
                 </div>
               </div>
 
               <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
-                <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                <div className="text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                   Recruiter Validation Score
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-2">
@@ -1006,13 +1006,13 @@ export const SubmissionDetailDrawer: React.FC<{
                     {valRecord.validationInterview.status.replace('_', ' ')}
                   </Badge>
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="text-[12px] text-[var(--text-secondary)]">
                   Separate human assessment (1–5 scale)
                 </div>
               </div>
 
               <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
-                <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                <div className="text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                   Source &amp; Ownership
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-2">
@@ -1029,7 +1029,7 @@ export const SubmissionDetailDrawer: React.FC<{
                     <Badge tone="red">Hold</Badge>
                   )}
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                <div className="text-[12px] text-[var(--text-secondary)] truncate">
                   Original:{' '}
                   {submission.candidates?.original_source === 'internal'
                     ? 'Admin'
@@ -1193,7 +1193,7 @@ export const SubmissionDetailDrawer: React.FC<{
                   <h3 className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--text-secondary)]">
                     JD Skill-by-Skill Evidence Breakdown ({valRecord.matchSummary.skills.length})
                   </h3>
-                  <div className="flex items-center gap-2 text-[11px] text-[var(--text-tertiary)]">
+                  <div className="flex items-center gap-2 text-[12px] text-[var(--text-tertiary)]">
                     <span>Mandatory &amp; Preferred</span>
                   </div>
                 </div>
@@ -1225,7 +1225,7 @@ export const SubmissionDetailDrawer: React.FC<{
                                   e.target.value as SkillEvidenceStatus
                                 )
                               }
-                              className="h-7 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2 text-[11px] text-[var(--text-primary)]"
+                              className="h-7 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2 text-[12px] text-[var(--text-primary)]"
                             >
                               <option value="matched">Matched in resume</option>
                               <option value="recruiter_verified">Recruiter-verified</option>
@@ -1243,7 +1243,7 @@ export const SubmissionDetailDrawer: React.FC<{
                           {item.evidenceSnippet}
                         </span>
                         {item.verifiedBy && (
-                          <span className="text-[11px] font-mono text-[var(--text-tertiary)] shrink-0">
+                          <span className="text-[12px] font-mono text-[var(--text-tertiary)] shrink-0">
                             Updated by {item.verifiedBy}
                           </span>
                         )}
@@ -1758,7 +1758,7 @@ export const SubmissionDetailDrawer: React.FC<{
                 </p>
 
                 {valRecord.followUp.requestedAt && (
-                  <div className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                  <div className="text-[12px] font-mono text-[var(--text-tertiary)]">
                     Requested {formatLocalDateTime(valRecord.followUp.requestedAt)} by{' '}
                     {valRecord.followUp.requestedBy}
                     {valRecord.followUp.respondedAt
@@ -1869,7 +1869,7 @@ export const SubmissionDetailDrawer: React.FC<{
                       ? 'Vendor Response, Skill Evidence & Updated Resume Version'
                       : 'Candidate Clarification Response & Updated Resume Evidence'}
                   </h3>
-                  <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                  <span className="text-[12px] font-mono text-[var(--text-tertiary)]">
                     Current version: {valRecord.matchSummary.resumeVersion}
                   </span>
                 </div>
@@ -1934,13 +1934,13 @@ export const SubmissionDetailDrawer: React.FC<{
                         <div className="font-medium text-[var(--text-primary)]">
                           <span className="font-mono mr-2">{ver.version}</span>· {ver.notes}
                         </div>
-                        <div className="text-[11px] text-[var(--text-tertiary)]">
+                        <div className="text-[12px] text-[var(--text-tertiary)]">
                           Uploaded by {ver.uploadedBy} · Digest: {ver.resumeHash}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <Badge tone="rich_blue">Match: {ver.matchScoreAtVersion}%</Badge>
-                        <span className="font-mono text-[11px] text-[var(--text-tertiary)]">
+                        <span className="font-mono text-[12px] text-[var(--text-tertiary)]">
                           {formatLocalDateTime(ver.uploadedAt)}
                         </span>
                       </div>
@@ -1965,7 +1965,7 @@ export const SubmissionDetailDrawer: React.FC<{
                   </Badge>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
                   {VALIDATION_STAGE_ORDER.map((st, i) => {
                     const isCurrent = valRecord.validationStage === st;
                     return (
@@ -2064,7 +2064,7 @@ export const SubmissionDetailDrawer: React.FC<{
                 {/* Final Review Fact Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px]">
                   <div>
-                    <span className="text-[11px] text-[var(--text-tertiary)] block">
+                    <span className="text-[12px] text-[var(--text-tertiary)] block">
                       Recipient Client
                     </span>
                     <strong className="text-[var(--text-primary)]">
@@ -2072,7 +2072,7 @@ export const SubmissionDetailDrawer: React.FC<{
                     </strong>
                   </div>
                   <div>
-                    <span className="text-[11px] text-[var(--text-tertiary)] block">
+                    <span className="text-[12px] text-[var(--text-tertiary)] block">
                       Resume Version
                     </span>
                     <strong className="font-mono text-[var(--text-primary)]">
@@ -2080,7 +2080,7 @@ export const SubmissionDetailDrawer: React.FC<{
                     </strong>
                   </div>
                   <div>
-                    <span className="text-[11px] text-[var(--text-tertiary)] block">
+                    <span className="text-[12px] text-[var(--text-tertiary)] block">
                       Explainable JD Match
                     </span>
                     <strong className="font-mono text-[var(--text-primary)]">
@@ -2088,7 +2088,7 @@ export const SubmissionDetailDrawer: React.FC<{
                     </strong>
                   </div>
                   <div>
-                    <span className="text-[11px] text-[var(--text-tertiary)] block">
+                    <span className="text-[12px] text-[var(--text-tertiary)] block">
                       Recruiter Approval
                     </span>
                     <strong className="text-[var(--text-primary)]">
@@ -2256,18 +2256,18 @@ export const SubmissionDetailDrawer: React.FC<{
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
                       <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-2">
-                        <span className="text-[11px] text-[var(--text-tertiary)] block">
+                        <span className="text-[12px] text-[var(--text-tertiary)] block">
                           Offer Date &amp; Status
                         </span>
                         <strong className="font-mono text-[var(--text-primary)]">
                           {offerRec.offerDate || '-'}
                         </strong>
-                        <div className="text-[11px] text-[var(--text-secondary)]">
+                        <div className="text-[12px] text-[var(--text-secondary)]">
                           {OFFER_STATUS_LABELS[offerRec.offerStatus]}
                         </div>
                       </div>
                       <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-2">
-                        <span className="text-[11px] text-[var(--text-tertiary)] block">
+                        <span className="text-[12px] text-[var(--text-tertiary)] block">
                           Response Date
                         </span>
                         <strong className="font-mono text-[var(--text-primary)]">
@@ -2275,7 +2275,7 @@ export const SubmissionDetailDrawer: React.FC<{
                         </strong>
                       </div>
                       <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-2">
-                        <span className="text-[11px] text-[var(--text-tertiary)] block">
+                        <span className="text-[12px] text-[var(--text-tertiary)] block">
                           Expected DOJ
                         </span>
                         <strong className="font-mono text-[var(--text-primary)]">
@@ -2283,13 +2283,13 @@ export const SubmissionDetailDrawer: React.FC<{
                         </strong>
                       </div>
                       <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-2">
-                        <span className="text-[11px] text-[var(--text-tertiary)] block">
+                        <span className="text-[12px] text-[var(--text-tertiary)] block">
                           Confirmed Actual DOJ
                         </span>
                         <strong className="font-mono text-emerald-700 dark:text-emerald-300">
                           {offerRec.actualDoj || 'Not yet joined'}
                         </strong>
-                        <div className="text-[11px] text-[var(--text-secondary)]">
+                        <div className="text-[12px] text-[var(--text-secondary)]">
                           {ONBOARDING_STATUS_LABELS[offerRec.onboardingStatus]}
                         </div>
                       </div>
@@ -2526,11 +2526,11 @@ export const SubmissionDetailDrawer: React.FC<{
                           )}
                         </div>
                         <div className="text-[var(--text-secondary)]">{item.reason}</div>
-                        <div className="text-[11px] text-[var(--text-tertiary)]">
+                        <div className="text-[12px] text-[var(--text-tertiary)]">
                           {item.actorName} ({item.actorRole})
                         </div>
                       </div>
-                      <span className="font-mono tabular-nums text-[11px] text-[var(--text-tertiary)] shrink-0">
+                      <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)] shrink-0">
                         {formatLocalDateTime(item.timestamp)}
                       </span>
                     </div>

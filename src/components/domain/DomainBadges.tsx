@@ -215,7 +215,7 @@ export const AiSuggestionBanner: React.FC<{
       <div className="flex items-center gap-2 min-w-0">
         {isOffline && (
           <span
-            className="shrink-0 inline-flex items-center gap-1 rounded-[4px] border border-[var(--border)] bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]"
+            className="shrink-0 inline-flex items-center gap-1 rounded-[4px] border border-[var(--border)] bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[12px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]"
             title={reasonLabel ? `Offline fallback: ${reasonLabel}` : 'Offline fallback'}
           >
             <span aria-hidden="true">●</span>

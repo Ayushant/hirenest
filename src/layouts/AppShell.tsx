@@ -350,14 +350,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             <img
               src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
               alt="HireNest Workforce Logo"
-              className="h-8 w-8 rounded-[6px] bg-white object-contain p-0.5 shrink-0 shadow-xs"
+              className="h-8 w-8 rounded-[6px] bg-white object-contain p-0.5 shrink-0"
             />
             <div className="min-w-0 flex flex-col">
               <span className="text-[14px] leading-[18px] font-semibold text-white truncate">
                 HireNest
               </span>
               {organization?.name ? (
-                <span className="text-[11px] leading-[14px] text-[var(--sidebar-muted)] truncate">
+                <span className="text-[12px] leading-[16px] text-[var(--sidebar-muted)] truncate">
                   {organization.name}
                 </span>
               ) : (
@@ -382,7 +382,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           {navGroups.map((group, gIdx) => (
             <div key={gIdx} className="space-y-0.5">
               {group.title && (
-                <div className="px-2.5 pb-1 text-[11px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--sidebar-muted)]">
+                <div className="px-2.5 pb-1 text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--sidebar-muted)]">
                   {group.title}
                 </div>
               )}
@@ -423,7 +423,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                           <span className="truncate">{item.label}</span>
                         </span>
                         {item.badgeCount !== undefined && item.badgeCount > 0 && (
-                          <span className="rounded-[6px] bg-[#88BDF2]/20 px-1.5 py-0.5 font-mono tabular-nums text-[11px] leading-[14px] text-[#88BDF2] font-medium">
+                          <span className="rounded-[6px] bg-[#88BDF2]/20 px-1.5 py-0.5 font-mono tabular-nums text-[12px] leading-[16px] text-[#88BDF2] font-medium">
                             {item.badgeCount}
                           </span>
                         )}
@@ -462,7 +462,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             <span>Sign out</span>
           </button>
 
-          <div className="pt-1.5 px-2.5 border-t border-white/10 text-[11px] leading-[16px] text-[var(--sidebar-muted)]">
+          <div className="pt-1.5 px-2.5 border-t border-white/10 text-[12px] leading-[16px] text-[var(--sidebar-muted)]">
             Built by{' '}
             <a
               href="https://atkind.com"
@@ -536,7 +536,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 placeholder={isCandidate ? 'Search open jobs...' : 'Search requirements...'}
                 className="w-full h-[34px] rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] pl-8 pr-10 text-[13px] leading-[20px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--focus-border)] focus:ring-[3px] focus:ring-[var(--focus-ring)] focus:bg-[var(--surface)]"
               />
-              <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[11px] leading-[16px] text-[var(--text-tertiary)]">
+              <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                 ⌘K
               </kbd>
             </form>
@@ -549,7 +549,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               >
                 <span className="h-2 w-2 rounded-full bg-[#88BDF2] shrink-0" />
                 <span>Assistant</span>
-                <kbd className="hidden sm:inline font-mono text-[11px] leading-[16px] text-[var(--text-tertiary)]">
+                <kbd className="hidden sm:inline font-mono text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                   ⌘J
                 </kbd>
               </button>

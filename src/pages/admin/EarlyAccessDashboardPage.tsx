@@ -121,7 +121,7 @@ function ApplicationDetail({
             <div className="flex items-center gap-2">
               <span className="font-mono text-[12px] text-[#94A3B8]">{app.applicationId}</span>
               <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_CONFIG[app.status].bg} ${STATUS_CONFIG[app.status].color}`}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${STATUS_CONFIG[app.status].bg} ${STATUS_CONFIG[app.status].color}`}
               >
                 {STATUS_CONFIG[app.status].label}
               </span>
@@ -204,7 +204,7 @@ function ApplicationDetail({
                 {app.interestedModules.map((m) => (
                   <span
                     key={m}
-                    className="px-2 py-0.5 rounded-[4px] bg-[#EFF6FF] text-[11px] font-medium text-[#1D4ED8]"
+                    className="px-2 py-0.5 rounded-[4px] bg-[#EFF6FF] text-[12px] font-medium text-[#1D4ED8]"
                   >
                     {MODULE_LABELS[m]}
                   </span>
@@ -297,7 +297,7 @@ function ApplicationDetail({
           </div>
 
           {/* Timestamps */}
-          <div className="flex flex-wrap gap-4 text-[11px] text-[#94A3B8]">
+          <div className="flex flex-wrap gap-4 text-[12px] text-[#94A3B8]">
             <span>Submitted: {formatDateTime(app.submittedAt)}</span>
             {app.invitationSentAt && <span>Invited: {formatDateTime(app.invitationSentAt)}</span>}
             {app.registeredAt && <span>Registered: {formatDateTime(app.registeredAt)}</span>}
@@ -474,18 +474,18 @@ export const EarlyAccessDashboardPage: React.FC = () => {
                   >
                     <td className="px-4 py-3">
                       <div className="font-medium text-[#0F172A]">{a.contactName}</div>
-                      <div className="text-[11px] text-[#94A3B8] font-mono">{a.applicationId}</div>
+                      <div className="text-[12px] text-[#94A3B8] font-mono">{a.applicationId}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-[#0F172A]">{a.companyName}</div>
-                      <div className="text-[11px] text-[#94A3B8]">{a.businessEmail}</div>
+                      <div className="text-[12px] text-[#94A3B8]">{a.businessEmail}</div>
                     </td>
                     <td className="px-4 py-3 text-[#64748B]">
                       {BUSINESS_TYPE_LABELS[a.businessType]}
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${sc.bg} ${sc.color}`}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${sc.bg} ${sc.color}`}
                       >
                         {sc.label}
                       </span>

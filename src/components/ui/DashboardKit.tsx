@@ -72,7 +72,7 @@ export const KpiCard: React.FC<{
               >
                 {isPositive ? '+' : ''}{change}%
               </span>
-              <span className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+              <span className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                 {changePeriod}
               </span>
             </div>
@@ -389,7 +389,7 @@ export const ActionItem: React.FC<{
       <span className="text-[var(--text-primary)] truncate">{label}</span>
       {badge && (
         <span
-          className="px-2 py-0.5 rounded-[4px] text-[11px] leading-[14px] font-medium shrink-0"
+          className="px-2 py-0.5 rounded-[4px] text-[12px] leading-[16px] font-medium shrink-0"
           style={{
             backgroundColor: badgeColor ? `${badgeColor}18` : 'var(--status-warning-bg)',
             color: badgeColor || 'var(--status-warning)',
@@ -448,7 +448,7 @@ export const FunnelChart: React.FC<{
                 className="h-full rounded-[4px] transition-all duration-700 ease-out flex items-center"
                 style={{ width: `${pct}%`, backgroundColor: stage.color }}
               >
-                <span className="px-2 text-[11px] font-semibold text-white whitespace-nowrap">
+                <span className="px-2 text-[12px] font-semibold text-white whitespace-nowrap">
                   {stage.value}
                 </span>
               </div>

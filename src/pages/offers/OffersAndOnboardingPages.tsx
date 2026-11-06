@@ -612,7 +612,7 @@ export const OffersWorkspaceView: React.FC<{
             {LIFECYCLE_STEPS.map((s) => (
               <span
                 key={s.key}
-                className="inline-flex items-center rounded-[5px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]"
+                className="inline-flex items-center rounded-[5px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1 text-[12px] font-medium text-[var(--text-secondary)]"
               >
                 {s.label}
               </span>
@@ -690,10 +690,10 @@ export const OffersWorkspaceView: React.FC<{
                     <div className="text-[13px] font-medium text-[var(--text-primary)] truncate">
                       {submission.candidates?.full_name || 'Candidate'}
                     </div>
-                    <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                    <div className="text-[12px] text-[var(--text-secondary)] truncate">
                       {submission.requirements?.title || 'Requirement'}
                     </div>
-                    <div className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)] mt-0.5">
+                    <div className="text-[12px] font-mono tabular-nums text-[var(--text-tertiary)] mt-0.5">
                       Expected DOJ:{' '}
                       <strong className="text-[var(--text-primary)]">
                         {record.expectedDoj}
@@ -890,7 +890,7 @@ export const OffersWorkspaceView: React.FC<{
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)] text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)] text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                   <th className="py-2.5 pl-4 pr-3 text-left">Candidate &amp; Contract</th>
                   <th className="px-3 py-2.5 text-left">Requirement &amp; Partner</th>
                   <th className="px-3 py-2.5 text-left">Lifecycle Stage</th>
@@ -931,7 +931,7 @@ export const OffersWorkspaceView: React.FC<{
                             {contactPolicy.engagementCode}
                           </Badge>
                           {record.offerReferenceCode && (
-                            <span className="font-mono text-[11px] text-[var(--text-tertiary)]">
+                            <span className="font-mono text-[12px] text-[var(--text-tertiary)]">
                               {record.offerReferenceCode}
                             </span>
                           )}
@@ -1001,7 +1001,7 @@ export const OffersWorkspaceView: React.FC<{
                           {OFFER_LIFECYCLE_LABELS[record.lifecycleStage]}
                         </Badge>
                         {record.adminVerified && (
-                          <div className="mt-1 flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                          <div className="mt-1 flex items-center gap-1 text-[12px] text-emerald-600 dark:text-emerald-400">
                             <CheckCircle2 className="h-3 w-3" />
                             <span>HQ Verified</span>
                           </div>
@@ -1014,12 +1014,12 @@ export const OffersWorkspaceView: React.FC<{
                           {record.offerDate ? formatLocalDate(record.offerDate) : '-'}
                         </div>
                         {record.offeredCtc && (
-                          <div className="text-[11px] text-[var(--text-secondary)]">
+                          <div className="text-[12px] text-[var(--text-secondary)]">
                             CTC: {record.offeredCtc}
                           </div>
                         )}
                         {record.issuedByName && (
-                          <div className="text-[11px] font-sans text-[var(--text-tertiary)]">
+                          <div className="text-[12px] font-sans text-[var(--text-tertiary)]">
                             by {record.issuedByName}
                           </div>
                         )}
@@ -1030,7 +1030,7 @@ export const OffersWorkspaceView: React.FC<{
                         <Badge tone={getOfferStatusTone(record.offerStatus)}>
                           {OFFER_STATUS_LABELS[record.offerStatus]}
                         </Badge>
-                        <div className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)] mt-1">
+                        <div className="text-[12px] font-mono tabular-nums text-[var(--text-tertiary)] mt-1">
                           {record.offerResponseDate
                             ? `Responded: ${formatLocalDate(record.offerResponseDate)}`
                             : record.offerStatus === 'issued'
@@ -1046,7 +1046,7 @@ export const OffersWorkspaceView: React.FC<{
                             <span className="font-semibold text-[var(--text-primary)]">
                               {formatLocalDate(record.expectedDoj)}
                             </span>
-                            <div className="text-[11px] font-sans text-[var(--text-tertiary)]">
+                            <div className="text-[12px] font-sans text-[var(--text-tertiary)]">
                               Scheduled target
                             </div>
                           </div>
@@ -1064,7 +1064,7 @@ export const OffersWorkspaceView: React.FC<{
                               <span>{formatLocalDate(record.actualDoj)}</span>
                             </div>
                             {record.joiningConfirmedByName && (
-                              <div className="text-[11px] text-[var(--text-tertiary)]">
+                              <div className="text-[12px] text-[var(--text-tertiary)]">
                                 Confirmed by {record.joiningConfirmedByName}
                               </div>
                             )}
@@ -1073,7 +1073,7 @@ export const OffersWorkspaceView: React.FC<{
                           <div>
                             <Badge tone="red">Did Not Join</Badge>
                             {record.didNotJoinReason && (
-                              <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5 max-w-[180px] truncate">
+                              <div className="text-[12px] text-[var(--text-tertiary)] mt-0.5 max-w-[180px] truncate">
                                 {record.didNotJoinReason}
                               </div>
                             )}
@@ -1227,7 +1227,7 @@ export const OffersWorkspaceView: React.FC<{
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)] text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)] text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                   <th className="py-2.5 pl-4 pr-3 text-left">Month</th>
                   <th className="px-3 py-2.5 text-right">Offers Issued</th>
                   <th className="px-3 py-2.5 text-right">Offers Accepted</th>
@@ -1589,7 +1589,7 @@ export const OffersWorkspaceView: React.FC<{
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px]">
               <div>
-                <span className="text-[11px] text-[var(--text-tertiary)] block">
+                <span className="text-[12px] text-[var(--text-tertiary)] block">
                   Offer Date
                 </span>
                 <strong className="font-mono text-[var(--text-primary)]">
@@ -1597,7 +1597,7 @@ export const OffersWorkspaceView: React.FC<{
                 </strong>
               </div>
               <div>
-                <span className="text-[11px] text-[var(--text-tertiary)] block">
+                <span className="text-[12px] text-[var(--text-tertiary)] block">
                   Response Date
                 </span>
                 <strong className="font-mono text-[var(--text-primary)]">
@@ -1605,7 +1605,7 @@ export const OffersWorkspaceView: React.FC<{
                 </strong>
               </div>
               <div>
-                <span className="text-[11px] text-[var(--text-tertiary)] block">
+                <span className="text-[12px] text-[var(--text-tertiary)] block">
                   Expected DOJ
                 </span>
                 <strong className="font-mono text-[var(--text-primary)]">
@@ -1613,7 +1613,7 @@ export const OffersWorkspaceView: React.FC<{
                 </strong>
               </div>
               <div>
-                <span className="text-[11px] text-[var(--text-tertiary)] block">
+                <span className="text-[12px] text-[var(--text-tertiary)] block">
                   Confirmed Actual DOJ
                 </span>
                 <strong className="font-mono text-emerald-600 dark:text-emerald-400">
@@ -1640,11 +1640,11 @@ export const OffersWorkspaceView: React.FC<{
                       {ev.notes && (
                         <div className="text-[var(--text-secondary)]">{ev.notes}</div>
                       )}
-                      <div className="text-[11px] text-[var(--text-tertiary)]">
+                      <div className="text-[12px] text-[var(--text-tertiary)]">
                         Confirmed by <strong>{ev.actorName}</strong> ({ev.actorRole})
                       </div>
                     </div>
-                    <span className="font-mono tabular-nums text-[11px] text-[var(--text-tertiary)] shrink-0">
+                    <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)] shrink-0">
                       {formatLocalDateTime(ev.timestamp)}
                     </span>
                   </div>

@@ -438,7 +438,7 @@ export const PrivacyGovernancePage: React.FC = () => {
             <ShieldCheck className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] leading-[16px] font-mono uppercase tracking-[0.05em] text-[var(--text-tertiary)]">
+            <div className="text-[12px] leading-[16px] font-mono uppercase tracking-[0.05em] text-[var(--text-tertiary)]">
               AIKIND PRIVATE LIMITED · HIRENESTOS · DPDP ACT, 2023 &amp; RULES, 2025
             </div>
             <div className="text-[13px] leading-[18px] font-medium text-[var(--text-primary)] truncate">
@@ -727,7 +727,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                     {n.purposes.map((p, idx) => (
                       <span
                         key={idx}
-                        className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[11px]"
+                        className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[12px]"
                       >
                         {p}
                       </span>
@@ -796,7 +796,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                           <div className="font-medium text-[var(--text-primary)]">
                             {ack.subjectName}
                           </div>
-                          <div className="font-mono text-[11px] text-[var(--text-tertiary)]">
+                          <div className="font-mono text-[12px] text-[var(--text-tertiary)]">
                             {ack.subjectRef}
                           </div>
                         </td>
@@ -828,7 +828,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                           <div className="text-[12px] text-[var(--text-secondary)]">
                             {ack.captureSource.replace(/_/g, ' ')}
                           </div>
-                          <div className="font-mono text-[11px] text-[var(--text-tertiary)]">
+                          <div className="font-mono text-[12px] text-[var(--text-tertiary)]">
                             {ack.evidenceRef}
                           </div>
                         </td>
@@ -915,7 +915,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                         <div className="text-[12px] text-[var(--text-secondary)]">
                           {rec.systems.join(', ')}
                         </div>
-                        <div className="font-mono text-[11px] text-[#1F4CC4] mt-0.5">
+                        <div className="font-mono text-[12px] text-[#1F4CC4] mt-0.5">
                           Policy: {rec.retentionPolicyId}
                         </div>
                       </td>
@@ -1039,7 +1039,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                         <div className="font-medium text-[var(--text-primary)]">
                           {reqItem.requesterName}
                         </div>
-                        <div className="font-mono text-[11px] text-[var(--text-tertiary)]">
+                        <div className="font-mono text-[12px] text-[var(--text-tertiary)]">
                           {reqItem.requesterEmail}
                         </div>
                       </td>
@@ -1065,7 +1065,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                             Decision: {reqItem.decision}
                           </div>
                         )}
-                        <div className="mt-0.5 text-[11px] text-[var(--text-tertiary)]">
+                        <div className="mt-0.5 text-[12px] text-[var(--text-tertiary)]">
                           Owner: {reqItem.assignedTo}
                         </div>
                       </td>
@@ -1091,7 +1091,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                       </td>
                       <td className="font-mono tabular-nums text-[12px] text-[var(--text-secondary)]">
                         <div>In: {formatLocalDate(reqItem.receivedAt)}</div>
-                        <div className="text-[11px] text-[var(--text-tertiary)]">
+                        <div className="text-[12px] text-[var(--text-tertiary)]">
                           Due: {formatLocalDate(reqItem.slaDueAt)}
                         </div>
                       </td>
@@ -1171,7 +1171,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                         <div className="text-[12px] text-[var(--text-primary)]">
                           {pol.durationRule}
                         </div>
-                        <div className="text-[11px] text-[var(--text-tertiary)]">
+                        <div className="text-[12px] text-[var(--text-tertiary)]">
                           Trigger: {pol.trigger}
                         </div>
                       </td>
@@ -1183,7 +1183,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                           <div>
                             <Badge tone="amber">Legal Hold Active</Badge>
                             {pol.legalHoldReason && (
-                              <div className="text-[11px] text-[var(--text-secondary)] mt-1 max-w-[220px]">
+                              <div className="text-[12px] text-[var(--text-secondary)] mt-1 max-w-[220px]">
                                 {pol.legalHoldReason}
                               </div>
                             )}
@@ -1264,7 +1264,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                         <div className="font-medium text-[var(--text-primary)]">
                           {job.subjectLabel}
                         </div>
-                        <div className="font-mono text-[11px] text-[var(--text-tertiary)]">
+                        <div className="font-mono text-[12px] text-[var(--text-tertiary)]">
                           Scope: {job.scope} · Attempts: {job.attempts}
                         </div>
                       </td>
@@ -1285,7 +1285,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                           {job.status}
                         </Badge>
                         {job.verifiedAt && (
-                          <div className="font-mono tabular-nums text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                          <div className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)] mt-0.5">
                             Verified: {formatLocalDate(job.verifiedAt)}
                           </div>
                         )}
@@ -1493,19 +1493,19 @@ export const PrivacyGovernancePage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1 font-mono text-[12px]">
                   <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
-                    <span className="text-[var(--text-tertiary)] block text-[11px]">Subject</span>
+                    <span className="text-[var(--text-tertiary)] block text-[12px]">Subject</span>
                     <span className="text-[var(--text-primary)]">{guardResult.maskedPayload.candidateName}</span>
                   </div>
                   <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
-                    <span className="text-[var(--text-tertiary)] block text-[11px]">Email Payload</span>
+                    <span className="text-[var(--text-tertiary)] block text-[12px]">Email Payload</span>
                     <span className="text-[var(--text-primary)]">{guardResult.maskedPayload.email}</span>
                   </div>
                   <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
-                    <span className="text-[var(--text-tertiary)] block text-[11px]">Phone Payload</span>
+                    <span className="text-[var(--text-tertiary)] block text-[12px]">Phone Payload</span>
                     <span className="text-[var(--text-primary)]">{guardResult.maskedPayload.phone}</span>
                   </div>
                   <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
-                    <span className="text-[var(--text-tertiary)] block text-[11px]">PII Masking</span>
+                    <span className="text-[var(--text-tertiary)] block text-[12px]">PII Masking</span>
                     <span className="text-[var(--text-primary)]">
                       {guardResult.maskedPayload.contactMasked ? 'MASKED / PROTECTED' : 'UNMASKED (APPROVED)'}
                     </span>
@@ -1552,7 +1552,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                         <div className="font-mono text-[12px] text-[var(--text-primary)]">
                           {evt.actorRef}
                         </div>
-                        <div className="text-[11px] text-[var(--text-tertiary)]">
+                        <div className="text-[12px] text-[var(--text-tertiary)]">
                           {evt.actorRole}
                         </div>
                       </td>
@@ -1581,7 +1581,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                           {evt.outcome}
                         </Badge>
                       </td>
-                      <td className="font-mono tabular-nums text-[11px] text-[var(--text-tertiary)]">
+                      <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                         <div>{evt.correlationId}</div>
                         <div>{formatLocalDate(evt.timestamp)}</div>
                       </td>
@@ -1634,7 +1634,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                     </td>
                     <td className="max-w-[240px]">
                       <div className="font-medium text-[var(--text-primary)]">{inc.title}</div>
-                      <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                      <div className="text-[12px] text-[var(--text-tertiary)] mt-0.5">
                         Systems: {inc.affectedSystems.join(', ')}
                       </div>
                     </td>
@@ -1678,7 +1678,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                         {inc.accountableOwner}
                       </div>
                       {inc.closureEvidence && (
-                        <div className="font-mono text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                        <div className="font-mono text-[12px] text-[var(--text-tertiary)] mt-0.5">
                           {inc.closureEvidence}
                         </div>
                       )}

@@ -1141,7 +1141,7 @@ export const AdminAuditLogsPage: React.FC = () => {
               <div className="font-medium text-[var(--text-secondary)] mb-1.5">
                 Previous state (old_data)
               </div>
-              <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] p-3 font-mono text-[11px] overflow-x-auto max-h-96">
+              <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] p-3 font-mono text-[12px] overflow-x-auto max-h-96">
                 {JSON.stringify(selectedLog.old_data, null, 2) || 'null'}
               </pre>
             </div>
@@ -1149,7 +1149,7 @@ export const AdminAuditLogsPage: React.FC = () => {
               <div className="font-medium text-[var(--text-secondary)] mb-1.5">
                 New state (new_data)
               </div>
-              <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] p-3 font-mono text-[11px] overflow-x-auto max-h-96">
+              <pre className="rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] p-3 font-mono text-[12px] overflow-x-auto max-h-96">
                 {JSON.stringify(selectedLog.new_data, null, 2) || 'null'}
               </pre>
             </div>

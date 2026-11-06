@@ -454,7 +454,7 @@ export const VendorRequirementsPage: React.FC = () => {
                           {budgetInfo.formatted}
                         </div>
                         {budgetInfo.subtitle && (
-                          <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                          <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                             {budgetInfo.subtitle}
                           </div>
                         )}
@@ -798,7 +798,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
                   {budgetInfo.formatted}
                 </div>
                 {budgetInfo.subtitle && (
-                  <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                  <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                     {budgetInfo.subtitle}
                   </div>
                 )}
@@ -1708,7 +1708,7 @@ export const VendorSubmissionsPage: React.FC = () => {
                     >
                       <td className="font-medium text-[var(--text-primary)]">
                         <div>{sub.candidates?.full_name || sub.candidate_id}</div>
-                        <div className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                        <div className="text-[12px] font-mono text-[var(--text-tertiary)]">
                           JD Match {validation.jd_match_percentage}% · {validation.resume_version_used}
                         </div>
                       </td>
@@ -2120,7 +2120,7 @@ export const VendorMatchIntelligencePage: React.FC = () => {
                         {(m.matched_skills || []).map((sk) => (
                           <span
                             key={`m-${sk}`}
-                            className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-primary)]"
+                            className="inline-flex items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[12px] font-medium text-[var(--text-primary)]"
                           >
                             {sk}
                           </span>
@@ -2128,7 +2128,7 @@ export const VendorMatchIntelligencePage: React.FC = () => {
                         {(m.unproven_skills || []).map((sk) => (
                           <span
                             key={`u-${sk}`}
-                            className="inline-flex items-center rounded-[6px] border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[11px] text-[var(--text-tertiary)]"
+                            className="inline-flex items-center rounded-[6px] border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[12px] text-[var(--text-tertiary)]"
                           >
                             {sk}
                           </span>

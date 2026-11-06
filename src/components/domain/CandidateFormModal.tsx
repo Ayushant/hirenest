@@ -568,7 +568,7 @@ export const CandidateFormModal: React.FC<{
                 Bulk resume upload ({bulkItems.length})
               </button>
             </div>
-            <span className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+            <span className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
               Auto-extracts Name, Role, Location, Experience &amp; Skills
             </span>
           </div>
@@ -665,7 +665,7 @@ export const CandidateFormModal: React.FC<{
                             setValue('phone', '');
                           }
                         }}
-                        className={`px-2.5 py-1 rounded-[4px] text-[11px] font-medium transition-colors cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer ${
                           engagementType === opt.id
                             ? 'bg-[#1F4CC4] text-white'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -676,7 +676,7 @@ export const CandidateFormModal: React.FC<{
                     ))}
                   </div>
                 </div>
-                <p className="text-[11px] leading-[16px] text-[var(--text-secondary)]">
+                <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
                   {contactPolicy.policyExplanation}
                 </p>
               </div>
@@ -834,7 +834,7 @@ export const CandidateFormModal: React.FC<{
                             {item.file.name}
                           </span>
                           {item.resumeHash && (
-                            <span className="font-mono text-[11px] text-[var(--text-tertiary)]">
+                            <span className="font-mono text-[12px] text-[var(--text-tertiary)]">
                               SHA-256: {item.resumeHash.slice(0, 10)}…
                             </span>
                           )}

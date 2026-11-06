@@ -50,7 +50,7 @@ export const Avatar: React.FC<{
 
   const sizeClass =
     size === 'sm'
-      ? 'h-6 w-6 text-[11px] leading-[16px]'
+      ? 'h-6 w-6 text-[12px] leading-[16px]'
       : 'h-7 w-7 text-[12px] leading-[16px]';
 
   return (
@@ -636,6 +636,8 @@ export const Pagination: React.FC<{
 };
 
 // Dialog (Modal): 480px default (640px for forms), 10px radius, floating shadow
+let dialogIdSeq = 0;
+
 export const Dialog: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -644,6 +646,53 @@ export const Dialog: React.FC<{
   children: React.ReactNode;
   maxWidth?: string;
 }> = ({ open, onClose, title, description, children, maxWidth = 'max-w-[480px]' }) => {
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const titleId = React.useRef(`dialog-title-${++dialogIdSeq}`).current;
+
+  // Escape closes the dialog; focus moves into it on open and is restored to
+  // the trigger on close, since nothing else manages focus for a fixed-position overlay.
+  React.useEffect(() => {
+    if (!open) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => {
+      const target = panelRef.current?.querySelector<HTMLElement>(
+        'input, select, textarea, button:not([aria-label="Close dialog"])'
+      );
+      (target || panelRef.current)?.focus();
+    });
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   const normalizedWidth =
     maxWidth === 'max-w-lg' || maxWidth === 'max-w-md'
@@ -655,14 +704,17 @@ export const Dialog: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         style={{ boxShadow: 'var(--shadow-floating)' }}
-        className={`w-full ${normalizedWidth} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden max-h-[90vh] flex flex-col`}
+        className={`w-full ${normalizedWidth} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden max-h-[90vh] flex flex-col outline-none`}
       >
         <div className="flex items-start justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
-            <h2 className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+            <h2 id={titleId} className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
               {title}
             </h2>
             {description && (

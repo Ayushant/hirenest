@@ -862,7 +862,7 @@ export const OsWorkspacePage: React.FC = () => {
               <span className="font-mono tabular-nums text-[22px] font-semibold text-white">
                 ${activePoint.revenueK.toLocaleString()}K
               </span>
-              <span className="font-mono text-[11px] text-emerald-400 flex items-center gap-0.5">
+              <span className="font-mono text-[12px] text-emerald-400 flex items-center gap-0.5">
                 <ArrowUpRight className="h-3 w-3" />
                 +18.4%
               </span>
@@ -898,7 +898,7 @@ export const OsWorkspacePage: React.FC = () => {
                 setTimeframe(tf);
                 setSelectedPointIdx(FINANCE_SERIES[tf].length - 1);
               }}
-              className={`px-2 py-0.5 text-[11px] font-mono rounded-[4px] transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 text-[12px] font-mono rounded-[4px] transition-colors cursor-pointer ${
                 timeframe === tf
                   ? 'bg-[#38BDF8] text-slate-950 font-semibold'
                   : 'text-slate-400 hover:text-slate-200'
@@ -1029,7 +1029,7 @@ export const OsWorkspacePage: React.FC = () => {
       </div>
 
       {/* Bottom Selected Node Telemetry Strip */}
-      <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+      <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[12px]">
         <div className="flex items-center gap-2 text-slate-300 truncate">
           <span className="h-2 w-2 rounded-full bg-[#38BDF8] shrink-0" />
           <span className="font-mono text-[#38BDF8]">{activePoint.label}:</span>
@@ -1060,11 +1060,11 @@ export const OsWorkspacePage: React.FC = () => {
       {/* Top Toolbar */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-mono text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             DAG ENGINE ONLINE
           </span>
-          <span className="text-[11px] font-mono text-slate-400">
+          <span className="text-[12px] font-mono text-slate-400">
             Executions:{' '}
             <strong className="text-slate-200">{workflowExecCount.toLocaleString()}</strong>
           </span>
@@ -1074,7 +1074,7 @@ export const OsWorkspacePage: React.FC = () => {
           type="button"
           onClick={triggerWorkflowRun}
           disabled={workflowRunning}
-          className="h-7 px-2.5 rounded-[5px] bg-[#38BDF8] hover:bg-[#0EA5E9] disabled:opacity-50 text-slate-950 font-semibold text-[11px] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+          className="h-7 px-2.5 rounded-[5px] bg-[#38BDF8] hover:bg-[#0EA5E9] disabled:opacity-50 text-slate-950 font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
         >
           <Play className="h-3 w-3 fill-current" />
           {workflowRunning ? 'Executing Pipeline...' : 'Execute Live Test'}
@@ -1223,7 +1223,7 @@ export const OsWorkspacePage: React.FC = () => {
       </div>
 
       {/* Selected Node Inspector Strip */}
-      <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+      <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
         <div className="space-y-0.5 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10px] px-1.5 py-0.2 bg-[#38BDF8]/15 text-[#38BDF8] rounded">
@@ -1236,7 +1236,7 @@ export const OsWorkspacePage: React.FC = () => {
               SLA {selectedWorkflowNode.successRate}
             </span>
           </div>
-          <p className="text-slate-400 text-[11px] truncate">
+          <p className="text-slate-400 text-[12px] truncate">
             {selectedWorkflowNode.ruleSummary}
           </p>
         </div>
@@ -1259,7 +1259,7 @@ export const OsWorkspacePage: React.FC = () => {
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
               placeholder="Filter accounts, SKU, code..."
-              className="w-full h-7 rounded-[5px] bg-slate-900/90 border border-slate-800 pl-8 pr-2 text-[11px] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#38BDF8]"
+              className="w-full h-7 rounded-[5px] bg-slate-900/90 border border-slate-800 pl-8 pr-2 text-[12px] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#38BDF8]"
             />
           </div>
 
@@ -1286,7 +1286,7 @@ export const OsWorkspacePage: React.FC = () => {
         <button
           type="button"
           onClick={() => setShowNewLeadModal(true)}
-          className="h-7 px-2.5 rounded-[5px] border border-[#38BDF8]/40 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] text-[11px] font-medium inline-flex items-center gap-1 cursor-pointer"
+          className="h-7 px-2.5 rounded-[5px] border border-[#38BDF8]/40 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] text-[12px] font-medium inline-flex items-center gap-1 cursor-pointer"
         >
           <Plus className="h-3 w-3" />
           New CRM Deal
@@ -1338,7 +1338,7 @@ export const OsWorkspacePage: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-2 px-2 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-300">
+                      <span className="inline-flex items-center gap-1.5 text-[12px] text-slate-300">
                         <span className={`h-1.5 w-1.5 rounded-full ${stageDot}`} />
                         {c.stage}
                       </span>
@@ -1346,7 +1346,7 @@ export const OsWorkspacePage: React.FC = () => {
                     <td className="py-2 px-2 text-right font-mono tabular-nums text-slate-100 font-medium">
                       ${(c.arrValue / 1000).toLocaleString()}K
                     </td>
-                    <td className="py-2 px-2 text-[11px] text-slate-400 truncate max-w-[155px]">
+                    <td className="py-2 px-2 text-[12px] text-slate-400 truncate max-w-[155px]">
                       {c.erpSkuAllocation}
                     </td>
                     <td className="py-2 px-2 text-right font-mono tabular-nums">
@@ -1385,12 +1385,12 @@ export const OsWorkspacePage: React.FC = () => {
                 <h4 className="text-[13px] font-semibold text-white">
                   {selectedCustomer.company}
                 </h4>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[12px] text-slate-400">
                   {selectedCustomer.contactName} ({selectedCustomer.contactRole})
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-[11px]">
+              <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-[12px]">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Contract ARR</span>
                   <span className="font-mono text-slate-100 font-semibold">
@@ -1414,7 +1414,7 @@ export const OsWorkspacePage: React.FC = () => {
               <button
                 type="button"
                 onClick={triggerWorkflowRun}
-                className="w-full h-7 rounded-[5px] bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-mono inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full h-7 rounded-[5px] bg-slate-800 hover:bg-slate-700 text-slate-200 text-[12px] font-mono inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw className="h-3 w-3 text-[#38BDF8]" />
                 Sync ERP Order Ledger
@@ -1425,7 +1425,7 @@ export const OsWorkspacePage: React.FC = () => {
       </div>
 
       {/* Footer Summary */}
-      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[12px] text-slate-400">
         <span>
           Showing <strong className="text-slate-200">{filteredCustomers.length}</strong> of{' '}
           {customers.length} enterprise CRM accounts
@@ -1441,7 +1441,7 @@ export const OsWorkspacePage: React.FC = () => {
   const renderErpSupplyWindowContent = () => (
     <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0B0F17]/85">
       <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
-        <div className="text-[11px] text-slate-300 font-medium">
+        <div className="text-[12px] text-slate-300 font-medium">
           Active Warehouse & Workforce SKU Matrix
         </div>
         <span className="font-mono text-[10px] text-[#38BDF8]">3 GLOBAL HUBS ONLINE</span>
@@ -1489,7 +1489,7 @@ export const OsWorkspacePage: React.FC = () => {
         })}
       </div>
 
-      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
+      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[12px] font-mono text-slate-400">
         <span>Customs & Freight Telemetry: NOMINAL</span>
         <span className="text-emerald-400">99.4% SLA</span>
       </div>
@@ -1528,7 +1528,7 @@ export const OsWorkspacePage: React.FC = () => {
           </div>
 
           {liveOrgsCount !== undefined && liveOrgsCount > 0 && (
-            <span className="hidden md:inline-flex items-center gap-1.5 font-mono text-[11px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded">
+            <span className="hidden md:inline-flex items-center gap-1.5 font-mono text-[12px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               Supabase Connected ({liveOrgsCount} orgs)
             </span>
@@ -1540,7 +1540,7 @@ export const OsWorkspacePage: React.FC = () => {
           <button
             type="button"
             onClick={() => setWindowMode('overlapping')}
-            className={`h-7 px-2.5 rounded-[5px] text-[11px] font-mono inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`h-7 px-2.5 rounded-[5px] text-[12px] font-mono inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
               windowMode === 'overlapping'
                 ? 'bg-[#38BDF8] text-slate-950 font-semibold'
                 : 'text-slate-400 hover:text-slate-200'
@@ -1552,7 +1552,7 @@ export const OsWorkspacePage: React.FC = () => {
           <button
             type="button"
             onClick={() => setWindowMode('tiled')}
-            className={`h-7 px-2.5 rounded-[5px] text-[11px] font-mono inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`h-7 px-2.5 rounded-[5px] text-[12px] font-mono inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
               windowMode === 'tiled'
                 ? 'bg-[#38BDF8] text-slate-950 font-semibold'
                 : 'text-slate-400 hover:text-slate-200'
@@ -1564,7 +1564,7 @@ export const OsWorkspacePage: React.FC = () => {
           <button
             type="button"
             onClick={cascadeWindows}
-            className="hidden md:inline-flex h-7 px-2.5 rounded-[5px] text-[11px] font-mono items-center gap-1 text-slate-400 hover:text-slate-200 hover:bg-slate-900 cursor-pointer"
+            className="hidden md:inline-flex h-7 px-2.5 rounded-[5px] text-[12px] font-mono items-center gap-1 text-slate-400 hover:text-slate-200 hover:bg-slate-900 cursor-pointer"
           >
             Cascade
           </button>
@@ -1572,7 +1572,7 @@ export const OsWorkspacePage: React.FC = () => {
             type="button"
             onClick={resetAllWindows}
             title="Reset all windows to default layout"
-            className="h-7 px-2 rounded-[5px] text-[11px] font-mono inline-flex items-center gap-1 text-slate-400 hover:text-slate-200 hover:bg-slate-900 cursor-pointer"
+            className="h-7 px-2 rounded-[5px] text-[12px] font-mono inline-flex items-center gap-1 text-slate-400 hover:text-slate-200 hover:bg-slate-900 cursor-pointer"
           >
             <RotateCcw className="h-3 w-3" />
           </button>
@@ -1583,7 +1583,7 @@ export const OsWorkspacePage: React.FC = () => {
           <button
             type="button"
             onClick={() => setLivePulse((p) => !p)}
-            className={`hidden sm:inline-flex h-7 px-2.5 rounded-[5px] border font-mono text-[11px] items-center gap-1.5 cursor-pointer ${
+            className={`hidden sm:inline-flex h-7 px-2.5 rounded-[5px] border font-mono text-[12px] items-center gap-1.5 cursor-pointer ${
               livePulse
                 ? 'border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#38BDF8]'
                 : 'border-slate-800 bg-slate-900 text-slate-400'
@@ -1595,7 +1595,7 @@ export const OsWorkspacePage: React.FC = () => {
 
           <Link
             to={session ? homeRoute : '/signin'}
-            className="h-7 px-3 rounded-[5px] border border-slate-700 bg-slate-900 hover:bg-slate-800 text-[11px] font-medium text-slate-200 inline-flex items-center gap-1.5"
+            className="h-7 px-3 rounded-[5px] border border-slate-700 bg-slate-900 hover:bg-slate-800 text-[12px] font-medium text-slate-200 inline-flex items-center gap-1.5"
           >
             <ArrowLeft className="h-3 w-3" />
             {session ? `Staffing Portal (${profile?.role || 'HQ'})` : 'Sign In Portal'}
@@ -1732,7 +1732,7 @@ export const OsWorkspacePage: React.FC = () => {
                     key={w.id}
                     type="button"
                     onClick={() => focusWindow(w.id)}
-                    className={`w-full h-7 px-2.5 rounded-[5px] flex items-center justify-between text-[11px] transition-colors cursor-pointer ${
+                    className={`w-full h-7 px-2.5 rounded-[5px] flex items-center justify-between text-[12px] transition-colors cursor-pointer ${
                       isFocused
                         ? 'bg-slate-800/90 text-[#38BDF8] font-medium'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
@@ -1855,7 +1855,7 @@ export const OsWorkspacePage: React.FC = () => {
                   key={w.id}
                   type="button"
                   onClick={() => focusWindow(w.id)}
-                  className={`h-7 px-3 rounded-full font-mono text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`h-7 px-3 rounded-full font-mono text-[12px] flex items-center gap-1.5 transition-all cursor-pointer ${
                     active
                       ? 'bg-[#38BDF8] text-slate-950 font-semibold shadow-[0_0_12px_rgba(56,189,248,0.5)]'
                       : w.isOpen && !w.isMinimized

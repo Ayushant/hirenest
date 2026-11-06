@@ -631,7 +631,7 @@ export const HqRequirementsListPage: React.FC = () => {
                           {budgetInfo.formatted}
                         </div>
                         {budgetInfo.subtitle && (
-                          <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                          <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                             {budgetInfo.subtitle}
                           </div>
                         )}
@@ -836,7 +836,7 @@ export const HqRequirementsListPage: React.FC = () => {
                                       <Badge tone="warning">Duplicate (Will archive)</Badge>
                                     )}
                                     {item.id === grp.recommendedCanonicalId && (
-                                      <span className="text-[11px] text-[var(--text-tertiary)]">
+                                      <span className="text-[12px] text-[var(--text-tertiary)]">
                                         (Recommended)
                                       </span>
                                     )}
@@ -2148,7 +2148,7 @@ export const HqRequirementDetailPage: React.FC = () => {
                   {formatRequirementBudgetWithSubtitle(req).formatted}
                 </div>
                 {formatRequirementBudgetWithSubtitle(req).subtitle && (
-                  <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                  <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                     {formatRequirementBudgetWithSubtitle(req).subtitle}
                   </div>
                 )}

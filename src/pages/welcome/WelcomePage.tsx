@@ -93,7 +93,7 @@ export const WelcomePage: React.FC = () => {
             <span className="text-[15px] leading-[20px] font-semibold text-white">
               HireNest
             </span>
-            <span className="text-[11px] leading-[14px] text-[#8FA6BC]">
+            <span className="text-[12px] leading-[16px] text-[#8FA6BC]">
               Hire Nest Workforce Pvt Ltd
             </span>
           </div>
@@ -109,7 +109,7 @@ export const WelcomePage: React.FC = () => {
           <div className="h-[3px] w-4 rounded-full bg-[#88BDF2]" />
 
           <p className="text-[14px] leading-[22px] text-[#D6E1EC]">
-            AI-powered staffing pipeline — from requirement to placement —
+            AI-powered staffing pipeline, from requirement to placement,
             governed by SLAs, quality scoring, and structured interviews.
           </p>
 
@@ -162,7 +162,7 @@ export const WelcomePage: React.FC = () => {
               <div className="text-[13px] leading-[18px] font-semibold text-[var(--text-primary)]">
                 HireNestOS
               </div>
-              <div className="text-[11px] leading-[15px] text-[var(--text-tertiary)] truncate">
+              <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] truncate">
                 Hire Nest Workforce Private Limited
               </div>
             </div>
@@ -194,7 +194,7 @@ export const WelcomePage: React.FC = () => {
                 >
                   {/* Colored square monogram */}
                   <span
-                    className={`w-8 h-8 rounded-[6px] ${ws.bgTint} border ${ws.borderTint} ${ws.textTint} flex items-center justify-center font-bold text-[11px] shrink-0 mr-3`}
+                    className={`w-8 h-8 rounded-[6px] ${ws.bgTint} border ${ws.borderTint} ${ws.textTint} flex items-center justify-center font-bold text-[12px] shrink-0 mr-3`}
                   >
                     {ws.initials}
                   </span>

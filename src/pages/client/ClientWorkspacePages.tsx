@@ -560,7 +560,7 @@ export const ClientRequirementsPage: React.FC = () => {
                         <div className="font-medium text-[var(--text-primary)]">
                           {req.title}
                         </div>
-                        <div className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                        <div className="text-[12px] font-mono text-[var(--text-tertiary)]">
                           ID: {shortId}
                         </div>
                       </td>
@@ -575,7 +575,7 @@ export const ClientRequirementsPage: React.FC = () => {
                           {budgetInfo.formatted}
                         </div>
                         {budgetInfo.subtitle && (
-                          <div className="text-[11px] leading-[14px] text-[var(--text-tertiary)]">
+                          <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                             {budgetInfo.subtitle}
                           </div>
                         )}
@@ -951,33 +951,33 @@ export const ClientRequirementDetailPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-3">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                    <div className="text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                       Vendor-visible budget
                     </div>
                     <div className="mt-1 font-mono tabular-nums text-[15px] font-semibold text-[var(--text-primary)]">
                       {budgetInfo.formatted}
                     </div>
                     {budgetInfo.subtitle && (
-                      <div className="text-[11px] text-[var(--text-secondary)]">
+                      <div className="text-[12px] text-[var(--text-secondary)]">
                         {budgetInfo.subtitle}
                       </div>
                     )}
                   </div>
 
                   <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-3">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                    <div className="text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                       Internal client budget
                     </div>
                     <div className="mt-1 font-mono tabular-nums text-[15px] font-semibold text-[var(--text-primary)]">
                       {formatFinancialAmount(financials?.actual_client_budget, req)}
                     </div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
+                    <div className="text-[12px] text-[var(--text-secondary)]">
                       Private (Client + HQ only)
                     </div>
                   </div>
 
                   <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-3">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
+                    <div className="text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                       Internal financial notes
                     </div>
                     <div className="mt-1 text-[13px] text-[var(--text-primary)] break-words">
@@ -1007,7 +1007,7 @@ export const ClientRequirementDetailPage: React.FC = () => {
                   {budgetInfo.formatted}
                 </div>
                 {budgetInfo.subtitle && (
-                  <div className="text-[11px] text-[var(--text-tertiary)]">
+                  <div className="text-[12px] text-[var(--text-tertiary)]">
                     {budgetInfo.subtitle}
                   </div>
                 )}

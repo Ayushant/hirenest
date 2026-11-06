@@ -113,7 +113,7 @@ export const PublicJobsListPage: React.FC = () => {
       <main className="max-w-5xl mx-auto px-5 sm:px-8 py-10 sm:py-14 space-y-8">
         <header className="space-y-3">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight">
-            Active Requirements Live on HireNest OS Platform — Apply Now!
+            Active Requirements Live on HireNest OS Platform. Apply Now!
           </h1>
           <p className="text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
             {jobs.length} active requirement{jobs.length === 1 ? '' : 's'} across our network.
@@ -135,13 +135,13 @@ export const PublicJobsListPage: React.FC = () => {
             <li className="flex gap-2">
               <span className="font-semibold shrink-0" style={{ color: 'var(--text-primary)' }}>1.</span>
               <span>
-                For jobs related to <strong style={{ color: 'var(--text-primary)' }}>Contract to Contract (C2C)</strong> &amp; <strong style={{ color: 'var(--text-primary)' }}>Contract to Hire (C2H)</strong> — only bench vendor resources must apply. No direct candidates or market profiles are allowed.
+                For jobs related to <strong style={{ color: 'var(--text-primary)' }}>Contract to Contract (C2C)</strong> &amp; <strong style={{ color: 'var(--text-primary)' }}>Contract to Hire (C2H)</strong>, only bench vendor resources must apply. No direct candidates or market profiles are allowed.
               </span>
             </li>
             <li className="flex gap-2">
               <span className="font-semibold shrink-0" style={{ color: 'var(--text-primary)' }}>2.</span>
               <span>
-                For <strong style={{ color: 'var(--text-primary)' }}>FTE (Full-time)</strong> jobs — direct candidates and market profiles are allowed to submit.
+                For <strong style={{ color: 'var(--text-primary)' }}>FTE (Full-time)</strong> jobs, direct candidates and market profiles are allowed to submit.
               </span>
             </li>
           </ol>
@@ -153,8 +153,12 @@ export const PublicJobsListPage: React.FC = () => {
             className="flex items-center gap-2 rounded-lg border px-4 py-3"
             style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
           >
-            <Search className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+            <Search className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} aria-hidden="true" />
+            <label htmlFor="job-search" className="sr-only">
+              Search jobs by title, location, or company
+            </label>
             <input
+              id="job-search"
               type="text"
               placeholder="Search by title, location, or company..."
               value={query}
@@ -176,6 +180,7 @@ export const PublicJobsListPage: React.FC = () => {
                 <button
                   key={opt.value}
                   type="button"
+                  aria-pressed={isActive}
                   onClick={() => setTypeFilter(opt.value)}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors cursor-pointer"
                   style={{
@@ -237,7 +242,7 @@ const JobRow: React.FC<{ job: PublicJobSummary }> = ({ job }) => {
                 className="flex items-center gap-1.5 text-sm"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                <Building2 className="w-4 h-4 shrink-0" />
+                <Building2 className="w-4 h-4 shrink-0" aria-hidden="true" />
                 {job.client_org_name}
               </div>
             )}
@@ -247,17 +252,17 @@ const JobRow: React.FC<{ job: PublicJobSummary }> = ({ job }) => {
             >
               {job.location && (
                 <span className="inline-flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" />
+                  <MapPin className="w-3.5 h-3.5" aria-hidden="true" />
                   {job.location}
                   {job.work_mode ? ` · ${WORK_MODE_LABEL[job.work_mode]}` : ''}
                 </span>
               )}
               <span className="inline-flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
+                <Clock className="w-3.5 h-3.5" aria-hidden="true" />
                 {formatExperience(job.min_experience, job.max_experience)}
               </span>
               <span className="inline-flex items-center gap-1">
-                <Briefcase className="w-3.5 h-3.5" />
+                <Briefcase className="w-3.5 h-3.5" aria-hidden="true" />
                 {EMPLOYMENT_FULL_LABEL[empType] || 'Full-time (FTE)'}
               </span>
             </div>
