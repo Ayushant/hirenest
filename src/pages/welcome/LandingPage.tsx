@@ -415,6 +415,9 @@ export const LandingPage: React.FC = () => {
               <a href="#platform" className="hover:text-[#0F172A] transition-colors">
                 Platform
               </a>
+              <Link to="/jobs" className="hover:text-[#0F172A] transition-colors">
+                Jobs
+              </Link>
               <a href="#early-access" className="hover:text-[#0F172A] transition-colors">
                 Early Access
               </a>

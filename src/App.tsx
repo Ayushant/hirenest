@@ -6,6 +6,7 @@ import { RequireRole } from './auth/RequireRole';
 import { ToastProvider } from './components/ui/Toast';
 import { AppShell } from './layouts/AppShell';
 import { PublicJobPage } from './pages/public/PublicJobPage';
+import { PublicJobsListPage } from './pages/public/PublicJobsListPage';
 import { WelcomePage } from './pages/welcome/WelcomePage';
 import { LandingPage } from './pages/welcome/LandingPage';
 import { PrivacyPolicyPage } from './pages/welcome/PrivacyPolicyPage';
@@ -141,6 +142,7 @@ function AppRoutes() {
       <Route path="/suspended" element={<SuspendedAccessPage />} />
 
       {/* Public shareable job pages (no auth required) */}
+      <Route path="/jobs" element={<PublicJobsListPage />} />
       <Route path="/jobs/:slug" element={<PublicJobPage />} />
 
       {/* Admin Workspace (/admin/*) */}
