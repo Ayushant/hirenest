@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Briefcase,
   Building2,
   Calendar,
+  CheckCircle2,
   Clock,
   MapPin,
   Share2,
@@ -14,7 +15,9 @@ import {
 import { fetchPublicJob } from '../../api/publicJobs';
 import { useAuth } from '../../auth/AuthProvider';
 import { applyToRequirementRpc } from '../../api/submissions';
-import { Button, Card, Badge } from '../../components/ui/kit';
+import { supabase } from '../../lib/supabase';
+import { mapSupabaseError } from '../../lib/errors';
+import { Button, Card, Badge, Dialog, Input } from '../../components/ui/kit';
 
 const EMPLOYMENT_LABEL: Record<string, string> = {
   full_time: 'Full-time',
@@ -51,7 +54,8 @@ function formatPostedDate(iso: string): string {
 export const PublicJobPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { session, profile } = useAuth();
+  const { session, profile, refreshProfile } = useAuth();
+  const [applyOpen, setApplyOpen] = useState(false);
 
   const {
     data: job,
@@ -72,28 +76,13 @@ export const PublicJobPage: React.FC = () => {
     if (metaDescription) metaDescription.setAttribute('content', desc);
   }, [job]);
 
+  // If the visitor arrives with ?apply=1 (e.g. after an external auth
+  // redirect), re-open the apply modal automatically.
   useEffect(() => {
-    if (!job || !session) return;
+    if (!job) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('apply') !== '1') return;
-    if (profile?.role !== 'candidate') return;
-    (async () => {
-      try {
-        await applyToRequirementRpc(job.id);
-        navigate('/candidate/applications?applied=1', { replace: true });
-      } catch (e) {
-        console.error('Auto-apply failed', e);
-      }
-    })();
-  }, [job, session, profile, navigate]);
-
-  const applyHref = useMemo(() => {
-    if (!slug) return '/signup';
-    const returnTo = `/jobs/${encodeURIComponent(slug)}?apply=1`;
-    return session
-      ? `${window.location.pathname}?apply=1`
-      : `/signup?returnTo=${encodeURIComponent(returnTo)}&role=candidate`;
-  }, [slug, session]);
+    if (params.get('apply') === '1') setApplyOpen(true);
+  }, [job]);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -223,9 +212,9 @@ export const PublicJobPage: React.FC = () => {
 
           {/* CTAs */}
           <div className="flex flex-wrap gap-3 pt-5">
-            <a href={applyHref} className="w-full sm:w-auto">
-              <Button size="lg" className="w-full sm:w-auto">Apply Now</Button>
-            </a>
+            <Button size="lg" className="w-full sm:w-auto" onClick={() => setApplyOpen(true)}>
+              Apply Now
+            </Button>
             <Button size="lg" variant="secondary" onClick={handleShare} className="flex-1 sm:flex-none">
               <Share2 className="w-4 h-4 mr-2" />
               Share
@@ -241,7 +230,7 @@ export const PublicJobPage: React.FC = () => {
           <p className="text-xs sm:text-sm pt-1" style={{ color: 'var(--text-tertiary)' }}>
             {session
               ? 'You are signed in - Apply Now will submit your application.'
-              : 'Sign up or sign in to complete your application.'}
+              : 'Sign up or sign in to apply - it only takes a minute.'}
           </p>
         </header>
 
@@ -321,11 +310,24 @@ export const PublicJobPage: React.FC = () => {
               Create a free candidate account to apply in minutes.
             </div>
           </div>
-          <a href={applyHref} className="w-full sm:w-auto">
-            <Button size="lg" className="w-full sm:w-auto">Apply Now</Button>
-          </a>
+          <Button size="lg" className="w-full sm:w-auto" onClick={() => setApplyOpen(true)}>
+            Apply Now
+          </Button>
         </section>
       </main>
+
+      <ApplyModal
+        open={applyOpen}
+        onClose={() => setApplyOpen(false)}
+        job={job}
+        session={session}
+        profile={profile}
+        refreshProfile={refreshProfile}
+        onApplied={() => {
+          setApplyOpen(false);
+          navigate('/candidate/applications?applied=1');
+        }}
+      />
     </div>
   );
 };
@@ -349,5 +351,286 @@ const OverviewCell: React.FC<{
     <div className="mt-1.5 text-base font-medium">{value}</div>
   </div>
 );
+
+// ---------------------------------------------------------------------
+// Apply modal: lets an unauthenticated visitor sign in or create a
+// candidate account inline, then submits the application immediately —
+// no full-page navigation. Reuses the same supabase.auth + RPC calls as
+// the dedicated sign-in/sign-up pages, so no parallel auth path exists.
+// ---------------------------------------------------------------------
+
+type ApplyStep = 'choice' | 'signin' | 'signup' | 'applying' | 'done' | 'wrong_role';
+
+const ApplyModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  job: { id: string; title: string } | undefined;
+  session: unknown;
+  profile: { role?: string } | null;
+  refreshProfile: () => Promise<void>;
+  onApplied: () => void;
+}> = ({ open, onClose, job, session, profile, refreshProfile, onApplied }) => {
+  const [step, setStep] = useState<ApplyStep>('choice');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Reset to the right starting step whenever the modal opens.
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setLoading(false);
+    if (session && profile?.role === 'candidate') {
+      void submitApplication();
+    } else if (session && profile?.role && profile.role !== 'candidate') {
+      setStep('wrong_role');
+    } else {
+      setStep('choice');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const submitApplication = async () => {
+    if (!job) return;
+    setStep('applying');
+    setError(null);
+    try {
+      await applyToRequirementRpc(job.id);
+      setStep('done');
+    } catch (e) {
+      setError(mapSupabaseError(e));
+      setStep('choice');
+    }
+  };
+
+  const handleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInErr) throw signInErr;
+      await refreshProfile();
+      await submitApplication();
+    } catch (e) {
+      setError(mapSupabaseError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const cleanEmail = email.trim();
+      const { data, error: signUpErr } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            signup_intent: 'candidate',
+          },
+        },
+      });
+
+      if (
+        signUpErr?.message?.toLowerCase().includes('already registered') ||
+        (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0)
+      ) {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        if (signInErr) {
+          throw new Error(
+            'An account with this email already exists. Try signing in instead.'
+          );
+        }
+      } else if (signUpErr) {
+        throw signUpErr;
+      } else if (!data.session) {
+        setError('Check your email inbox to confirm your account, then sign in to apply.');
+        setLoading(false);
+        return;
+      }
+
+      await refreshProfile();
+      await submitApplication();
+    } catch (e) {
+      setError(mapSupabaseError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const title =
+    step === 'done'
+      ? 'Application submitted'
+      : step === 'wrong_role'
+        ? 'Candidate account required'
+        : step === 'applying'
+          ? 'Submitting your application…'
+          : `Apply${job ? ` for ${job.title}` : ''}`;
+
+  return (
+    <Dialog open={open} onClose={onClose} title={title} maxWidth="max-w-[420px]">
+      {step === 'applying' && (
+        <div className="flex items-center justify-center py-8">
+          <div
+            className="h-6 w-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
+          />
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="text-center py-4 space-y-3">
+          <CheckCircle2 className="w-10 h-10 mx-auto" style={{ color: 'var(--status-success, #16A34A)' }} />
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Your application has been submitted. You can track its status from your dashboard.
+          </p>
+          <Button size="md" className="w-full" onClick={onApplied}>
+            View my applications
+          </Button>
+        </div>
+      )}
+
+      {step === 'wrong_role' && (
+        <div className="text-center py-4 space-y-3">
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            You're signed in with a non-candidate account. Applications must be submitted from a
+            candidate account. Sign out and create one to continue.
+          </p>
+          <Link to={`/signin?returnTo=${encodeURIComponent(window.location.pathname + '?apply=1')}`}>
+            <Button size="md" className="w-full" onClick={onClose}>
+              Switch account
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {(step === 'choice' || step === 'signin' || step === 'signup') && (
+        <div className="space-y-4">
+          {error && (
+            <div
+              className="text-xs rounded-md px-3 py-2"
+              style={{
+                background: 'var(--status-danger-bg, #FEF2F2)',
+                color: 'var(--status-danger, #DC2626)',
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {step === 'choice' && (
+            <div className="space-y-2.5">
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Sign in or create a free candidate account to apply.
+              </p>
+              <Button size="md" className="w-full" onClick={() => setStep('signup')}>
+                Create account &amp; apply
+              </Button>
+              <Button size="md" variant="secondary" className="w-full" onClick={() => setStep('signin')}>
+                I already have an account
+              </Button>
+            </div>
+          )}
+
+          {step === 'signin' && (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSignIn();
+              }}
+            >
+              <Input
+                label="Email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <Input
+                label="Password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <Button size="md" type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Signing in…' : 'Sign in & apply'}
+              </Button>
+              <button
+                type="button"
+                className="w-full text-xs text-center"
+                style={{ color: 'var(--text-tertiary)' }}
+                onClick={() => setStep('choice')}
+              >
+                Back
+              </button>
+            </form>
+          )}
+
+          {step === 'signup' && (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSignUp();
+              }}
+            >
+              <Input
+                label="Full name"
+                autoComplete="name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+              />
+              <Input
+                label="Email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <Input
+                label="Password"
+                type="password"
+                autoComplete="new-password"
+                hint="At least 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                required
+              />
+              <Button size="md" type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Creating account…' : 'Create account & apply'}
+              </Button>
+              <button
+                type="button"
+                className="w-full text-xs text-center"
+                style={{ color: 'var(--text-tertiary)' }}
+                onClick={() => setStep('choice')}
+              >
+                Back
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+    </Dialog>
+  );
+};
 
 export default PublicJobPage;
