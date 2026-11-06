@@ -3473,8 +3473,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
           return;
         }
 
-        const { count } = await sb.from('early_access_applications').select('id', { count: 'exact', head: true });
-        const appId = `EA-${String((count || 0) + 1).padStart(5, '0')}`;
+        const appId = `EA-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
         const { error: insertErr } = await sb.from('early_access_applications').insert({
           application_id: appId,
@@ -3557,6 +3556,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
   app.get('/api/early-access/applications', async (req, res) => {
     const statusFilter = req.query.status as string | undefined;
 
+    let supabaseApps: EarlyAccessRecord[] = [];
     const sb = buildAuthedSupabase(req);
     if (sb) {
       try {
@@ -3565,46 +3565,52 @@ Return JSON array of objects with fields: targetSkill, question.`;
         const { data, error: fetchErr } = await query;
         if (fetchErr) throw fetchErr;
 
-        const mapped = (data || []).map((r: Record<string, unknown>) => ({
-          id: r.id,
-          applicationId: r.application_id,
-          contactName: r.contact_name,
-          designation: r.designation || '',
-          businessEmail: r.business_email,
-          phone: r.phone || '',
-          companyName: r.company_name,
-          companyWebsite: r.company_website || '',
-          businessType: r.business_type,
-          country: r.country,
-          companySize: r.company_size,
-          recruitmentTeamSize: r.recruitment_team_size || '',
-          businessRequirements: r.business_requirements || '',
-          interestedModules: r.interested_modules || [],
-          currentChallenges: r.current_challenges || '',
-          linkedinUrl: r.linkedin_url || '',
-          comments: r.comments || '',
-          privacyConsent: r.privacy_consent,
-          status: r.status,
-          assignedTo: r.assigned_to || null,
-          adminNotes: r.admin_notes || '',
-          followUpDate: r.follow_up_date || null,
-          invitationSentAt: r.invitation_sent_at || null,
-          registeredAt: r.registered_at || null,
-          trialActivatedAt: r.trial_activated_at || null,
-          paidConvertedAt: r.paid_converted_at || null,
-          submittedAt: r.submitted_at,
-          updatedAt: r.updated_at,
+        supabaseApps = (data || []).map((r: Record<string, unknown>) => ({
+          id: String(r.id),
+          applicationId: String(r.application_id),
+          contactName: String(r.contact_name),
+          designation: String(r.designation || ''),
+          businessEmail: String(r.business_email),
+          phone: String(r.phone || ''),
+          companyName: String(r.company_name),
+          companyWebsite: String(r.company_website || ''),
+          businessType: String(r.business_type),
+          country: String(r.country),
+          companySize: String(r.company_size),
+          recruitmentTeamSize: String(r.recruitment_team_size || ''),
+          businessRequirements: String(r.business_requirements || ''),
+          interestedModules: (r.interested_modules as string[]) || [],
+          currentChallenges: String(r.current_challenges || ''),
+          linkedinUrl: String(r.linkedin_url || ''),
+          comments: String(r.comments || ''),
+          privacyConsent: Boolean(r.privacy_consent),
+          status: String(r.status) as EarlyAccessRecord['status'],
+          assignedTo: r.assigned_to ? String(r.assigned_to) : null,
+          adminNotes: String(r.admin_notes || ''),
+          followUpDate: r.follow_up_date ? String(r.follow_up_date) : null,
+          invitationSentAt: r.invitation_sent_at ? String(r.invitation_sent_at) : null,
+          registeredAt: r.registered_at ? String(r.registered_at) : null,
+          trialActivatedAt: r.trial_activated_at ? String(r.trial_activated_at) : null,
+          paidConvertedAt: r.paid_converted_at ? String(r.paid_converted_at) : null,
+          submittedAt: String(r.submitted_at),
+          updatedAt: String(r.updated_at),
         }));
-        res.json(mapped);
-        return;
       } catch (err) {
         console.error('[early-access] Supabase fetch failed, falling back:', err);
       }
     }
 
-    let apps = [...enterpriseStore.earlyAccessApplications].reverse();
-    if (statusFilter) apps = apps.filter((a) => a.status === statusFilter);
-    res.json(apps);
+    // Merge JSON fallback apps that aren't already in Supabase (by email)
+    const supabaseEmails = new Set(supabaseApps.map((a) => a.businessEmail.toLowerCase()));
+    let jsonApps = enterpriseStore.earlyAccessApplications.filter(
+      (a) => !supabaseEmails.has(a.businessEmail.toLowerCase())
+    );
+    if (statusFilter) jsonApps = jsonApps.filter((a) => a.status === statusFilter);
+
+    const merged = [...supabaseApps, ...jsonApps].sort(
+      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    );
+    res.json(merged);
   });
 
   app.patch('/api/early-access/applications/:id', async (req, res) => {
