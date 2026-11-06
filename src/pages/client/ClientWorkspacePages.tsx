@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Layers, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Layers, Trash2, Briefcase, Users, CalendarCheck, MessageCircle, Send, CheckCircle, Clock } from 'lucide-react';
 import {
   PageHeader,
   MetricStrip,
@@ -17,6 +17,14 @@ import {
   Dialog,
   Textarea,
 } from '../../components/ui/kit';
+import {
+  KpiCard,
+  KpiRow,
+  ChartCard,
+  FunnelChart,
+  DashboardSection,
+  ActionItem,
+} from '../../components/ui/DashboardKit';
 import {
   RequirementStatusBadge,
   SourceBadge,
@@ -143,219 +151,168 @@ export const ClientDashboardPage: React.FC = () => {
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
+  const hiringFunnel = useMemo(() => [
+    { name: 'Shared', value: offerMetrics.candidatesShared, color: '#6A89A7' },
+    { name: 'Interviewing', value: upcomingInterviews?.count ?? 0, color: '#4F95DB' },
+    { name: 'Offered', value: offerMetrics.offersIssued, color: '#1F4CC4' },
+    { name: 'Accepted', value: offerMetrics.offersAccepted, color: '#2A9D8F' },
+    { name: 'Onboarded', value: offerMetrics.onboardedCandidates, color: '#17734A' },
+  ], [offerMetrics, upcomingInterviews]);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
+      {/* Header Band */}
       <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="type-greeting text-[var(--text-primary)]">
-            Good day, {firstName}
-          </h1>
+          <h1 className="type-greeting text-[var(--text-primary)]">Good day, {firstName}</h1>
           <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
             Client hiring overview, offer management, and confirmed onboarding tracker.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => navigate('/client/offers')}>
-            Offers Desk ({offerMetrics.offersIssued})
+            Offers ({offerMetrics.offersIssued})
           </Button>
-          <Button size="sm" variant="primary" onClick={() => navigate('/client/onboarded')}>
-            Confirmed Onboarded ({offerMetrics.onboardedCandidates})
+          <Button size="sm" onClick={() => navigate('/client/onboarded')}>
+            Onboarded ({offerMetrics.onboardedCandidates})
           </Button>
         </div>
       </div>
 
-      {/* Needs attention */}
-      <div className="space-y-2.5">
-        <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-          Needs attention
-        </h2>
-        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
-          {(reviewSubs?.count ?? 0) > 0 && (
-            <div
-              onClick={() => navigate('/client/candidates')}
-              className="flex h-11 items-center justify-between px-4 hover:bg-[var(--bg-hover)] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 text-[13px]">
-                <Badge tone="warning">Candidates awaiting client review</Badge>
-              </div>
-              <span className="font-mono tabular-nums text-[13px] font-medium text-[var(--text-primary)]">
-                {reviewSubs?.count ?? 0}
-              </span>
-            </div>
-          )}
-          {offerMetrics.pendingOffers > 0 && (
-            <div
-              onClick={() => navigate('/client/offers')}
-              className="flex h-11 items-center justify-between px-4 hover:bg-[var(--bg-hover)] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 text-[13px]">
-                <Badge tone="amber">Issued offers awaiting candidate acceptance</Badge>
-              </div>
-              <span className="font-mono tabular-nums text-[13px] font-medium text-[var(--text-primary)]">
-                {offerMetrics.pendingOffers}
-              </span>
-            </div>
-          )}
-          {offerMetrics.upcomingJoiningsCount > 0 && (
-            <div
-              onClick={() => navigate('/client/onboarded')}
-              className="flex h-11 items-center justify-between px-4 hover:bg-[var(--bg-hover)] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 text-[13px]">
-                <Badge tone="sky">Upcoming scheduled joining dates (Expected DOJ)</Badge>
-              </div>
-              <span className="font-mono tabular-nums text-[13px] font-medium text-[var(--text-primary)]">
-                {offerMetrics.upcomingJoiningsCount}
-              </span>
-            </div>
-          )}
-          {pendingFeedback.map((pf) => (
-            <div
-              key={pf.interview_id}
-              onClick={() => navigate('/client/interviews')}
-              className="flex h-11 items-center justify-between px-4 hover:bg-[var(--bg-hover)] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 text-[13px]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)]" />
-                <span className="font-medium text-[var(--text-primary)]">
-                  {pf.candidate_name}
-                </span>
-                <span className="text-[var(--text-secondary)]">
-                  · {pf.requirement_title} (Round {pf.round_number}:{' '}
-                  {ROUND_LABELS[pf.round_type]})
-                </span>
-              </div>
-              <span className="text-[12px] font-medium text-[var(--accent)]">
-                Submit feedback →
-              </span>
-            </div>
-          ))}
-          {(reviewSubs?.count ?? 0) === 0 &&
-            offerMetrics.pendingOffers === 0 &&
-            offerMetrics.upcomingJoiningsCount === 0 &&
-            pendingFeedback.length === 0 && (
-              <div className="flex h-11 items-center px-4 text-[13px] text-[var(--text-secondary)]">
-                All candidate reviews, offers, and interview evaluations are up to date.
-              </div>
-            )}
-        </div>
-      </div>
-
-      {/* Primary Pipeline Metric Strip */}
-      <MetricStrip
-        items={[
-          {
-            label: 'Open requirements',
-            value: openReqs?.count ?? 0,
-            onClick: () => navigate('/client/requirements'),
-          },
-          {
-            label: 'Candidates shared',
-            value: offerMetrics.candidatesShared,
-            onClick: () => navigate('/client/candidates'),
-          },
-          {
-            label: 'Upcoming interviews',
-            value: upcomingInterviews?.count ?? 0,
-            onClick: () => navigate('/client/interviews'),
-          },
-          {
-            label: 'Pending feedback',
-            value: pendingFeedback.length,
-            tone: pendingFeedback.length > 0 ? 'danger' : 'default',
-            onClick: () => navigate('/client/interviews'),
-          },
-        ]}
-      />
-
-      {/* Database-Driven Offer & Onboarding Lifecycle Metrics */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-            Offer Management &amp; Onboarding Metrics
-          </h2>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={() => navigate('/client/offers')}>
-              View Offers →
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => navigate('/client/onboarded')}>
-              View Onboarded →
-            </Button>
-          </div>
-        </div>
-
-        <MetricStrip
-          items={[
-            {
-              label: 'Offers issued',
-              value: offerMetrics.offersIssued,
-              onClick: () => navigate('/client/offers'),
-            },
-            {
-              label: 'Offers accepted',
-              value: offerMetrics.offersAccepted,
-              tone: offerMetrics.offersAccepted > 0 ? 'success' : 'default',
-              onClick: () => navigate('/client/offers'),
-            },
-            {
-              label: 'Offers declined',
-              value: offerMetrics.offersDeclined,
-              tone: offerMetrics.offersDeclined > 0 ? 'danger' : 'default',
-              onClick: () => navigate('/client/offers'),
-            },
-            {
-              label: 'Pending offers',
-              value: offerMetrics.pendingOffers,
-              tone: offerMetrics.pendingOffers > 0 ? 'warning' : 'default',
-              onClick: () => navigate('/client/offers'),
-            },
-            {
-              label: 'Onboarded candidates',
-              value: offerMetrics.onboardedCandidates,
-              tone: offerMetrics.onboardedCandidates > 0 ? 'success' : 'default',
-              onClick: () => navigate('/client/onboarded'),
-            },
-            {
-              label: 'Upcoming joinings',
-              value: offerMetrics.upcomingJoiningsCount,
-              onClick: () => navigate('/client/onboarded'),
-            },
-          ]}
+      {/* KPI Cards */}
+      <KpiRow cols={4}>
+        <KpiCard
+          label="Open Requirements"
+          value={openReqs?.count ?? 0}
+          icon={<Briefcase className="w-5 h-5" />}
+          accentColor="#1F4CC4"
+          onClick={() => navigate('/client/requirements')}
         />
+        <KpiCard
+          label="Candidates Shared"
+          value={offerMetrics.candidatesShared}
+          icon={<Users className="w-5 h-5" />}
+          accentColor="#4F95DB"
+          onClick={() => navigate('/client/candidates')}
+        />
+        <KpiCard
+          label="Upcoming Interviews"
+          value={upcomingInterviews?.count ?? 0}
+          icon={<CalendarCheck className="w-5 h-5" />}
+          accentColor="#2A9D8F"
+          onClick={() => navigate('/client/interviews')}
+        />
+        <KpiCard
+          label="Pending Feedback"
+          value={pendingFeedback.length}
+          icon={<MessageCircle className="w-5 h-5" />}
+          accentColor={pendingFeedback.length > 0 ? '#B8322B' : '#6A89A7'}
+          onClick={() => navigate('/client/interviews')}
+        />
+      </KpiRow>
+
+      {/* Needs Attention + Hiring Funnel */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Needs attention */}
+        <DashboardSection title="Needs attention">
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+            {(reviewSubs?.count ?? 0) > 0 && (
+              <ActionItem
+                icon={<Users className="w-4 h-4" />}
+                label="Candidates awaiting client review"
+                count={reviewSubs?.count ?? 0}
+                badge="Review"
+                badgeColor="#D99A2B"
+                onClick={() => navigate('/client/candidates')}
+              />
+            )}
+            {offerMetrics.pendingOffers > 0 && (
+              <ActionItem
+                icon={<Clock className="w-4 h-4" />}
+                label="Offers awaiting candidate acceptance"
+                count={offerMetrics.pendingOffers}
+                badge="Pending"
+                badgeColor="#D99A2B"
+                onClick={() => navigate('/client/offers')}
+              />
+            )}
+            {offerMetrics.upcomingJoiningsCount > 0 && (
+              <ActionItem
+                icon={<CalendarCheck className="w-4 h-4" />}
+                label="Upcoming joining dates"
+                count={offerMetrics.upcomingJoiningsCount}
+                badge="Scheduled"
+                badgeColor="#4F95DB"
+                onClick={() => navigate('/client/onboarded')}
+              />
+            )}
+            {pendingFeedback.map((pf) => (
+              <ActionItem
+                key={pf.interview_id}
+                icon={<MessageCircle className="w-4 h-4" />}
+                label={`${pf.candidate_name} · ${pf.requirement_title} (Round ${pf.round_number})`}
+                badge="Feedback due"
+                badgeColor="#B8322B"
+                onClick={() => navigate('/client/interviews')}
+              />
+            ))}
+            {(reviewSubs?.count ?? 0) === 0 &&
+              offerMetrics.pendingOffers === 0 &&
+              offerMetrics.upcomingJoiningsCount === 0 &&
+              pendingFeedback.length === 0 && (
+                <div className="flex h-12 items-center px-4 text-[13px] text-[var(--text-secondary)]">
+                  <CheckCircle className="w-4 h-4 mr-2 text-[#17734A]" />
+                  All reviews, offers, and evaluations up to date.
+                </div>
+              )}
+          </div>
+        </DashboardSection>
+
+        {/* Hiring Funnel */}
+        <ChartCard title="Hiring funnel" subtitle="Candidate progression through stages">
+          <FunnelChart stages={hiringFunnel} />
+        </ChartCard>
+      </div>
+
+      {/* Offer & Onboarding Metrics */}
+      <DashboardSection
+        title="Offer management & onboarding"
+        action={
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={() => navigate('/client/offers')}>View Offers →</Button>
+            <Button size="sm" variant="ghost" onClick={() => navigate('/client/onboarded')}>View Onboarded →</Button>
+          </div>
+        }
+      >
+        <KpiRow cols={6}>
+          <KpiCard label="Offers issued" value={offerMetrics.offersIssued} icon={<Send className="w-4 h-4" />} accentColor="#1F4CC4" onClick={() => navigate('/client/offers')} />
+          <KpiCard label="Accepted" value={offerMetrics.offersAccepted} icon={<CheckCircle className="w-4 h-4" />} accentColor="#17734A" onClick={() => navigate('/client/offers')} />
+          <KpiCard label="Declined" value={offerMetrics.offersDeclined} icon={<AlertTriangle className="w-4 h-4" />} accentColor="#B8322B" onClick={() => navigate('/client/offers')} />
+          <KpiCard label="Pending" value={offerMetrics.pendingOffers} icon={<Clock className="w-4 h-4" />} accentColor="#D99A2B" onClick={() => navigate('/client/offers')} />
+          <KpiCard label="Onboarded" value={offerMetrics.onboardedCandidates} icon={<CheckCircle className="w-4 h-4" />} accentColor="#2A9D8F" onClick={() => navigate('/client/onboarded')} />
+          <KpiCard label="Upcoming joinings" value={offerMetrics.upcomingJoiningsCount} icon={<CalendarCheck className="w-4 h-4" />} accentColor="#6A89A7" onClick={() => navigate('/client/onboarded')} />
+        </KpiRow>
 
         {offerMetrics.upcomingJoinings.length > 0 && (
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-4 space-y-2.5">
-            <div className="flex items-center justify-between">
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+            <div className="px-4 py-3 flex items-center justify-between border-b border-[var(--border)]">
               <span className="text-[12px] font-semibold text-[var(--text-primary)]">
-                Upcoming Scheduled Joining Dates (Expected DOJ · Awaiting Day-1 Confirmation)
+                Upcoming Joining Dates (Expected DOJ)
               </span>
               <Badge tone="sky">{offerMetrics.upcomingJoinings.length} scheduled</Badge>
             </div>
-            <div className="divide-y divide-[var(--border)]">
-              {offerMetrics.upcomingJoinings.slice(0, 5).map(({ submission, record }) => (
-                <div
-                  key={submission.id}
-                  onClick={() => navigate('/client/onboarded')}
-                  className="py-2 flex items-center justify-between text-[13px] hover:bg-[var(--bg-hover)] px-2 rounded-[4px] cursor-pointer"
-                >
-                  <div>
-                    <span className="font-medium text-[var(--text-primary)]">
-                      {submission.candidates?.full_name || 'Candidate'}
-                    </span>
-                    <span className="text-[var(--text-secondary)]">
-                      {' '}
-                      · {submission.requirements?.title || 'Requirement'}
-                    </span>
-                  </div>
-                  <span className="font-mono tabular-nums text-[12px] text-[var(--text-primary)]">
-                    Expected DOJ: {record.expectedDoj ? formatLocalDate(record.expectedDoj) : '-'}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {offerMetrics.upcomingJoinings.slice(0, 5).map(({ submission, record }) => (
+              <ActionItem
+                key={submission.id}
+                label={`${submission.candidates?.full_name || 'Candidate'} · ${submission.requirements?.title || 'Requirement'}`}
+                badge={record.expectedDoj ? formatLocalDate(record.expectedDoj) : 'TBD'}
+                badgeColor="#4F95DB"
+                onClick={() => navigate('/client/onboarded')}
+              />
+            ))}
           </div>
         )}
-      </div>
+      </DashboardSection>
     </div>
   );
 };

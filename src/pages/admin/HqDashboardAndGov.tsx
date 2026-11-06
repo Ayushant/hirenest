@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, Building2, Briefcase, Users, CalendarCheck, Send, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 import {
   PageHeader,
   MetricStrip,
@@ -16,6 +16,17 @@ import {
   Pagination,
   Dialog,
 } from '../../components/ui/kit';
+import {
+  KpiCard,
+  KpiRow,
+  ChartCard,
+  DonutChart,
+  ChartLegend,
+  FunnelChart,
+  DashboardSection,
+  ActionItem,
+  ProgressBar,
+} from '../../components/ui/DashboardKit';
 import { VendorPerformancePanel } from '../../components/domain/VendorScoreCard';
 import { OrganizationOnboardingPanel } from '../../components/domain/OrganizationOnboardingPanel';
 import {
@@ -171,9 +182,33 @@ export const HqDashboardPage: React.FC = () => {
     },
   ];
 
+  const totalCandidates = (candBySource.vendor ?? 0) + (candBySource.direct ?? 0) + (candBySource.internal ?? 0);
+  const totalReqs = Object.values(reqByStatus).reduce((a, b) => a + (b || 0), 0);
+  const totalSubs = Object.values(subByStage).reduce((a, b) => a + (b || 0), 0);
+
+  const reqDonutData = useMemo(() => [
+    { name: 'Open', value: reqByStatus.open ?? 0 },
+    { name: 'Pending', value: reqByStatus.pending_approval ?? 0 },
+    { name: 'Draft', value: reqByStatus.draft ?? 0 },
+    { name: 'On Hold', value: reqByStatus.on_hold ?? 0 },
+    { name: 'Filled', value: reqByStatus.filled ?? 0 },
+    { name: 'Closed', value: reqByStatus.closed ?? 0 },
+  ].filter((d) => d.value > 0), [reqByStatus]);
+
+  const REQ_COLORS = ['#2A9D8F', '#D99A2B', '#6A89A7', '#384959', '#1F4CC4', '#B8322B'];
+
+  const funnelStages = useMemo(() => [
+    { name: 'Applied', value: subByStage.applied ?? 0, color: '#6A89A7' },
+    { name: 'Recruiter review', value: subByStage.recruiter_review ?? 0, color: '#4F95DB' },
+    { name: 'Client review', value: subByStage.client_review ?? 0, color: '#1F4CC4' },
+    { name: 'Interviewing', value: subByStage.interviewing ?? 0, color: '#2A9D8F' },
+    { name: 'Offered', value: subByStage.offered ?? 0, color: '#D99A2B' },
+    { name: 'Onboarded', value: subByStage.onboarded ?? 0, color: '#17734A' },
+  ], [subByStage]);
+
   return (
-    <div className="space-y-8">
-      {/* Workspace Dashboard Header Band (Sky 50 + 24px storm-blue dot grid at 8% opacity) */}
+    <div className="space-y-7">
+      {/* Header Band */}
       <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="type-greeting text-[var(--text-primary)]">
@@ -184,12 +219,7 @@ export const HqDashboardPage: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handlePublishAllToVendors}
-            loading={syncingVendors}
-          >
+          <Button size="sm" variant="outline" onClick={handlePublishAllToVendors} loading={syncingVendors}>
             <RefreshCw className="h-3.5 w-3.5" />
             Publish &amp; share all with vendors
           </Button>
@@ -199,210 +229,186 @@ export const HqDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 1. Needs attention */}
-      <section className="space-y-2.5">
-        <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-          Needs attention
-        </h2>
-        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
-          {attentionItems.map((item) => (
-            <div
-              key={item.label}
-              onClick={() => navigate(item.to)}
-              className="h-11 px-4 flex items-center justify-between text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
-            >
-              <Badge tone={item.tone}>{item.label}</Badge>
-              <div className="flex items-center gap-4">
-                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-                  {item.count}
-                </span>
-                <span className="text-[12px] leading-[16px] text-[var(--accent)] font-medium">
-                  Review →
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 2. Single row of 4 plain metrics separated by vertical dividers */}
-      <MetricStrip
-        items={[
-          {
-            label: 'Client organizations',
-            value: summary.clients ?? 0,
-            onClick: () =>
-              navigate(isAdmin ? '/admin/organizations' : `${prefix}/requirements`),
-          },
-          {
-            label: 'Vendor agencies',
-            value: summary.vendors ?? 0,
-            onClick: () =>
-              navigate(isAdmin ? '/admin/organizations' : `${prefix}/vendor-performance`),
-          },
-          {
-            label: 'Open requirements',
-            value: reqByStatus.open ?? 0,
-            onClick: () => navigate(`${prefix}/requirements?status=open`),
-          },
-          {
-            label: 'Active interviews',
-            value: subByStage.interviewing ?? 0,
-            onClick: () => navigate(`${prefix}/submissions?stage=interviewing`),
-          },
-        ]}
-      />
-
-      {/* 2B. Company-Wide Offer & Onboarding Lifecycle Metrics */}
-      <section className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <h2 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-            Offer Management &amp; Onboarding Oversight
-          </h2>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => navigate(`${prefix}/offers`)}>
-              Offers Desk ({offerMetrics.offersIssued})
-            </Button>
-            <Button size="sm" variant="primary" onClick={() => navigate(`${prefix}/onboarded`)}>
-              Confirmed Onboarded ({offerMetrics.onboardedCandidates})
-            </Button>
-          </div>
-        </div>
-        <MetricStrip
-          items={[
-            {
-              label: 'Candidates shared',
-              value: offerMetrics.candidatesShared,
-              onClick: () => navigate(`${prefix}/submissions`),
-            },
-            {
-              label: 'Offers issued',
-              value: offerMetrics.offersIssued,
-              onClick: () => navigate(`${prefix}/offers`),
-            },
-            {
-              label: 'Offers accepted',
-              value: offerMetrics.offersAccepted,
-              tone: offerMetrics.offersAccepted > 0 ? 'success' : 'default',
-              onClick: () => navigate(`${prefix}/offers`),
-            },
-            {
-              label: 'Pending offers',
-              value: offerMetrics.pendingOffers,
-              tone: offerMetrics.pendingOffers > 0 ? 'warning' : 'default',
-              onClick: () => navigate(`${prefix}/offers`),
-            },
-            {
-              label: 'Confirmed onboarded',
-              value: offerMetrics.onboardedCandidates,
-              tone: offerMetrics.onboardedCandidates > 0 ? 'success' : 'default',
-              onClick: () => navigate(`${prefix}/onboarded`),
-            },
-            {
-              label: 'Upcoming joinings',
-              value: offerMetrics.upcomingJoiningsCount,
-              onClick: () => navigate(`${prefix}/onboarded`),
-            },
-          ]}
+      {/* KPI Cards Row */}
+      <KpiRow cols={4}>
+        <KpiCard
+          label="Client Organizations"
+          value={summary.clients ?? 0}
+          icon={<Building2 className="w-5 h-5" />}
+          accentColor="#1F4CC4"
+          onClick={() => navigate(isAdmin ? '/admin/organizations' : `${prefix}/requirements`)}
         />
-      </section>
+        <KpiCard
+          label="Vendor Agencies"
+          value={summary.vendors ?? 0}
+          icon={<Briefcase className="w-5 h-5" />}
+          accentColor="#4F95DB"
+          onClick={() => navigate(isAdmin ? '/admin/organizations' : `${prefix}/vendor-performance`)}
+        />
+        <KpiCard
+          label="Total Candidates"
+          value={totalCandidates}
+          icon={<Users className="w-5 h-5" />}
+          accentColor="#2A9D8F"
+          onClick={() => navigate(`${prefix}/candidates`)}
+        />
+        <KpiCard
+          label="Open Requirements"
+          value={reqByStatus.open ?? 0}
+          icon={<CalendarCheck className="w-5 h-5" />}
+          accentColor="#D99A2B"
+          onClick={() => navigate(`${prefix}/requirements?status=open`)}
+        />
+      </KpiRow>
 
-      {/* 3. Breakdown tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="space-y-2.5">
-          <h3 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-            Candidates by source
-          </h3>
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
-            {(['vendor', 'direct', 'internal'] as const).map((src) => (
-              <div
-                key={src}
-                onClick={() => navigate(`${prefix}/candidates?source=${src}`)}
-                className="h-11 px-4 flex items-center justify-between text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)]"
-              >
-                <span className="text-[var(--text-primary)]">
-                  {src === 'internal'
-                    ? 'HireNest'
-                    : src === 'direct'
-                      ? 'Direct'
-                      : 'Vendor'}
-                </span>
-                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-                  {candBySource[src] ?? 0}
-                </span>
-              </div>
+      {/* Needs Attention */}
+      {attentionItems.some((item) => item.count > 0) && (
+        <DashboardSection title="Needs attention">
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+            {attentionItems.map((item) => (
+              <ActionItem
+                key={item.label}
+                icon={
+                  item.tone === 'red' || item.tone === 'amber'
+                    ? <AlertTriangle className="w-4 h-4" />
+                    : <Clock className="w-4 h-4" />
+                }
+                label={item.label}
+                count={item.count}
+                badge={item.count > 0 ? 'Action needed' : undefined}
+                badgeColor={item.tone === 'red' ? '#B8322B' : '#D99A2B'}
+                onClick={() => navigate(item.to)}
+              />
             ))}
           </div>
-        </div>
+        </DashboardSection>
+      )}
 
-        <div className="space-y-2.5">
-          <h3 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-            Requirements by status
-          </h3>
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
-            {(
-              ['open', 'pending_approval', 'draft', 'on_hold', 'filled', 'closed'] as const
-            ).map((st) => (
+      {/* Charts Row: Requirements by Status (Donut) + Submission Funnel */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <ChartCard
+          title="Requirements by status"
+          subtitle={`${totalReqs} total requirements`}
+        >
+          <DonutChart
+            data={reqDonutData}
+            colors={REQ_COLORS}
+            centerValue={totalReqs}
+            centerLabel="Total"
+          />
+          <ChartLegend
+            items={reqDonutData.map((d, i) => ({
+              name: d.name,
+              color: REQ_COLORS[i % REQ_COLORS.length],
+              value: d.value,
+            }))}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Submission pipeline"
+          subtitle={`${totalSubs} total submissions`}
+        >
+          <FunnelChart stages={funnelStages} />
+        </ChartCard>
+      </div>
+
+      {/* Offer & Onboarding Lifecycle */}
+      <DashboardSection
+        title="Offer management & onboarding"
+        action={
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate(`${prefix}/offers`)}>
+              Offers ({offerMetrics.offersIssued})
+            </Button>
+            <Button size="sm" onClick={() => navigate(`${prefix}/onboarded`)}>
+              Onboarded ({offerMetrics.onboardedCandidates})
+            </Button>
+          </div>
+        }
+      >
+        <KpiRow cols={6}>
+          <KpiCard
+            label="Candidates shared"
+            value={offerMetrics.candidatesShared}
+            icon={<Send className="w-4 h-4" />}
+            accentColor="#4F95DB"
+            onClick={() => navigate(`${prefix}/submissions`)}
+          />
+          <KpiCard
+            label="Offers issued"
+            value={offerMetrics.offersIssued}
+            icon={<Briefcase className="w-4 h-4" />}
+            accentColor="#1F4CC4"
+            onClick={() => navigate(`${prefix}/offers`)}
+          />
+          <KpiCard
+            label="Offers accepted"
+            value={offerMetrics.offersAccepted}
+            icon={<CheckCircle className="w-4 h-4" />}
+            accentColor="#17734A"
+            onClick={() => navigate(`${prefix}/offers`)}
+          />
+          <KpiCard
+            label="Pending offers"
+            value={offerMetrics.pendingOffers}
+            icon={<Clock className="w-4 h-4" />}
+            accentColor="#D99A2B"
+            onClick={() => navigate(`${prefix}/offers`)}
+          />
+          <KpiCard
+            label="Confirmed onboarded"
+            value={offerMetrics.onboardedCandidates}
+            icon={<CheckCircle className="w-4 h-4" />}
+            accentColor="#2A9D8F"
+            onClick={() => navigate(`${prefix}/onboarded`)}
+          />
+          <KpiCard
+            label="Upcoming joinings"
+            value={offerMetrics.upcomingJoiningsCount}
+            icon={<CalendarCheck className="w-4 h-4" />}
+            accentColor="#6A89A7"
+            onClick={() => navigate(`${prefix}/onboarded`)}
+          />
+        </KpiRow>
+      </DashboardSection>
+
+      {/* Candidates by Source */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <ChartCard title="Candidates by source" subtitle={`${totalCandidates} total`}>
+          <div className="px-3 space-y-4 py-2">
+            <ProgressBar label="Vendor" value={candBySource.vendor ?? 0} total={totalCandidates} color="#1F4CC4" />
+            <ProgressBar label="Direct" value={candBySource.direct ?? 0} total={totalCandidates} color="#4F95DB" />
+            <ProgressBar label="HireNest" value={candBySource.internal ?? 0} total={totalCandidates} color="#2A9D8F" />
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Requirements breakdown" className="lg:col-span-2">
+          <div className="rounded-[10px] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+            {(['open', 'pending_approval', 'draft', 'on_hold', 'filled', 'closed'] as const).map((st) => (
               <div
                 key={st}
                 onClick={() => navigate(`${prefix}/requirements?status=${st}`)}
                 className="h-11 px-4 flex items-center justify-between text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)]"
               >
-                <span className="text-[var(--text-primary)]">
-                  {REQUIREMENT_STATUS_LABELS[st]}
-                </span>
-                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-                  {reqByStatus[st] ?? 0}
-                </span>
+                <span className="text-[var(--text-primary)]">{REQUIREMENT_STATUS_LABELS[st]}</span>
+                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">{reqByStatus[st] ?? 0}</span>
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="space-y-2.5">
-          <h3 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-            Submissions by stage
-          </h3>
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
-            {(
-              [
-                'applied',
-                'recruiter_review',
-                'client_review',
-                'interviewing',
-                'offered',
-                'onboarded',
-              ] as const
-            ).map((stage) => (
-              <div
-                key={stage}
-                onClick={() => navigate(`${prefix}/submissions?stage=${stage}`)}
-                className="h-11 px-4 flex items-center justify-between text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)]"
-              >
-                <span className="text-[var(--text-primary)]">{STAGE_LABELS[stage]}</span>
-                <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-                  {subByStage[stage] ?? 0}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        </ChartCard>
       </div>
 
-      {/* 4. Active Requirements Overview on Dashboard */}
+      {/* Active Requirements Table */}
       {recentReqs?.data && recentReqs.data.length > 0 && (
-        <section className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <h3 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-              Active requirements ({recentReqs.data.length})
-            </h3>
-            <Link
-              to={`${prefix}/requirements`}
-              className="text-[12px] font-medium text-[var(--accent)] hover:underline"
-            >
+        <DashboardSection
+          title={`Active requirements (${recentReqs.data.length})`}
+          action={
+            <Link to={`${prefix}/requirements`} className="text-[12px] font-medium text-[var(--accent)] hover:underline">
               Open requirements pipeline →
             </Link>
-          </div>
+          }
+        >
           <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
             {recentReqs.data.slice(0, 6).map((req) => {
               const budgetInfo = formatRequirementBudgetWithSubtitle(req);
@@ -413,9 +419,7 @@ export const HqDashboardPage: React.FC = () => {
                   className="h-12 px-4 flex items-center justify-between gap-4 text-[13px] leading-[20px] cursor-pointer hover:bg-[var(--bg-hover)]"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-medium text-[var(--text-primary)] truncate">
-                      {req.title}
-                    </span>
+                    <span className="font-medium text-[var(--text-primary)] truncate">{req.title}</span>
                     <Badge tone={req.status === 'open' ? 'emerald' : 'slate'}>
                       {REQUIREMENT_STATUS_LABELS[req.status]}
                     </Badge>
@@ -424,18 +428,14 @@ export const HqDashboardPage: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
-                    <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">
-                      {budgetInfo.formatted}
-                    </span>
-                    <span className="text-[12px] text-[var(--accent)] font-medium">
-                      Open →
-                    </span>
+                    <span className="font-mono tabular-nums font-medium text-[var(--text-primary)]">{budgetInfo.formatted}</span>
+                    <span className="text-[12px] text-[var(--accent)] font-medium">Open →</span>
                   </div>
                 </div>
               );
             })}
           </div>
-        </section>
+        </DashboardSection>
       )}
     </div>
   );
