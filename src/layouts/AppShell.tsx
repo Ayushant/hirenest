@@ -454,7 +454,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             type="button"
             onClick={async () => {
               await signOut();
-              navigate('/signin', { replace: true });
+              navigate('/landing', { replace: true });
             }}
             className="w-full h-[34px] px-2.5 rounded-[6px] flex items-center gap-2 text-[13px] leading-[20px] text-[var(--sidebar-muted)] hover:text-white hover:bg-[var(--sidebar-hover)] transition-colors cursor-pointer"
           >
