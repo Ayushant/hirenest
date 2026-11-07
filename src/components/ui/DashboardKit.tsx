@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -13,8 +13,123 @@ import {
   Area,
   CartesianGrid,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, ArrowRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ArrowRight, Sun, Cloud, Sunset, Moon, Activity } from 'lucide-react';
 import { CATEGORY_PALETTE } from './kit';
+
+// ─── Time-based Greeting ─────────────────────────────────
+type GreetingInfo = { text: string; emoji: React.ReactNode };
+
+export function getTimeGreeting(firstName?: string): GreetingInfo {
+  const h = new Date().getHours();
+  let text: string;
+  let emoji: React.ReactNode;
+  if (h >= 5 && h < 12) {
+    text = 'Good morning';
+    emoji = <Sun className="w-6 h-6 text-amber-500 inline-block" />;
+  } else if (h >= 12 && h < 17) {
+    text = 'Good afternoon';
+    emoji = <Cloud className="w-6 h-6 text-sky-500 inline-block" />;
+  } else if (h >= 17 && h < 21) {
+    text = 'Good evening';
+    emoji = <Sunset className="w-6 h-6 text-orange-500 inline-block" />;
+  } else {
+    text = 'Working late?';
+    emoji = <Moon className="w-6 h-6 text-indigo-400 inline-block" />;
+  }
+  if (firstName) text += `, ${firstName}`;
+  return { text, emoji };
+}
+
+export const GreetingHeader: React.FC<{ firstName?: string; subtitle: string }> = ({
+  firstName,
+  subtitle,
+}) => {
+  const { text, emoji } = useMemo(() => getTimeGreeting(firstName), [firstName]);
+  return (
+    <div>
+      <h1 className="type-greeting text-[var(--text-primary)] flex items-center gap-2">
+        {emoji} {text}
+      </h1>
+      <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">{subtitle}</p>
+    </div>
+  );
+};
+
+// ─── Since Your Last Visit ───────────────────────────────
+const LAST_VISIT_KEY = 'hirenest_last_visit';
+
+function getLastVisitTimestamp(): number | null {
+  try {
+    const v = localStorage.getItem(LAST_VISIT_KEY);
+    return v ? parseInt(v, 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveVisitTimestamp() {
+  try {
+    localStorage.setItem(LAST_VISIT_KEY, Date.now().toString());
+  } catch {}
+}
+
+function formatTimeSince(ms: number): string {
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+export type DeltaItem = { label: string; count: number; icon?: React.ReactNode };
+
+export const SinceLastVisit: React.FC<{ items: DeltaItem[] }> = ({ items }) => {
+  const [lastVisit, setLastVisit] = useState<number | null>(null);
+
+  useEffect(() => {
+    const prev = getLastVisitTimestamp();
+    setLastVisit(prev);
+    saveVisitTimestamp();
+  }, []);
+
+  const hasActivity = items.some((i) => i.count > 0);
+  if (!lastVisit && !hasActivity) return null;
+
+  return (
+    <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Activity className="w-4 h-4 text-[var(--text-secondary)]" />
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">
+          Since your last visit
+        </span>
+        {lastVisit && (
+          <span className="text-[11px] text-[var(--text-tertiary)]">
+            ({formatTimeSince(Date.now() - lastVisit)})
+          </span>
+        )}
+      </div>
+      {hasActivity ? (
+        <div className="flex flex-wrap gap-3">
+          {items
+            .filter((i) => i.count > 0)
+            .map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-1.5 rounded-full bg-[var(--bg-secondary)] px-3 py-1"
+              >
+                {item.icon}
+                <span className="text-[18px] font-bold text-[var(--text-primary)]">{item.count}</span>
+                <span className="text-[12px] text-[var(--text-secondary)]">{item.label}</span>
+              </div>
+            ))}
+        </div>
+      ) : (
+        <p className="text-[12px] text-[var(--text-tertiary)]">No new activity — you&apos;re all caught up!</p>
+      )}
+    </div>
+  );
+};
 
 const CHART_COLORS = [
   '#1F4CC4', '#4F95DB', '#2A9D8F', '#D99A2B', '#6A89A7', '#384959',

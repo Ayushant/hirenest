@@ -26,6 +26,8 @@ import {
   DashboardSection,
   ActionItem,
   ProgressBar,
+  GreetingHeader,
+  SinceLastVisit,
 } from '../../components/ui/DashboardKit';
 import { VendorPerformancePanel } from '../../components/domain/VendorScoreCard';
 import { OrganizationOnboardingPanel } from '../../components/domain/OrganizationOnboardingPanel';
@@ -210,14 +212,10 @@ export const HqDashboardPage: React.FC = () => {
     <div className="space-y-7">
       {/* Header Band */}
       <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="type-greeting text-[var(--text-primary)]">
-            {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}` : 'Operations'}
-          </h1>
-          <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
-            Governed overview across client requisitions, vendor SLAs, and pipeline stages.
-          </p>
-        </div>
+        <GreetingHeader
+          firstName={profile?.full_name?.split(' ')[0]}
+          subtitle="Governed overview across client requisitions, vendor SLAs, and pipeline stages."
+        />
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={handlePublishAllToVendors} loading={syncingVendors}>
             <RefreshCw className="h-3.5 w-3.5" />
@@ -228,6 +226,14 @@ export const HqDashboardPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      <SinceLastVisit
+        items={[
+          { label: 'new candidates', count: summary.pending_users ?? 0 },
+          { label: 'open reqs', count: totalReqs },
+          { label: 'pending feedback', count: summary.interviews_pending_feedback ?? 0 },
+        ]}
+      />
 
       {/* KPI Cards Row */}
       <KpiRow cols={4}>

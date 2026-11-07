@@ -24,6 +24,8 @@ import {
   FunnelChart,
   DashboardSection,
   ActionItem,
+  GreetingHeader,
+  SinceLastVisit,
 } from '../../components/ui/DashboardKit';
 import {
   RequirementStatusBadge,
@@ -163,12 +165,10 @@ export const ClientDashboardPage: React.FC = () => {
     <div className="space-y-7">
       {/* Header Band */}
       <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="type-greeting text-[var(--text-primary)]">Good day, {firstName}</h1>
-          <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
-            Client hiring overview, offer management, and confirmed onboarding tracker.
-          </p>
-        </div>
+        <GreetingHeader
+          firstName={firstName}
+          subtitle="Client hiring overview, offer management, and confirmed onboarding tracker."
+        />
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => navigate('/client/offers')}>
             Offers ({offerMetrics.offersIssued})
@@ -178,6 +178,14 @@ export const ClientDashboardPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      <SinceLastVisit
+        items={[
+          { label: 'candidates shared', count: offerMetrics.candidatesShared },
+          { label: 'interviews scheduled', count: upcomingInterviews?.count ?? 0 },
+          { label: 'offers pending', count: offerMetrics.offersIssued - offerMetrics.offersAccepted },
+        ]}
+      />
 
       {/* KPI Cards */}
       <KpiRow cols={4}>

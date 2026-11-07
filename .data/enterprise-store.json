@@ -5,13 +5,13 @@
       "accountName": "Test Corp",
       "planId": "free_trial",
       "billingCycle": "annual",
-      "subscriptionStatus": "expired",
+      "subscriptionStatus": "trialing",
       "trialDurationDays": 15,
       "trialStartedAt": "2026-10-23T09:27:50.490Z",
       "trialEndsAt": "2026-11-07T09:27:50.490Z",
       "paidActivatedAt": null,
       "currentPeriodEndsAt": null,
-      "updatedAt": "2026-11-07T09:28:50.490Z"
+      "updatedAt": "2026-11-06T21:27:43.838Z"
     },
     "default_hirenest_account": {
       "accountId": "default_hirenest_account",
@@ -41,6 +41,22 @@
     }
   },
   "reminders": [
+    {
+      "id": "rem_954f6a90c7e1",
+      "accountId": "default_hirenest_account",
+      "milestone": "1d",
+      "daysRemaining": 1,
+      "dedupeKey": "default_hirenest_account:2026-11-07:1d",
+      "title": "Action required: Your HireNestOS trial expires today",
+      "message": "Your trial expires today. Complete your plan purchase now so your team retains uninterrupted write access.",
+      "urgency": "danger",
+      "channels": [
+        "in_app",
+        "email"
+      ],
+      "deliveredAt": "2026-11-06T21:27:43.838Z",
+      "acknowledgedAt": null
+    },
     {
       "id": "rem_3a08f062c62f",
       "accountId": "test_acc_1792748411734",
@@ -363,5 +379,456 @@
       },
       "createdAt": "2026-10-24T07:40:00.180Z"
     }
-  ]
+  ],
+  "requirementShareActivities": [],
+  "privacyNotices": [
+    {
+      "noticeId": "HN-DPDP-NOTICE-2026-V2",
+      "version": "2.4.0",
+      "locale": "en-IN",
+      "title": "HireNestOS Candidate & Workforce Personal Data Protection Notice (DPDP Act, 2023)",
+      "purposes": [
+        "Candidate profile creation, resume parsing & SHA-256 deduplication",
+        "4-dimension JD skill matching & explainable recruiter screening",
+        "Authorised submission to mapped hiring clients with human recruiter approval",
+        "Interview scheduling, evaluation feedback & communication (Email / WhatsApp)"
+      ],
+      "legalBasesSupported": [
+        "consent",
+        "voluntary_employment_use",
+        "contractual_processor_instruction"
+      ],
+      "effectiveAt": "2026-10-26T00:00:00.000Z",
+      "publishedBy": "Data Protection & Governance Office (HireNest Workforce Pvt Ltd)",
+      "status": "active",
+      "contentSummary": "Explains categories of personal data collected (resume, contact details, employment history, skills, interview evaluations), specific recruitment purposes, Data Fiduciary/Processor responsibilities, AI Gateway PII redaction safeguards, retention windows, and how Data Principals can exercise rights of access, correction, consent withdrawal, erasure, and grievance redressal.",
+      "fiduciaryEntity": "HireNest Workforce Private Limited (Technical Partner: AIKIND Private Limited)",
+      "grievanceOfficerContact": "dpo-grievance@hirenestworkforce.com"
+    },
+    {
+      "noticeId": "HN-DPDP-VENDOR-2026-V1",
+      "version": "1.2.0",
+      "locale": "en-IN",
+      "title": "Vendor Agency Candidate Representation & Notice Attestation Charter",
+      "purposes": [
+        "Vendor representation attestation & candidate notice delivery confirmation",
+        "Ownership lock verification (30-day exclusivity window) & dispute resolution"
+      ],
+      "legalBasesSupported": [
+        "consent",
+        "contractual_processor_instruction"
+      ],
+      "effectiveAt": "2026-09-15T00:00:00.000Z",
+      "publishedBy": "HQ Compliance & Vendor Operations",
+      "status": "active",
+      "contentSummary": "Requires staffing vendors uploading candidate resumes to attest that the candidate has received the HireNestOS DPDP Notice and authorized submission to the specific requirement.",
+      "fiduciaryEntity": "HireNest Workforce Private Limited",
+      "grievanceOfficerContact": "vendor-privacy@hirenestworkforce.com"
+    }
+  ],
+  "privacyAcknowledgements": [
+    {
+      "id": "ACK-2026-901",
+      "subjectRef": "cand_aarav_mehta",
+      "subjectName": "Aarav Mehta",
+      "tenantId": "hirenest_hq",
+      "noticeId": "HN-DPDP-NOTICE-2026-V2",
+      "version": "2.4.0",
+      "purpose": "Candidate profile creation, AI matching & authorised client submission",
+      "processingBasis": "consent",
+      "action": "consented",
+      "communicationPreferences": {
+        "email": true,
+        "whatsapp": true,
+        "sms": false
+      },
+      "timestamp": "2026-10-24T09:15:00.000Z",
+      "captureSource": "candidate_portal",
+      "evidenceRef": "sha256:8f3c91b2e4d10a77c5f"
+    },
+    {
+      "id": "ACK-2026-902",
+      "subjectRef": "cand_divya_nair",
+      "subjectName": "Divya Nair",
+      "tenantId": "hirenest_hq",
+      "noticeId": "HN-DPDP-NOTICE-2026-V2",
+      "version": "2.4.0",
+      "purpose": "Direct job application & interview scheduling",
+      "processingBasis": "voluntary_employment_use",
+      "action": "acknowledged",
+      "communicationPreferences": {
+        "email": true,
+        "whatsapp": false,
+        "sms": false
+      },
+      "timestamp": "2026-10-25T11:40:00.000Z",
+      "captureSource": "resume_upload",
+      "evidenceRef": "sha256:4b2d88e19f02a631d9c"
+    },
+    {
+      "id": "ACK-2026-903",
+      "subjectRef": "cand_rohan_kulkarni",
+      "subjectName": "Rohan Kulkarni",
+      "tenantId": "vendor_apex_talent",
+      "noticeId": "HN-DPDP-VENDOR-2026-V1",
+      "version": "1.2.0",
+      "purpose": "Vendor agency submission for Senior Backend Architect",
+      "processingBasis": "consent",
+      "action": "withdrawn",
+      "communicationPreferences": {
+        "email": false,
+        "whatsapp": false,
+        "sms": false
+      },
+      "timestamp": "2026-10-26T06:20:00.000Z",
+      "captureSource": "privacy_center",
+      "evidenceRef": "sha256:1e9f77a43c88b012e4a"
+    }
+  ],
+  "dataProcessingRecords": [
+    {
+      "id": "ROPA-01",
+      "workflow": "Candidate Portal & Resume Upload",
+      "dataCategories": [
+        "Full Name, Email, Phone, LinkedIn URL",
+        "Resume Document (PDF/DOCX) & SHA-256 Digest",
+        "Employment & Education History, Skills"
+      ],
+      "source": "Direct Candidate Portal / Vendor Upload",
+      "purpose": "Candidate onboarding, structured profile creation, and duplicate ownership check",
+      "responsibleEntity": "HireNest Workforce Pvt Ltd",
+      "legalRole": "Data Fiduciary",
+      "processingBasis": "consent",
+      "recipients": [
+        "Internal HQ Recruiters",
+        "Authorised Hiring Clients (on approved submission)"
+      ],
+      "systems": [
+        "Supabase PostgreSQL",
+        "Supabase Storage (resumes bucket)"
+      ],
+      "retentionPolicyId": "RET-CAND-ACTIVE",
+      "status": "active"
+    },
+    {
+      "id": "ROPA-02",
+      "workflow": "AI Screening & 4-Dimension Matching",
+      "dataCategories": [
+        "PII-Scrubbed Resume Text Snippet",
+        "Extracted Atomic Skills, Match Scores & Explanations",
+        "First-Round Advisory Screening Q&A"
+      ],
+      "source": "Candidate Profile & Requirement JD",
+      "purpose": "Explainable JD-to-candidate matching and advisory recruiter screening assistance",
+      "responsibleEntity": "AIKIND Private Limited",
+      "legalRole": "Technology / Service Provider",
+      "processingBasis": "voluntary_employment_use",
+      "recipients": [
+        "HireNestOS Matching Engine",
+        "Server-Side Gemini AI Gateway (PII Redacted)"
+      ],
+      "systems": [
+        "HireNestOS Express API Gateway",
+        "Supabase PostgreSQL"
+      ],
+      "retentionPolicyId": "RET-AI-TELEMETRY",
+      "status": "active"
+    },
+    {
+      "id": "ROPA-03",
+      "workflow": "Vendor / Client Candidate Collaboration",
+      "dataCategories": [
+        "Candidate Submission Packet",
+        "Ownership Evidence & Timestamp",
+        "Client Shortlist & Interview Decisions"
+      ],
+      "source": "Vendor Agency / HQ Recruiter",
+      "purpose": "Evaluating and presenting shortlisted candidates against specific client requirements",
+      "responsibleEntity": "Client Organisation",
+      "legalRole": "Data Processor",
+      "processingBasis": "contractual_processor_instruction",
+      "recipients": [
+        "Mapped Client Hiring Managers",
+        "Submitting Vendor Agency"
+      ],
+      "systems": [
+        "Supabase PostgreSQL",
+        "Server-Side Sharing & Export Guard"
+      ],
+      "retentionPolicyId": "RET-SUBMISSION-RECORD",
+      "status": "active"
+    },
+    {
+      "id": "ROPA-04",
+      "workflow": "Recruiter & Admin Governance Operations",
+      "dataCategories": [
+        "User Identity, Role & Organization Mapping",
+        "Approval Decisions, Dispute Rulings & Audit Events"
+      ],
+      "source": "Authenticated Workspace Users",
+      "purpose": "RBAC/ABAC access control, SLA monitoring, and statutory audit compliance",
+      "responsibleEntity": "HireNest Workforce Pvt Ltd",
+      "legalRole": "Data Fiduciary",
+      "processingBasis": "legal_obligation",
+      "recipients": [
+        "HQ Admin",
+        "Security & Audit Governance Officers"
+      ],
+      "systems": [
+        "Supabase Auth",
+        "Enterprise Governance Store"
+      ],
+      "retentionPolicyId": "RET-AUDIT-LEDGER",
+      "status": "active"
+    },
+    {
+      "id": "ROPA-05",
+      "workflow": "WhatsApp, Email & Calendar Notifications",
+      "dataCategories": [
+        "Contact Identifiers (Email, Mobile)",
+        "Interview Slot Details & Meeting Links",
+        "Channel Opt-In / Opt-Out Preferences"
+      ],
+      "source": "Candidate & Recruiter Scheduling Workflows",
+      "purpose": "Interview invitations, SLA reminders, and application status updates",
+      "responsibleEntity": "HireNest Workforce Pvt Ltd",
+      "legalRole": "Data Fiduciary",
+      "processingBasis": "consent",
+      "recipients": [
+        "Transactional Email Relay",
+        "WhatsApp Business Gateway"
+      ],
+      "systems": [
+        "Notification Dispatcher",
+        "Consent & Preference Registry"
+      ],
+      "retentionPolicyId": "RET-COMM-LOGS",
+      "status": "active"
+    }
+  ],
+  "privacyRequests": [
+    {
+      "requestId": "DSR-2026-104",
+      "tenantId": "hirenest_hq",
+      "requesterRef": "cand_rohan_kulkarni",
+      "requesterName": "Rohan Kulkarni",
+      "requesterEmail": "rohan.kulkarni@example.in",
+      "requestType": "erasure",
+      "summary": "Requesting erasure of resume PDF, contact details, and parsed profile from active sourcing pools following consent withdrawal.",
+      "receivedAt": "2026-10-25T14:10:00.000Z",
+      "slaDueAt": "2026-11-01T14:10:00.000Z",
+      "verificationStatus": "verified",
+      "status": "in_review",
+      "assignedTo": "Ananya Sharma (HQ Privacy Desk)",
+      "decision": null,
+      "resolvedAt": null,
+      "notes": "Identity verified via registered email OTP. Checking active legal/dispute holds before queuing multi-system deletion job."
+    },
+    {
+      "requestId": "DSR-2026-103",
+      "tenantId": "hirenest_hq",
+      "requesterRef": "cand_priya_iyer",
+      "requesterName": "Priya Iyer",
+      "requesterEmail": "priya.iyer@example.in",
+      "requestType": "access",
+      "summary": "Requesting summary of personal data processed, match scores generated, and list of client organisations with whom profile was shared.",
+      "receivedAt": "2026-10-23T10:00:00.000Z",
+      "slaDueAt": "2026-10-30T10:00:00.000Z",
+      "verificationStatus": "verified",
+      "status": "completed",
+      "assignedTo": "Vikram Desai (Compliance Lead)",
+      "decision": "Provided structured JSON/PDF export of profile, 2 client submissions, and notice history.",
+      "resolvedAt": "2026-10-24T16:45:00.000Z",
+      "notes": "Disclosed all recipient organisations as required under DPDP Act Section 11."
+    },
+    {
+      "requestId": "DSR-2026-105",
+      "tenantId": "hirenest_hq",
+      "requesterRef": "cand_karthik_reddy",
+      "requesterName": "Karthik Reddy",
+      "requesterEmail": "karthik.r@example.in",
+      "requestType": "correction",
+      "summary": "Correction of total experience from 4.5 years to 6.0 years and updated notice period record.",
+      "receivedAt": "2026-10-26T04:30:00.000Z",
+      "slaDueAt": "2026-11-02T04:30:00.000Z",
+      "verificationStatus": "verified",
+      "status": "open",
+      "assignedTo": "Ananya Sharma (HQ Privacy Desk)",
+      "decision": null,
+      "resolvedAt": null,
+      "notes": "Propagating correction across candidate profile and recomputing active JD match scores."
+    }
+  ],
+  "retentionPolicies": [
+    {
+      "policyId": "RET-CAND-ACTIVE",
+      "dataCategory": "Candidate Profiles & Uploaded Resumes",
+      "purpose": "Active recruitment matching, career portal applications & talent pool sourcing",
+      "trigger": "Last candidate interaction, application activity, or consent renewal",
+      "durationRule": "24 months from last active interaction (or immediate upon erasure/withdrawal)",
+      "durationDays": 730,
+      "legalHoldException": false,
+      "legalHoldReason": null,
+      "owner": "HQ Talent Operations & DPO",
+      "version": "1.3",
+      "status": "active"
+    },
+    {
+      "policyId": "RET-SUBMISSION-RECORD",
+      "dataCategory": "Client Submissions & Vendor Ownership Locks",
+      "purpose": "Commercial agency fee attribution, 30-day ownership governance & client audit",
+      "trigger": "Requirement closure or final submission stage disposition",
+      "durationRule": "36 months post requirement closure (statutory commercial dispute window)",
+      "durationDays": 1095,
+      "legalHoldException": true,
+      "legalHoldReason": "Active vendor ownership dispute #DSP-2026-08 requires preserving submission timestamp metadata.",
+      "owner": "HQ Legal & Commercial Governance",
+      "version": "2.0",
+      "status": "active"
+    },
+    {
+      "policyId": "RET-AI-TELEMETRY",
+      "dataCategory": "AI Gateway Prompts & Screening Evaluations",
+      "purpose": "Explainable AI auditability, rate-limit enforcement & quality assurance",
+      "trigger": "AI Gateway execution timestamp",
+      "durationRule": "Zero raw PII persisted in prompts; advisory evaluation artifacts retained 180 days",
+      "durationDays": 180,
+      "legalHoldException": false,
+      "legalHoldReason": null,
+      "owner": "AIKIND Engineering & Security",
+      "version": "1.1",
+      "status": "active"
+    },
+    {
+      "policyId": "RET-AUDIT-LEDGER",
+      "dataCategory": "Privacy & Security Audit Events (Minimal Non-PII)",
+      "purpose": "DPDP Act accountability, breach investigation & regulatory evidence",
+      "trigger": "Audit event creation",
+      "durationRule": "60 months immutable metadata retention (no raw resume text or contact PII)",
+      "durationDays": 1825,
+      "legalHoldException": false,
+      "legalHoldReason": null,
+      "owner": "Chief Information Security Officer",
+      "version": "1.0",
+      "status": "active"
+    }
+  ],
+  "deletionJobs": [
+    {
+      "jobId": "DEL-JOB-2026-401",
+      "tenantId": "hirenest_hq",
+      "subjectRef": "cand_suresh_menon_archived",
+      "subjectLabel": "Subject #cand_suresh_menon (Erasure Request DSR-2026-098)",
+      "scope": "full_erasure",
+      "requestedAt": "2026-10-22T08:00:00.000Z",
+      "status": "completed",
+      "targetSystems": {
+        "postgresql_db": "purged",
+        "supabase_storage": "purged",
+        "search_indexes": "purged",
+        "ai_caches": "purged",
+        "operational_logs": "retained_audit_minimal",
+        "external_processors": "purged"
+      },
+      "attempts": 1,
+      "verifiedAt": "2026-10-22T08:04:12.000Z",
+      "exceptionReason": null
+    },
+    {
+      "jobId": "DEL-JOB-2026-402",
+      "tenantId": "vendor_apex_talent",
+      "subjectRef": "cand_rohan_kulkarni",
+      "subjectLabel": "Subject #cand_rohan_kulkarni (Consent Withdrawal DSR-2026-104)",
+      "scope": "full_erasure",
+      "requestedAt": "2026-10-26T06:25:00.000Z",
+      "status": "in_progress",
+      "targetSystems": {
+        "postgresql_db": "pending",
+        "supabase_storage": "pending",
+        "search_indexes": "purged",
+        "ai_caches": "purged",
+        "operational_logs": "retained_audit_minimal",
+        "external_processors": "pending"
+      },
+      "attempts": 1,
+      "verifiedAt": null,
+      "exceptionReason": null
+    }
+  ],
+  "privacyIncidents": [
+    {
+      "incidentId": "INC-DPDP-2026-01",
+      "tenantId": "vendor_global_staffing",
+      "title": "Blocked Cross-Tenant Bulk Candidate Export Attempt by Unauthorised Vendor Role",
+      "detectedAt": "2026-10-24T17:22:10.000Z",
+      "severity": "medium",
+      "affectedSystems": [
+        "Server-Side Sharing & Export Guard",
+        "Vendor Candidate Pool API"
+      ],
+      "affectedRecordsEstimate": 0,
+      "assessment": "Vendor recruiter session attempted to export candidate contact records belonging to another tenant ID. Server-side ABAC Sharing Guard intercepted and denied the request with HTTP 403 before any PII left the database.",
+      "containment": "Request blocked automatically; session token rotated; vendor admin notified to review recruiter role permissions.",
+      "notificationStatus": "not_required",
+      "accountableOwner": "AIKIND Security Operations & HireNest DPO",
+      "closureEvidence": "Audit Correlation ID corr_99281a7b confirms 0 bytes exfiltrated."
+    }
+  ],
+  "privacyAuditEvents": [
+    {
+      "eventId": "evt_dpdp_8801",
+      "actorRef": "usr_hq_admin_01",
+      "actorRole": "admin",
+      "tenantId": "hirenest_hq",
+      "action": "notice_published",
+      "resourceType": "privacy_notice",
+      "resourceRef": "HN-DPDP-NOTICE-2026-V2",
+      "purpose": "Publish DPDP Act 2023 Candidate Privacy Notice v2.4.0",
+      "timestamp": "2026-10-26T01:00:00.000Z",
+      "outcome": "completed",
+      "correlationId": "corr_dpdp_20261026_01"
+    },
+    {
+      "eventId": "evt_dpdp_8802",
+      "actorRef": "cand_rohan_kulkarni",
+      "actorRole": "candidate",
+      "tenantId": "vendor_apex_talent",
+      "action": "consent_withdrawn",
+      "resourceType": "candidate_profile",
+      "resourceRef": "cand_rohan_kulkarni",
+      "purpose": "Data Principal withdrew recruitment processing consent via Privacy Center",
+      "timestamp": "2026-10-26T06:20:00.000Z",
+      "outcome": "completed",
+      "correlationId": "corr_dpdp_20261026_02"
+    },
+    {
+      "eventId": "evt_dpdp_8803",
+      "actorRef": "usr_vendor_rec_09",
+      "actorRole": "vendor_recruiter",
+      "tenantId": "vendor_global_staffing",
+      "action": "unauthorized_share_blocked",
+      "resourceType": "submission_packet",
+      "resourceRef": "cand_rohan_kulkarni",
+      "purpose": "Attempted client submission after candidate consent withdrawal",
+      "timestamp": "2026-10-26T06:45:12.000Z",
+      "outcome": "denied_consent_withdrawn",
+      "correlationId": "corr_dpdp_20261026_03"
+    },
+    {
+      "eventId": "evt_dpdp_8804",
+      "actorRef": "usr_hq_recruiter_04",
+      "actorRole": "recruiter",
+      "tenantId": "hirenest_hq",
+      "action": "candidate_shared",
+      "resourceType": "submission_packet",
+      "resourceRef": "sub_aarav_mehta_req_101",
+      "purpose": "Authorised shortlist submission to mapped client organisation",
+      "timestamp": "2026-10-25T15:30:00.000Z",
+      "outcome": "allowed",
+      "correlationId": "corr_dpdp_20261025_09"
+    }
+  ],
+  "submissionValidations": {},
+  "offerOnboardingRecords": {},
+  "earlyAccessApplications": []
 }

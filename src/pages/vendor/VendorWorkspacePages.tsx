@@ -25,6 +25,8 @@ import {
   FunnelChart,
   DashboardSection,
   ActionItem,
+  GreetingHeader,
+  SinceLastVisit,
 } from '../../components/ui/DashboardKit';
 import {
   SourceBadge,
@@ -166,16 +168,22 @@ export const VendorDashboardPage: React.FC = () => {
     <div className="space-y-7">
       {/* Header Band */}
       <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="type-greeting text-[var(--text-primary)]">Good day, {firstName}</h1>
-          <p className="mt-1 text-[13px] leading-[20px] text-[var(--text-secondary)]">
-            Shared requirements, SLA countdowns, and agency performance standing.
-          </p>
-        </div>
+        <GreetingHeader
+          firstName={firstName}
+          subtitle="Shared requirements, SLA countdowns, and agency performance standing."
+        />
         <Button size="sm" onClick={() => navigate('/vendor/requirements')}>
           Open requirements pipeline
         </Button>
       </div>
+
+      <SinceLastVisit
+        items={[
+          { label: 'new shares', count: unacknowledged.length },
+          { label: 'submissions', count: offerMetrics.candidatesShared },
+          { label: 'interviews', count: interviewsData?.count ?? 0 },
+        ]}
+      />
 
       {/* KPI Cards */}
       <KpiRow cols={4}>
