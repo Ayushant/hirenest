@@ -132,6 +132,15 @@ export function buildTrackedRequirementShareUrl(params: {
   return `${origin}${basePath}?${qs.toString()}`;
 }
 
+export function buildShortShareUrl(requirementId: string): string {
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://os.hirenestworkforce.com';
+  const code = `HN-${requirementId.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+  return `${origin}/r/${code}`;
+}
+
 /**
  * Builds a sanitized WhatsApp requirement message (never exposing confidential client identity)
  * formatted for either Vendor Partners or Direct Candidates.
@@ -184,7 +193,7 @@ export function buildSanitizedWhatsAppMessage(params: {
       `• *Submission SLA:* Within ${effectiveSla} hours`,
       ``,
       `👉 *Acknowledge & Submit Candidate Profiles in HireNestOS:*`,
-      `${shareUrl}`,
+      `${buildShortShareUrl(requirement.id)}`,
       ``,
       `_All candidate submissions and SLA statuses are tracked directly inside HireNestOS._`,
     ].join('\n');

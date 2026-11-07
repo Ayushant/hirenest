@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { RequireRole } from './auth/RequireRole';
@@ -118,6 +118,50 @@ function RootRedirect() {
   return <Navigate to={homeRoute} replace />;
 }
 
+function ShortLinkRedirect() {
+  const { code } = useParams<{ code: string }>();
+  const navigate = useNavigate();
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!code) { setError(true); return; }
+    const hex = code.replace(/^HN-/i, '').toLowerCase();
+    if (!hex || hex.length < 4) { setError(true); return; }
+
+    (async () => {
+      const { supabase } = await import('./lib/supabase');
+      const { data } = await supabase
+        .from('requirements')
+        .select('id')
+        .ilike('id', `${hex}%`)
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) {
+        navigate(`/vendor/requirements/${data.id}?audience=vendor`, { replace: true });
+      } else {
+        setError(true);
+      }
+    })();
+  }, [code, navigate]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] px-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-lg font-semibold text-[var(--text-primary)]">Link not found</h1>
+          <p className="text-sm text-[var(--text-secondary)]">This short link doesn&apos;t match any requirement.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+      <div className="h-4 w-32 rounded-[4px] bg-[var(--bg-hover)] animate-pulse" />
+    </div>
+  );
+}
+
 function AppRoutes() {
   const { isConfigured } = useAuth();
 
@@ -144,6 +188,9 @@ function AppRoutes() {
       {/* Public shareable job pages (no auth required) */}
       <Route path="/jobs" element={<PublicJobsListPage />} />
       <Route path="/jobs/:slug" element={<PublicJobPage />} />
+
+      {/* Short link redirect (e.g. /r/HN-49A0DD) */}
+      <Route path="/r/:code" element={<ShortLinkRedirect />} />
 
       {/* Admin Workspace (/admin/*) */}
       <Route
