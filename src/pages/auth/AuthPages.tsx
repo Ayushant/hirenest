@@ -304,7 +304,7 @@ export const SignUpPage: React.FC = () => {
       full_name: '',
       email: '',
       password: '',
-      signup_intent: 'candidate',
+      signup_intent: (['candidate', 'vendor', 'client'].includes(searchParams.get('intent') || '') ? searchParams.get('intent') as 'candidate' | 'vendor' | 'client' : 'candidate'),
       company_name: '',
     },
   });

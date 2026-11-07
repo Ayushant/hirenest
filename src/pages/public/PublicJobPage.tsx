@@ -381,7 +381,8 @@ const OverviewCell: React.FC<{
 // the dedicated sign-in/sign-up pages, so no parallel auth path exists.
 // ---------------------------------------------------------------------
 
-type ApplyStep = 'choice' | 'signin' | 'signup' | 'applying' | 'done' | 'wrong_role';
+type ApplyStep = 'role_select' | 'choice' | 'signin' | 'signup' | 'applying' | 'done' | 'wrong_role';
+type ApplyRole = 'candidate' | 'vendor' | 'freelancer';
 
 const ApplyModal: React.FC<{
   open: boolean;
@@ -392,7 +393,8 @@ const ApplyModal: React.FC<{
   refreshProfile: () => Promise<void>;
   onApplied: () => void;
 }> = ({ open, onClose, job, session, profile, refreshProfile, onApplied }) => {
-  const [step, setStep] = useState<ApplyStep>('choice');
+  const [step, setStep] = useState<ApplyStep>('role_select');
+  const [selectedRole, setSelectedRole] = useState<ApplyRole>('candidate');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -409,7 +411,7 @@ const ApplyModal: React.FC<{
     } else if (session && profile?.role && profile.role !== 'candidate') {
       setStep('wrong_role');
     } else {
-      setStep('choice');
+      setStep('role_select');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -456,7 +458,7 @@ const ApplyModal: React.FC<{
         options: {
           data: {
             full_name: fullName.trim(),
-            signup_intent: 'candidate',
+            signup_intent: selectedRole === 'vendor' ? 'vendor' : 'candidate',
           },
         },
       });
@@ -498,7 +500,9 @@ const ApplyModal: React.FC<{
         ? 'Candidate account required'
         : step === 'applying'
           ? 'Submitting your application…'
-          : `Apply${job ? ` for ${job.title}` : ''}`;
+          : step === 'role_select'
+            ? 'How would you like to proceed?'
+            : `Apply${job ? ` for ${job.title}` : ''}`;
 
   return (
     <Dialog open={open} onClose={onClose} title={title} maxWidth="max-w-[420px]">
@@ -537,6 +541,49 @@ const ApplyModal: React.FC<{
         </div>
       )}
 
+      {step === 'role_select' && (
+        <div className="space-y-3">
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Select how you&apos;d like to register for this opportunity.
+          </p>
+          {([
+            { role: 'candidate' as ApplyRole, label: 'Direct Candidate', desc: 'Apply directly as an individual job seeker' },
+            { role: 'freelancer' as ApplyRole, label: 'Freelancer', desc: 'Apply as a freelance / contract professional' },
+            { role: 'vendor' as ApplyRole, label: 'Vendor / Staffing Agency', desc: 'Register as a vendor partner to submit candidates' },
+          ]).map(({ role, label, desc }) => (
+            <button
+              key={role}
+              type="button"
+              className="w-full text-left rounded-lg border p-4 transition-colors"
+              style={{
+                borderColor: selectedRole === role ? 'var(--accent)' : 'var(--border)',
+                background: selectedRole === role ? 'var(--accent-bg, var(--bg-subtle))' : 'var(--surface)',
+              }}
+              onClick={() => setSelectedRole(role)}
+            >
+              <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{label}</div>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{desc}</div>
+            </button>
+          ))}
+          <Button
+            size="md"
+            className="w-full"
+            onClick={() => {
+              if (selectedRole === 'vendor') {
+                window.location.href = `/signup?intent=vendor&returnTo=${encodeURIComponent(window.location.pathname + '?apply=1')}`;
+              } else {
+                setStep('choice');
+              }
+            }}
+          >
+            Continue
+          </Button>
+          <Button size="md" variant="secondary" className="w-full" onClick={() => { setStep('signin'); }}>
+            I already have an account
+          </Button>
+        </div>
+      )}
+
       {(step === 'choice' || step === 'signin' || step === 'signup') && (
         <div className="space-y-4">
           {error && (
@@ -556,7 +603,9 @@ const ApplyModal: React.FC<{
           {step === 'choice' && (
             <div className="space-y-2.5">
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Sign in or create a free candidate account to apply.
+                {selectedRole === 'freelancer'
+                  ? 'Create a freelancer account or sign in to apply.'
+                  : 'Create a candidate account or sign in to apply.'}
               </p>
               <Button size="md" className="w-full" onClick={() => setStep('signup')}>
                 Create account &amp; apply
@@ -564,6 +613,14 @@ const ApplyModal: React.FC<{
               <Button size="md" variant="secondary" className="w-full" onClick={() => setStep('signin')}>
                 I already have an account
               </Button>
+              <button
+                type="button"
+                className="text-xs underline w-full text-center mt-1"
+                style={{ color: 'var(--text-tertiary)' }}
+                onClick={() => setStep('role_select')}
+              >
+                ← Change selection
+              </button>
             </div>
           )}
 
