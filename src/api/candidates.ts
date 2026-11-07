@@ -104,6 +104,15 @@ export async function fetchCandidateContacts(
   return data as CandidateContacts | null;
 }
 
+export async function fetchCandidateNameById(id: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('candidates')
+    .select('full_name')
+    .eq('id', id)
+    .maybeSingle();
+  return data?.full_name ?? null;
+}
+
 // Section 5.4 RPCs: check_candidate_duplicate & create_candidate
 export async function checkCandidateDuplicate(params: {
   p_email?: string | null;

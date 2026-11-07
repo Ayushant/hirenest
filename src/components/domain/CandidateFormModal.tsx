@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, FileText, Loader2, Trash2, Upload, Users } from 'lucide-react';
+import { CheckCircle2, ExternalLink, FileText, Loader2, Trash2, Upload, Users } from 'lucide-react';
 import {
   Dialog,
   Button,
@@ -16,6 +16,7 @@ import {
   checkCandidateDuplicate,
   createCandidateRpc,
   uploadCandidateResume,
+  fetchCandidateNameById,
 } from '../../api/candidates';
 import { computeFileSha256, validateResumeFile } from '../../lib/hash';
 import { parseResumeFile } from '../../lib/resumeParser';
@@ -53,6 +54,8 @@ interface BulkCandidateItem {
   summary: string;
   status: 'parsing' | 'ready' | 'creating' | 'created' | 'duplicate' | 'error';
   statusMessage?: string;
+  existingCandidateId?: string | null;
+  existingCandidateName?: string | null;
 }
 
 export const CandidateFormModal: React.FC<{
@@ -326,6 +329,9 @@ export const CandidateFormModal: React.FC<{
 
         if (dupCheck?.is_duplicate) {
           duplicateCount += 1;
+          const existingName = dupCheck.existing_candidate_id
+            ? await fetchCandidateNameById(dupCheck.existing_candidate_id).catch(() => null)
+            : null;
           setBulkItems((prev) =>
             prev.map((r) =>
               r.id === item.id
@@ -333,6 +339,8 @@ export const CandidateFormModal: React.FC<{
                     ...r,
                     status: 'duplicate',
                     statusMessage: `Duplicate (${dupCheck.match_type || 'hash/contact'})`,
+                    existingCandidateId: dupCheck.existing_candidate_id,
+                    existingCandidateName: existingName,
                   }
                 : r
             )
@@ -355,6 +363,9 @@ export const CandidateFormModal: React.FC<{
 
         if (result.status === 'duplicate') {
           duplicateCount += 1;
+          const existingName = result.existing_candidate_id
+            ? await fetchCandidateNameById(result.existing_candidate_id).catch(() => null)
+            : null;
           setBulkItems((prev) =>
             prev.map((r) =>
               r.id === item.id
@@ -362,6 +373,8 @@ export const CandidateFormModal: React.FC<{
                     ...r,
                     status: 'duplicate',
                     statusMessage: `Duplicate (${result.match_type || 'record'})`,
+                    existingCandidateId: result.existing_candidate_id,
+                    existingCandidateName: existingName,
                   }
                 : r
             )
@@ -853,7 +866,21 @@ export const CandidateFormModal: React.FC<{
                             <Badge tone="emerald">Imported</Badge>
                           )}
                           {item.status === 'duplicate' && (
-                            <Badge tone="amber">{item.statusMessage || 'Duplicate'}</Badge>
+                            <div className="flex items-center gap-1.5">
+                              <Badge tone="amber">{item.statusMessage || 'Duplicate'}</Badge>
+                              {item.existingCandidateId && (
+                                <a
+                                  href={`${window.location.pathname.startsWith('/vendor') ? '/vendor' : '/admin'}/candidates/${item.existingCandidateId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--rich-blue-600)] hover:underline"
+                                  title={item.existingCandidateName ? `View ${item.existingCandidateName}` : 'View existing candidate'}
+                                >
+                                  {item.existingCandidateName || 'View existing'}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
                           )}
                           {item.status === 'error' && (
                             <Badge tone="danger">{item.statusMessage || 'Error'}</Badge>
