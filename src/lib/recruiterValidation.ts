@@ -6,6 +6,7 @@ import {
   recordValidationInterviewRpc,
   approveSubmissionRpc,
   requestClarificationRpc,
+  transitionSubmissionRpc,
 } from '../api/submissions';
 
 export type SkillEvidenceStatus =
@@ -834,6 +835,18 @@ async function syncValidationToSupabase(
   // 4. Final approval - makes the DB gate open.
   if (stage === 'approved_for_submission') {
     await approveSubmissionRpc(submissionId);
+  }
+
+  // 5. Submitted to client — approve first (DB gate requires it), then advance to client_review.
+  if (stage === 'submitted_to_client') {
+    await approveSubmissionRpc(submissionId).catch(() => {});
+    await transitionSubmissionRpc({
+      p_submission_id: submissionId,
+      p_to: 'client_review',
+      p_reason: 'Submitted to client via recruiter validation',
+    }).catch((err) => {
+      console.warn('[recruiterValidation] client_review transition failed:', err);
+    });
   }
 }
 
