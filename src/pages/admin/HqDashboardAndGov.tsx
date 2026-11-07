@@ -104,6 +104,29 @@ export const HqDashboardPage: React.FC = () => {
     offerRecordsMap
   );
 
+  const summary = data || {};
+  const candBySource = summary.candidates_by_source || {};
+  const reqByStatus = summary.requirements_by_status || {};
+  const subByStage = summary.submissions_by_stage || {};
+
+  const reqDonutData = useMemo(() => [
+    { name: 'Open', value: reqByStatus.open ?? 0 },
+    { name: 'Pending', value: reqByStatus.pending_approval ?? 0 },
+    { name: 'Draft', value: reqByStatus.draft ?? 0 },
+    { name: 'On Hold', value: reqByStatus.on_hold ?? 0 },
+    { name: 'Filled', value: reqByStatus.filled ?? 0 },
+    { name: 'Closed', value: reqByStatus.closed ?? 0 },
+  ].filter((d) => d.value > 0), [reqByStatus]);
+
+  const funnelStages = useMemo(() => [
+    { name: 'Applied', value: subByStage.applied ?? 0, color: '#6A89A7' },
+    { name: 'Recruiter review', value: subByStage.recruiter_review ?? 0, color: '#4F95DB' },
+    { name: 'Client review', value: subByStage.client_review ?? 0, color: '#1F4CC4' },
+    { name: 'Interviewing', value: subByStage.interviewing ?? 0, color: '#2A9D8F' },
+    { name: 'Offered', value: subByStage.offered ?? 0, color: '#D99A2B' },
+    { name: 'Onboarded', value: subByStage.onboarded ?? 0, color: '#17734A' },
+  ], [subByStage]);
+
   const handlePublishAllToVendors = async () => {
     setSyncingVendors(true);
     try {
@@ -140,11 +163,6 @@ export const HqDashboardPage: React.FC = () => {
   if (error) {
     return <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />;
   }
-
-  const summary = data || {};
-  const candBySource = summary.candidates_by_source || {};
-  const reqByStatus = summary.requirements_by_status || {};
-  const subByStage = summary.submissions_by_stage || {};
 
   const attentionItems = [
     ...(isAdmin
@@ -186,25 +204,7 @@ export const HqDashboardPage: React.FC = () => {
   const totalReqs = Object.values(reqByStatus).reduce((a, b) => a + (b || 0), 0);
   const totalSubs = Object.values(subByStage).reduce((a, b) => a + (b || 0), 0);
 
-  const reqDonutData = useMemo(() => [
-    { name: 'Open', value: reqByStatus.open ?? 0 },
-    { name: 'Pending', value: reqByStatus.pending_approval ?? 0 },
-    { name: 'Draft', value: reqByStatus.draft ?? 0 },
-    { name: 'On Hold', value: reqByStatus.on_hold ?? 0 },
-    { name: 'Filled', value: reqByStatus.filled ?? 0 },
-    { name: 'Closed', value: reqByStatus.closed ?? 0 },
-  ].filter((d) => d.value > 0), [reqByStatus]);
-
   const REQ_COLORS = ['#2A9D8F', '#D99A2B', '#6A89A7', '#384959', '#1F4CC4', '#B8322B'];
-
-  const funnelStages = useMemo(() => [
-    { name: 'Applied', value: subByStage.applied ?? 0, color: '#6A89A7' },
-    { name: 'Recruiter review', value: subByStage.recruiter_review ?? 0, color: '#4F95DB' },
-    { name: 'Client review', value: subByStage.client_review ?? 0, color: '#1F4CC4' },
-    { name: 'Interviewing', value: subByStage.interviewing ?? 0, color: '#2A9D8F' },
-    { name: 'Offered', value: subByStage.offered ?? 0, color: '#D99A2B' },
-    { name: 'Onboarded', value: subByStage.onboarded ?? 0, color: '#17734A' },
-  ], [subByStage]);
 
   return (
     <div className="space-y-7">
