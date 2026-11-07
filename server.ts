@@ -1031,27 +1031,40 @@ async function startServer() {
 
       const supabaseUrl = process.env.VITE_SUPABASE_URL;
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!supabaseUrl || !serviceRoleKey) return res.status(500).json({ error: 'Server config missing' });
+      if (!supabaseUrl || !serviceRoleKey) {
+        console.error('[short-link] Missing env:', { url: !!supabaseUrl, key: !!serviceRoleKey });
+        return res.status(500).json({ error: 'Server config missing' });
+      }
 
-      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
       const padded = hex.padEnd(8, '0');
       const lower = `${padded}-0000-0000-0000-000000000000`;
       const upperHex = (parseInt(hex, 16) + 1).toString(16).padStart(hex.length, '0').padEnd(8, '0');
       const upper = `${upperHex}-0000-0000-0000-000000000000`;
 
-      const { data } = await adminClient
-        .from('requirements')
-        .select('id')
-        .gte('id', lower)
-        .lt('id', upper)
-        .limit(1)
-        .maybeSingle();
+      // Use direct fetch to PostgREST REST API with and() for UUID range query
+      const restUrl = `${supabaseUrl}/rest/v1/requirements?select=id&and=(id.gte.${lower},id.lt.${upper})&limit=1`;
+      const response = await fetch(restUrl, {
+        headers: {
+          'apikey': serviceRoleKey,
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Accept': 'application/json',
+        },
+      });
 
-      if (!data?.id) return res.status(404).json({ error: 'Requirement not found' });
-      return res.json({ id: data.id });
-    } catch {
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('[short-link] PostgREST error:', response.status, errText);
+        return res.status(500).json({ error: 'Lookup query failed' });
+      }
+
+      const rows = await response.json() as Array<{ id: string }>;
+      if (rows.length > 0 && rows[0].id) {
+        return res.json({ id: rows[0].id });
+      }
+
+      return res.status(404).json({ error: 'Requirement not found' });
+    } catch (err) {
+      console.error('[short-link] Exception:', err);
       return res.status(500).json({ error: 'Lookup failed' });
     }
   });
