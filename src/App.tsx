@@ -125,20 +125,18 @@ function ShortLinkRedirect() {
 
   useEffect(() => {
     if (!code) { setError(true); return; }
-    const hex = code.replace(/^HN-/i, '').toLowerCase();
-    if (!hex || hex.length < 4) { setError(true); return; }
 
     (async () => {
-      const { supabase } = await import('./lib/supabase');
-      const { data } = await supabase
-        .from('requirements')
-        .select('id')
-        .ilike('id', `${hex}%`)
-        .limit(1)
-        .maybeSingle();
-      if (data?.id) {
-        navigate(`/vendor/requirements/${data.id}?audience=vendor`, { replace: true });
-      } else {
+      try {
+        const res = await fetch(`/api/r/${encodeURIComponent(code)}`);
+        if (!res.ok) { setError(true); return; }
+        const { id } = await res.json();
+        if (id) {
+          navigate(`/vendor/requirements/${id}?audience=vendor`, { replace: true });
+        } else {
+          setError(true);
+        }
+      } catch {
         setError(true);
       }
     })();

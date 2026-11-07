@@ -1021,6 +1021,42 @@ async function startServer() {
   }, 60_000);
 
   // ==========================================================================
+  // SHORT LINK RESOLVER (e.g. /r/HN-49A0DD → requirement UUID)
+  // ==========================================================================
+  app.get('/api/r/:code', async (req, res) => {
+    try {
+      const code = req.params.code || '';
+      const hex = code.replace(/^HN-/i, '').toLowerCase();
+      if (!hex || hex.length < 4) return res.status(404).json({ error: 'Invalid short code' });
+
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseUrl || !serviceRoleKey) return res.status(500).json({ error: 'Server config missing' });
+
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const padded = hex.padEnd(8, '0');
+      const lower = `${padded}-0000-0000-0000-000000000000`;
+      const upperHex = (parseInt(hex, 16) + 1).toString(16).padStart(hex.length, '0').padEnd(8, '0');
+      const upper = `${upperHex}-0000-0000-0000-000000000000`;
+
+      const { data } = await adminClient
+        .from('requirements')
+        .select('id')
+        .gte('id', lower)
+        .lt('id', upper)
+        .limit(1)
+        .maybeSingle();
+
+      if (!data?.id) return res.status(404).json({ error: 'Requirement not found' });
+      return res.json({ id: data.id });
+    } catch {
+      return res.status(500).json({ error: 'Lookup failed' });
+    }
+  });
+
+  // ==========================================================================
   // RESUME PARSING ENDPOINT (Single & Bulk Upload Auto-Fill)
   // ==========================================================================
   app.post('/api/resumes/parse', async (req, res) => {
