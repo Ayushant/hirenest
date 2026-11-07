@@ -130,11 +130,11 @@ function ShortLinkRedirect() {
       try {
         const res = await fetch(`/api/r/${encodeURIComponent(code)}`);
         if (!res.ok) { setError(true); return; }
-        const { id, slug } = await res.json();
-        if (slug) {
-          navigate(`/jobs/${slug}?apply=1`, { replace: true });
-        } else if (id) {
-          navigate(`/jobs/${id}?apply=1`, { replace: true });
+        const data = await res.json();
+        if (data.slug) {
+          navigate(`/jobs/${data.slug}?apply=1`, { replace: true });
+        } else if (data.id) {
+          navigate(`/jobs/${data.id}?apply=1`, { replace: true, state: { jobData: data } });
         } else {
           setError(true);
         }

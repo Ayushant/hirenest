@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Briefcase,
@@ -54,11 +54,15 @@ function formatPostedDate(iso: string): string {
 export const PublicJobPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, profile, refreshProfile } = useAuth();
   const [applyOpen, setApplyOpen] = useState(false);
 
+  // Route state may carry job data from the short-link resolver (bypasses RLS)
+  const routeJobData = (location.state as { jobData?: Record<string, unknown> } | null)?.jobData;
+
   const {
-    data: job,
+    data: fetchedJob,
     isLoading,
     isError,
   } = useQuery({
@@ -67,6 +71,24 @@ export const PublicJobPage: React.FC = () => {
     enabled: Boolean(slug),
     retry: 1,
   });
+
+  // Use fetched job, or fall back to route state from short-link resolver
+  const job = fetchedJob || (routeJobData ? {
+    id: String(routeJobData.id || ''),
+    slug: String(routeJobData.slug || routeJobData.id || ''),
+    title: String(routeJobData.title || ''),
+    description: String(routeJobData.description || ''),
+    skills: Array.isArray(routeJobData.skills) ? routeJobData.skills as string[] : [],
+    min_experience: typeof routeJobData.min_experience === 'number' ? routeJobData.min_experience : null,
+    max_experience: typeof routeJobData.max_experience === 'number' ? routeJobData.max_experience : null,
+    location: typeof routeJobData.location === 'string' ? routeJobData.location : null,
+    work_mode: (routeJobData.work_mode as 'onsite' | 'hybrid' | 'remote') || null,
+    employment_type: (routeJobData.employment_type as 'full_time' | 'contract' | 'contract_to_hire' | 'part_time') || null,
+    openings: typeof routeJobData.openings === 'number' ? routeJobData.openings : 1,
+    currency: String(routeJobData.currency || 'INR'),
+    client_org_name: null,
+    posted_at: String(routeJobData.created_at || new Date().toISOString()),
+  } : null);
 
   useEffect(() => {
     if (!job) return;
@@ -107,7 +129,7 @@ export const PublicJobPage: React.FC = () => {
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }, [job]);
 
-  if (isLoading) {
+  if (isLoading && !job) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
@@ -118,7 +140,7 @@ export const PublicJobPage: React.FC = () => {
     );
   }
 
-  if (isError || !job) {
+  if ((isError && !job) || !job) {
     return (
       <div
         className="min-h-screen flex items-center justify-center p-6"

@@ -1042,7 +1042,8 @@ async function startServer() {
       const upper = `${upperHex}-0000-0000-0000-000000000000`;
 
       // Use direct fetch to PostgREST REST API with and() for UUID range query
-      const restUrl = `${supabaseUrl}/rest/v1/requirements?select=id,slug&and=(id.gte.${lower},id.lt.${upper})&limit=1`;
+      const fields = 'id,slug,title,description,skills,min_experience,max_experience,location,work_mode,employment_type,openings,currency,created_at';
+      const restUrl = `${supabaseUrl}/rest/v1/requirements?select=${fields}&and=(id.gte.${lower},id.lt.${upper})&limit=1`;
       const response = await fetch(restUrl, {
         headers: {
           'apikey': serviceRoleKey,
@@ -1057,9 +1058,9 @@ async function startServer() {
         return res.status(500).json({ error: 'Lookup query failed' });
       }
 
-      const rows = await response.json() as Array<{ id: string; slug?: string }>;
+      const rows = await response.json() as Array<Record<string, unknown>>;
       if (rows.length > 0 && rows[0].id) {
-        return res.json({ id: rows[0].id, slug: rows[0].slug || null });
+        return res.json(rows[0]);
       }
 
       return res.status(404).json({ error: 'Requirement not found' });
