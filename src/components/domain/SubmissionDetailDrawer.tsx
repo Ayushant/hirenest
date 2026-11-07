@@ -46,6 +46,7 @@ import {
   transitionRequiresReason,
   transitionSubmissionRpc,
   markSubmissionInvalidRpc,
+  approveSubmissionRpc,
 } from '../../api/submissions';
 import {
   fetchInterviews,
@@ -760,6 +761,7 @@ export const SubmissionDetailDrawer: React.FC<{
         }).catch(() => undefined);
       }
       if (submission.stage === 'applied' || submission.stage === 'recruiter_review') {
+        await approveSubmissionRpc(submission.id).catch(() => {});
         await transitionSubmissionRpc({
           p_submission_id: submission.id,
           p_to: 'client_review',
@@ -842,6 +844,9 @@ export const SubmissionDetailDrawer: React.FC<{
 
     setTransitionLoading(true);
     try {
+      if (targetStage === 'client_review') {
+        await approveSubmissionRpc(submission.id).catch(() => {});
+      }
       await transitionSubmissionRpc({
         p_submission_id: submission.id,
         p_to: targetStage,
