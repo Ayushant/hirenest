@@ -5,26 +5,26 @@
       "accountName": "Test Corp",
       "planId": "free_trial",
       "billingCycle": "annual",
-      "subscriptionStatus": "trialing",
+      "subscriptionStatus": "expired",
       "trialDurationDays": 15,
       "trialStartedAt": "2026-10-23T09:27:50.490Z",
       "trialEndsAt": "2026-11-07T09:27:50.490Z",
       "paidActivatedAt": null,
       "currentPeriodEndsAt": null,
-      "updatedAt": "2026-11-06T21:27:43.838Z"
+      "updatedAt": "2026-11-08T01:50:15.542Z"
     },
     "default_hirenest_account": {
       "accountId": "default_hirenest_account",
       "accountName": "HireNest Workspace Account",
       "planId": "free_trial",
       "billingCycle": "annual",
-      "subscriptionStatus": "trialing",
+      "subscriptionStatus": "expired",
       "trialDurationDays": 15,
       "trialStartedAt": "2026-10-23T09:28:12.269Z",
       "trialEndsAt": "2026-11-07T09:28:12.269Z",
       "paidActivatedAt": null,
       "currentPeriodEndsAt": null,
-      "updatedAt": "2026-10-23T09:28:12.269Z"
+      "updatedAt": "2026-11-08T01:50:15.542Z"
     },
     "test_acc_1792748411734": {
       "accountId": "test_acc_1792748411734",
