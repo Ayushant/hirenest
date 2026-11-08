@@ -936,7 +936,7 @@ export const SkillsChipInput: React.FC<{
 // PageHeader: Title on left (20px/28px/600), max 1-line secondary text, primary action on right, 24px below
 export const PageHeader: React.FC<{
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   actions?: React.ReactNode;
 }> = ({ title, description, actions }) => (
   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">

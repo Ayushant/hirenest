@@ -1280,11 +1280,35 @@ export const HqRequirementDetailPage: React.FC = () => {
 
   const submissions = submissionsData?.data || [];
 
+  const statusOptions = ['open', 'on_hold', 'closed', 'filled', 'draft'] as const;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={req.title}
-        description={`${req.organizations?.name || 'Client'} · ${req.location} · ${req.work_mode}`}
+        description={
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{req.organizations?.name || 'Client'} · {req.location || '—'} · {req.work_mode || '—'}</span>
+            <select
+              value={req.status}
+              onChange={(e) => {
+                const val = e.target.value as typeof statusOptions[number];
+                if (val !== req.status) {
+                  setStatusTarget(val);
+                  setStatusReason('');
+                }
+              }}
+              className="ml-1 h-6 rounded-[4px] border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[12px] font-semibold uppercase tracking-wide cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              style={{
+                color: req.status === 'open' ? 'var(--success, #16a34a)' : req.status === 'on_hold' ? 'var(--warning, #f59e0b)' : req.status === 'closed' || req.status === 'filled' ? 'var(--error, #ef4444)' : 'var(--text-secondary)',
+              }}
+            >
+              {statusOptions.map((st) => (
+                <option key={st} value={st}>{st.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+          </div>
+        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -1357,9 +1381,45 @@ export const HqRequirementDetailPage: React.FC = () => {
                 <h3 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
                   Description
                 </h3>
-                <p className="text-[14px] leading-[20px] text-[var(--text-primary)] whitespace-pre-line">
-                  {req.description}
-                </p>
+                {(() => {
+                  const gdocMatch = req.description?.match(/https:\/\/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
+                  const descText = req.description?.replace(/https:\/\/docs\.google\.com\/document\/d\/[^\s]+/g, '').trim();
+                  return (
+                    <>
+                      {descText && (
+                        <p className="text-[14px] leading-[20px] text-[var(--text-primary)] whitespace-pre-line">
+                          {descText}
+                        </p>
+                      )}
+                      {gdocMatch && (
+                        <div className="mt-3 rounded-[8px] border border-[var(--border)] overflow-hidden">
+                          <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-subtle)] border-b border-[var(--border)]">
+                            <span className="text-[12px] font-medium text-[var(--text-secondary)]">Job Description (Google Docs)</span>
+                            <a
+                              href={gdocMatch[0]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[12px] text-[var(--accent)] hover:underline"
+                            >
+                              Open in new tab ↗
+                            </a>
+                          </div>
+                          <iframe
+                            src={`https://docs.google.com/document/d/${gdocMatch[1]}/preview`}
+                            className="w-full border-0"
+                            style={{ height: '500px' }}
+                            title="Job Description"
+                          />
+                        </div>
+                      )}
+                      {!descText && !gdocMatch && (
+                        <p className="text-[14px] leading-[20px] text-[var(--text-tertiary)] italic">
+                          No description provided.
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="pt-4 border-t border-[var(--border)] space-y-2">
