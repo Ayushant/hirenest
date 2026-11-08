@@ -164,8 +164,9 @@ export function buildSanitizedWhatsAppMessage(params: {
       : requirement.employment_type === 'contract_to_hire'
         ? 'Contract-to-Hire (C2H)'
         : 'Contract';
-  const modeLabel =
-    requirement.work_mode.charAt(0).toUpperCase() + requirement.work_mode.slice(1);
+  const modeLabel = requirement.work_mode
+    ? requirement.work_mode.charAt(0).toUpperCase() + requirement.work_mode.slice(1)
+    : 'Flexible';
   const budgetLine =
     budgetInfo.formatted && budgetInfo.formatted !== '-'
       ? `${budgetInfo.formatted}${budgetInfo.subtitle ? ` (${budgetInfo.subtitle})` : ''}`
