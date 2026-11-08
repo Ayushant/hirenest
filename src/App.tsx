@@ -30,6 +30,7 @@ import {
 } from './pages/admin/HqDashboardAndGov';
 import { EarlyAccessDashboardPage } from './pages/admin/EarlyAccessDashboardPage';
 import { AdminSubscriptionPage } from './pages/admin/AdminSubscriptionPage';
+import { CeoDashboardPage, CfoDashboardPage } from './pages/admin/ExecutiveDashboards';
 
 import {
   HqRequirementsListPage,
@@ -227,6 +228,8 @@ function AppRoutes() {
         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
         <Route path="early-access" element={<EarlyAccessDashboardPage />} />
         <Route path="subscription" element={<AdminSubscriptionPage />} />
+        <Route path="ceo" element={<CeoDashboardPage />} />
+        <Route path="cfo" element={<CfoDashboardPage />} />
       </Route>
 
       {/* Recruiter HQ Workspace (/recruiter/*) */}

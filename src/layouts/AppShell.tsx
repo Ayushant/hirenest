@@ -29,6 +29,8 @@ import {
   CreditCard,
   Lock,
   Inbox,
+  Crown,
+  Landmark,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -215,7 +217,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Subscription management', to: '/admin/subscription', icon: CreditCard },
           ],
         };
-        return [pipelineGroup, govGroup];
+        const execGroup: NavGroup = {
+          title: 'Executive',
+          items: [
+            { label: 'CEO Command Centre', to: '/admin/ceo', icon: Crown },
+            { label: 'CFO Command Centre', to: '/admin/cfo', icon: Landmark },
+          ],
+        };
+        return [execGroup, pipelineGroup, govGroup];
       }
       return [
         {
