@@ -228,7 +228,7 @@ export const RequirementsPipelineGrid: React.FC<{
             const locationText =
               req.work_mode === 'remote'
                 ? 'REMOTE'
-                : (req.location || req.work_mode).toUpperCase();
+                : (req.location || req.work_mode || 'N/A').toUpperCase();
 
             const budgetText =
               budgetInfo.formatted && budgetInfo.formatted !== '-'
