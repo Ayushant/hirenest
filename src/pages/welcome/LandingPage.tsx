@@ -6,6 +6,8 @@ import {
   ShieldCheck,
   Check,
   Loader2,
+  Menu,
+  X,
 } from 'lucide-react';
 import {
   submitEarlyAccessApplication,
@@ -520,11 +522,13 @@ function EarlyAccessForm() {
 }
 
 export const LandingPage: React.FC = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-white font-sans antialiased" style={{ color: INK }}>
       {/* Navigation */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b" style={{ borderColor: LINE_SOFT }}>
-        <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-[1180px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2.5">
               <img
@@ -560,25 +564,55 @@ export const LandingPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <Link
               to="/signin"
-              className="text-[13px] font-medium transition-colors"
+              className="hidden sm:inline text-[13px] font-medium transition-colors"
               style={{ color: INK_SOFT }}
             >
               Sign in
             </Link>
             <a
               href="#early-access"
-              className="h-9 px-3.5 rounded-[6px] text-white text-[13px] font-medium transition-colors inline-flex items-center gap-1.5"
+              className="hidden sm:inline-flex h-9 px-3.5 rounded-[6px] text-white text-[13px] font-medium transition-colors items-center gap-1.5"
               style={{ background: BRAND }}
             >
               Request early access
             </a>
+            <button
+              type="button"
+              className="md:hidden h-9 w-9 inline-flex items-center justify-center rounded-[6px] border transition-colors"
+              style={{ borderColor: LINE, color: INK_SOFT }}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            >
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t px-4 py-4 space-y-1 bg-white" style={{ borderColor: LINE_SOFT }}>
+            <a href="#platform" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 text-[14px] font-medium transition-colors" style={{ color: INK_SOFT }}>Platform</a>
+            <a href="#pipeline" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 text-[14px] font-medium transition-colors" style={{ color: INK_SOFT }}>Pipeline</a>
+            <Link to="/jobs" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 text-[14px] font-medium transition-colors" style={{ color: INK_SOFT }}>Jobs</Link>
+            <a href="#security" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 text-[14px] font-medium transition-colors" style={{ color: INK_SOFT }}>Security</a>
+            <div className="pt-3 mt-2 border-t flex flex-col gap-2.5" style={{ borderColor: LINE_SOFT }}>
+              <Link to="/signin" className="text-[14px] font-medium transition-colors" style={{ color: INK_SOFT }}>Sign in</Link>
+              <a
+                href="#early-access"
+                onClick={() => setMobileMenuOpen(false)}
+                className="h-10 rounded-[6px] text-white text-[14px] font-medium transition-colors inline-flex items-center justify-center gap-1.5"
+                style={{ background: BRAND }}
+              >
+                Request early access
+              </a>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Hero */}
-      <section className="pt-14 pb-20 border-b" style={{ borderColor: LINE_SOFT }}>
-        <div className="max-w-[1180px] mx-auto px-6 grid lg:grid-cols-[1.08fr_1fr] gap-14 items-center">
+      <section className="pt-10 sm:pt-14 pb-14 sm:pb-20 border-b" style={{ borderColor: LINE_SOFT }}>
+        <div className="max-w-[1180px] mx-auto px-4 sm:px-6 grid lg:grid-cols-[1.08fr_1fr] gap-10 lg:gap-14 items-center">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-[3px] border text-[12px] font-medium" style={{ background: BRAND_SOFT, borderColor: BRAND_TINT, color: BRAND_DEEP }}>
               <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: BRAND }} />
@@ -611,15 +645,15 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Data strip — real numbers, set in mono, divided not boxed */}
-            <div className="flex items-stretch gap-6 pt-6">
+            <div className="grid grid-cols-3 gap-4 sm:gap-6 pt-6">
               {[
                 { value: '48h', label: 'SLA to first shortlist' },
                 { value: '6-axis', label: 'Candidate scoring rubric' },
                 { value: '14 days', label: 'Free trial, every org' },
               ].map((s, i) => (
-                <div key={s.label} className={i > 0 ? 'pl-6 border-l' : ''} style={i > 0 ? { borderColor: LINE } : undefined}>
-                  <div className="text-[22px] font-semibold font-mono tracking-tight">{s.value}</div>
-                  <div className="text-[12px] mt-0.5" style={{ color: INK_FAINT }}>{s.label}</div>
+                <div key={s.label} className={i > 0 ? 'pl-4 sm:pl-6 border-l' : ''} style={i > 0 ? { borderColor: LINE } : undefined}>
+                  <div className="text-[18px] sm:text-[22px] font-semibold font-mono tracking-tight">{s.value}</div>
+                  <div className="text-[11px] sm:text-[12px] mt-0.5" style={{ color: INK_FAINT }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -630,8 +664,8 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Platform, grouped by the role it serves */}
-      <section id="platform" className="py-20 border-b" style={{ borderColor: LINE_SOFT, background: PAPER }}>
-        <div className="max-w-[1180px] mx-auto px-6 space-y-12">
+      <section id="platform" className="py-14 sm:py-20 border-b" style={{ borderColor: LINE_SOFT, background: PAPER }}>
+        <div className="max-w-[1180px] mx-auto px-4 sm:px-6 space-y-10 sm:space-y-12">
           <div className="max-w-xl space-y-3">
             <h2 className="text-[28px] sm:text-[32px] font-semibold tracking-[-0.02em] leading-tight">
               One platform, four different jobs to do
@@ -662,18 +696,20 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Platform-wide capabilities that sit underneath every role */}
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-8 border-t text-[13px]" style={{ borderColor: LINE, color: INK_SOFT }}>
-            <span className="font-medium" style={{ color: INK }}>Underneath all four:</span>
-            <span>AI copilot for JD drafting & screening</span>
-            <span>Server-side NDA gate before protected collaboration</span>
-            <span>Annual or monthly billing, GST-compliant invoicing</span>
+          <div className="pt-8 border-t text-[13px] space-y-2 sm:space-y-0" style={{ borderColor: LINE, color: INK_SOFT }}>
+            <span className="font-medium block sm:inline sm:mr-4" style={{ color: INK }}>Underneath all four:</span>
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-x-8 sm:gap-y-3">
+              <span>AI copilot for JD drafting & screening</span>
+              <span>Server-side NDA gate before protected collaboration</span>
+              <span>Annual or monthly billing, GST-compliant invoicing</span>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Pipeline — a real sequence, so it earns the numbering */}
-      <section id="pipeline" className="py-20 border-b" style={{ borderColor: LINE_SOFT }}>
-        <div className="max-w-[1180px] mx-auto px-6 space-y-10">
+      <section id="pipeline" className="py-14 sm:py-20 border-b" style={{ borderColor: LINE_SOFT }}>
+        <div className="max-w-[1180px] mx-auto px-4 sm:px-6 space-y-10">
           <div className="max-w-xl space-y-3">
             <h2 className="text-[28px] sm:text-[32px] font-semibold tracking-[-0.02em] leading-tight">
               The pipeline, with a clock on every handoff
@@ -705,7 +741,7 @@ export const LandingPage: React.FC = () => {
 
       {/* Security */}
       <section id="security" className="py-10 border-b" style={{ borderColor: LINE_SOFT }}>
-        <div className="max-w-[1180px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-[1180px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" style={{ color: BRAND }} />
             <span className="text-[13px] font-semibold">
@@ -727,8 +763,8 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Early Access Form */}
-      <section id="early-access" className="py-20" style={{ background: PAPER }}>
-        <div className="max-w-[720px] mx-auto px-6">
+      <section id="early-access" className="py-14 sm:py-20" style={{ background: PAPER }}>
+        <div className="max-w-[720px] mx-auto px-4 sm:px-6">
           <div className="text-center space-y-3 mb-10">
             <h2 className="text-[28px] sm:text-[32px] font-semibold tracking-[-0.02em] leading-tight">
               Get early access to HireNestOS
@@ -748,7 +784,7 @@ export const LandingPage: React.FC = () => {
 
       {/* Footer */}
       <footer className="py-10 border-t bg-white" style={{ borderColor: LINE }}>
-        <div className="max-w-[1180px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px]" style={{ color: INK_FAINT }}>
+        <div className="max-w-[1180px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px]" style={{ color: INK_FAINT }}>
           <div className="flex items-center gap-2">
             <img
               src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
