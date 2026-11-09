@@ -3932,8 +3932,14 @@ Return JSON array of objects with fields: targetSkill, question.`;
     }
 
     function parseBudget(text: string) {
-      const m = String(text || '').match(/(\d+(?:\.\d+)?)/);
-      return m ? Number(m[1]) : null;
+      const s = String(text || '').trim();
+      if (!s) return null;
+      const m = s.match(/(\d+(?:[,.\d]*\d)?)/);
+      if (!m) return null;
+      const raw = Number(m[1].replace(/,/g, ''));
+      if (isNaN(raw) || raw <= 0) return null;
+      // Cap to numeric(14,2) max
+      return raw <= 999999999999 ? raw : null;
     }
 
     function mapStatus(text: string): string {
@@ -4088,8 +4094,8 @@ Return JSON array of objects with fields: targetSkill, question.`;
               colEngagement >= 0 ? String(row[colEngagement] || '') : '',
               tabConfig.defaultEmploymentType,
             ),
-            openings: colOpenings >= 0 && row[colOpenings] ? Number(row[colOpenings]) : 1,
-            vendor_visible_budget: budget,
+            openings: colOpenings >= 0 && row[colOpenings] && !isNaN(Number(row[colOpenings])) ? Math.max(1, Math.round(Number(row[colOpenings]))) : 1,
+            vendor_visible_budget: budget !== null && budget <= 999999999999 ? budget : null,
             currency: 'INR',
             status: isPublicActiveTab ? 'open' : (colStatus >= 0 ? mapStatus(String(row[colStatus] || '')) : 'open'),
             ...(isPublicActiveTab ? { is_public: true } : {}),
