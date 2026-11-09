@@ -1716,7 +1716,10 @@ begin
     v_allowed := true;
   elsif private.is_submission_client(s.id) then
     v_allowed := (s.stage::text || '>' || p_to::text) = any (array[
-      'client_review>interviewing', 'client_review>rejected', 'interviewing>offered', 'interviewing>rejected']);
+      'client_review>interviewing', 'client_review>rejected',
+      'interviewing>offered', 'interviewing>rejected',
+      'offered>offer_accepted', 'offered>offer_declined',
+      'offer_accepted>onboarded']);
   elsif p_to = 'withdrawn' and (
           (private.is_vendor_user() and s.vendor_org_id = private.my_org())
           or s.candidate_id = private.my_candidate_id()) then
