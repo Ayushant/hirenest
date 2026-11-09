@@ -4076,6 +4076,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
             description = (description + `\n\n(Imported from "${tabConfig.name}" tab, row ${i + 1}.)`).trim();
           }
 
+          const isPublicActiveTab = tabConfig.name === 'Public Active Requirements';
           const { error: upsertErr } = await adminClient.from('requirements').upsert(
             {
               external_ref: externalRef,
@@ -4094,7 +4095,8 @@ Return JSON array of objects with fields: targetSkill, question.`;
               openings: colOpenings >= 0 && row[colOpenings] ? Number(row[colOpenings]) : 1,
               vendor_visible_budget: budget,
               currency: 'INR',
-              status: colStatus >= 0 ? mapStatus(String(row[colStatus] || '')) : 'open',
+              status: isPublicActiveTab ? 'open' : (colStatus >= 0 ? mapStatus(String(row[colStatus] || '')) : 'open'),
+              is_public: isPublicActiveTab ? true : undefined,
             },
             { onConflict: 'external_ref' },
           );
