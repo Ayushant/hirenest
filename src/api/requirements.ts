@@ -500,9 +500,6 @@ export async function fetchRequirements(params: {
     if (!params.includeDeleted && isRequirementSoftDeleted(req)) {
       return false;
     }
-    if (!params.includeDeleted && !params.status && req.status === 'closed') {
-      return false;
-    }
     const meta = parseRequirementMeta(req);
     if (params.onlyClientMapped) {
       if (!meta.isClientMapped || !meta.mappedClientOrgId) return false;
@@ -514,7 +511,8 @@ export async function fetchRequirements(params: {
   });
 
   // Deduplicate active requirements by canonical duplicate group key so merged/duplicate rows never inflate Vendor or Candidate views
-  if (!params.includeDeleted) {
+  // Skip dedup for HQ admin views (forVendor=false, no special flag) so admins see every requirement
+  if (!params.includeDeleted && params.forVendor) {
     const byGroup = new Map<string, Requirement>();
     const sortedForCanonical = [...filtered].sort((a, b) => {
       if (a.status === 'open' && b.status !== 'open') return -1;
