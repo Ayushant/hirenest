@@ -137,8 +137,8 @@ export const HqRequirementsListPage: React.FC = () => {
       } else {
         setSheetSyncResult(`Error: ${data.error}`);
       }
-    } catch (err) {
-      setSheetSyncResult('Sync failed — check server logs');
+    } catch (err: any) {
+      setSheetSyncResult(`Sync failed: ${err?.message || 'check server logs'}`);
     } finally {
       setSyncingSheet(false);
     }

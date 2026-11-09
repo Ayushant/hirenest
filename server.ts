@@ -6,7 +6,7 @@ import zlib from 'zlib';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI, Type } from '@google/genai';
-import { google } from 'googleapis';
+import { GoogleAuth } from 'google-auth-library';
 import {
   type BillingCycle,
   type PlanId,
@@ -3969,14 +3969,23 @@ Return JSON array of objects with fields: targetSkill, question.`;
     }
 
     try {
-      const auth = new google.auth.GoogleAuth({
+      const auth = new GoogleAuth({
         credentials: {
           client_email: credentials.client_email,
           private_key: credentials.private_key,
         },
         scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
       });
-      const sheets = google.sheets({ version: 'v4', auth });
+      const authClient = await auth.getClient();
+      const accessToken = (await authClient.getAccessToken()).token;
+
+      async function sheetsGet(url: string) {
+        const resp = await fetch(url, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!resp.ok) throw new Error(`Sheets API ${resp.status}: ${await resp.text()}`);
+        return resp.json();
+      }
 
       const adminClient = createClient(supabaseUrl, serviceRoleKey, {
         auth: { persistSession: false, autoRefreshToken: false },
@@ -4013,8 +4022,8 @@ Return JSON array of objects with fields: targetSkill, question.`;
         return;
       }
 
-      const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-      const sheetNames = spreadsheet.data.sheets?.map((s) => s.properties?.title) || [];
+      const spreadsheet = await sheetsGet(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`);
+      const sheetNames = (spreadsheet.sheets || []).map((s: any) => s.properties?.title) as string[];
 
       const synced: string[] = [];
       const skipped: Array<{ ref: string; reason: string }> = [];
@@ -4023,14 +4032,10 @@ Return JSON array of objects with fields: targetSkill, question.`;
       for (const tabConfig of TABS) {
         if (!sheetNames.includes(tabConfig.name)) continue;
 
-        const range = `'${tabConfig.name}'!A1:Z`;
-        const resp = await sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range,
-          valueRenderOption: 'UNFORMATTED_VALUE',
-        });
+        const range = encodeURIComponent(`'${tabConfig.name}'!A1:Z`);
+        const valuesResp = await sheetsGet(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?valueRenderOption=UNFORMATTED_VALUE`);
 
-        const allRows = resp.data.values;
+        const allRows = valuesResp.values as any[][] | undefined;
         if (!allRows || allRows.length < 2) continue;
 
         const headers = allRows[0].map((h: unknown) => String(h || ''));
@@ -4045,8 +4050,8 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
         if (colTitle < 0) continue;
 
-        const sheetGid = spreadsheet.data.sheets?.find(
-          (s) => s.properties?.title === tabConfig.name,
+        const sheetGid = (spreadsheet.sheets || []).find(
+          (s: any) => s.properties?.title === tabConfig.name,
         )?.properties?.sheetId ?? 0;
 
         for (let i = 1; i < allRows.length; i++) {
