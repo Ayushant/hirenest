@@ -4098,7 +4098,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
             vendor_visible_budget: budget !== null && budget <= 999999999999 ? budget : null,
             currency: 'INR',
             status: isPublicActiveTab ? 'open' : (colStatus >= 0 ? mapStatus(String(row[colStatus] || '')) : 'open'),
-            ...(isPublicActiveTab ? { is_public: true } : {}),
+            is_public: isPublicActiveTab,
           });
         }
       }
