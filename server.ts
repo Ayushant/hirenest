@@ -3870,8 +3870,10 @@ Return JSON array of objects with fields: targetSkill, question.`;
   // ============================================================
   app.get('/api/sheet-sync/pull', async (req, res) => {
     const cronSecret = process.env.CRON_SECRET;
-    const authHeader = req.get('authorization');
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    const authHeader = req.get('authorization') || '';
+    const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    const isAdmin = authHeader.startsWith('Bearer ') && authHeader !== `Bearer ${cronSecret}`;
+    if (!isCron && !isAdmin) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
