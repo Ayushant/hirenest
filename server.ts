@@ -3864,73 +3864,26 @@ Return JSON array of objects with fields: targetSkill, question.`;
     }
   });
 
-  // Admin-facing manual sync trigger (validates Supabase JWT, then calls pull)
-  app.post('/api/sheet-sync/trigger', async (req, res) => {
-    try {
-      const supabaseUrl = process.env.VITE_SUPABASE_URL;
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      const authHeader = req.get('authorization') || '';
-      if (!authHeader.startsWith('Bearer ') || !supabaseUrl || !serviceRoleKey) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-      }
-      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const { data: { user } } = await adminClient.auth.getUser(authHeader.slice(7));
-      if (!user) {
-        res.status(401).json({ error: 'Invalid session' });
-        return;
-      }
-      // Forward internally with the sheet sync secret
-      const sheetSyncSecret = process.env.SHEET_SYNC_SECRET || '';
-      const protocol = req.protocol;
-      const host = req.get('host');
-      const pullResp = await fetch(`${protocol}://${host}/api/sheet-sync/pull`, {
-        headers: { 'x-sheet-sync-secret': sheetSyncSecret },
-      });
-      const data = await pullResp.json();
-      res.status(pullResp.status).json(data);
-    } catch (err) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Trigger failed' });
-    }
-  });
-
-  // ============================================================
-  // Scheduled Google Sheets pull sync (service account)
-  // ============================================================
-  app.get('/api/sheet-sync/pull', async (req, res) => {
-    const cronSecret = process.env.CRON_SECRET;
-    const sheetSyncSecret = process.env.SHEET_SYNC_SECRET;
-    const authHeader = req.get('authorization') || '';
-    const syncHeader = req.get('x-sheet-sync-secret') || '';
-    const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
-    const isSheetSync = sheetSyncSecret && syncHeader === sheetSyncSecret;
-    if (!isCron && !isSheetSync) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
+  // Core sheet sync logic (shared by cron and manual trigger)
+  async function runSheetPullSync(): Promise<{ ok: boolean; synced: number; skipped: number; totalRowsProcessed: number; skippedDetails?: Array<{ ref: string; reason: string }>; error?: string; timestamp: string }> {
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const sheetId = process.env.GOOGLE_SHEET_ID;
     const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
+    const ts = () => new Date().toISOString();
     if (!supabaseUrl || !serviceRoleKey) {
-      res.status(503).json({ error: 'Supabase service role not configured.' });
-      return;
+      return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: 'Supabase service role not configured.', timestamp: ts() };
     }
     if (!sheetId || !serviceAccountJson) {
-      res.status(503).json({ error: 'Google Sheet sync not configured. Set GOOGLE_SHEET_ID and GOOGLE_SERVICE_ACCOUNT_JSON.' });
-      return;
+      return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: 'Google Sheet sync not configured. Set GOOGLE_SHEET_ID and GOOGLE_SERVICE_ACCOUNT_JSON.', timestamp: ts() };
     }
 
     let credentials: { client_email: string; private_key: string };
     try {
       credentials = JSON.parse(serviceAccountJson);
     } catch {
-      res.status(503).json({ error: 'GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.' });
-      return;
+      return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: 'GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.', timestamp: ts() };
     }
 
     const TABS = [
@@ -4013,8 +3966,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
       });
       if (!tokenResp.ok) {
         const errText = await tokenResp.text();
-        res.status(502).json({ error: `Google auth failed: ${errText}` });
-        return;
+        return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: `Google auth failed: ${errText}`, timestamp: ts() };
       }
       const { access_token: accessToken } = await tokenResp.json() as { access_token: string };
 
@@ -4044,8 +3996,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
           .select('id')
           .single();
         if (orgErr || !createdOrg) {
-          res.status(500).json({ error: `Could not resolve client org: ${orgErr?.message}` });
-          return;
+          return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: `Could not resolve client org: ${orgErr?.message}`, timestamp: ts() };
         }
         org = createdOrg;
       }
@@ -4057,8 +4008,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
         .eq('email', ADMIN_EMAIL)
         .maybeSingle();
       if (!adminProfile) {
-        res.status(500).json({ error: `Could not resolve admin profile for ${ADMIN_EMAIL}.` });
-        return;
+        return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: `Could not resolve admin profile for ${ADMIN_EMAIL}.`, timestamp: ts() };
       }
 
       const spreadsheet = await sheetsGet(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`);
@@ -4148,18 +4098,59 @@ Return JSON array of objects with fields: targetSkill, question.`;
         }
       }
 
-      res.json({
+      return {
         ok: true,
         synced: synced.length,
         skipped: skipped.length,
         totalRowsProcessed: totalRows,
         skippedDetails: skipped.length > 0 ? skipped.slice(0, 10) : undefined,
         timestamp: new Date().toISOString(),
-      });
+      };
     } catch (err) {
       console.error('[Sheet Pull Sync Error]:', err);
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Pull sync failed.' });
+      return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: err instanceof Error ? err.message : 'Pull sync failed.', timestamp: new Date().toISOString() };
     }
+  }
+
+  // Admin-facing manual sync trigger (validates Supabase JWT)
+  app.post('/api/sheet-sync/trigger', async (req, res) => {
+    try {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const authHeader = req.get('authorization') || '';
+      if (!authHeader.startsWith('Bearer ') || !supabaseUrl || !serviceRoleKey) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const verifyClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: { user } } = await verifyClient.auth.getUser(authHeader.slice(7));
+      if (!user) {
+        res.status(401).json({ error: 'Invalid session' });
+        return;
+      }
+      const result = await runSheetPullSync();
+      res.status(result.ok ? 200 : 500).json(result);
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Trigger failed' });
+    }
+  });
+
+  // Cron-triggered sheet sync (protected by CRON_SECRET)
+  app.get('/api/sheet-sync/pull', async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    const sheetSyncSecret = process.env.SHEET_SYNC_SECRET;
+    const authHeader = req.get('authorization') || '';
+    const syncHeader = req.get('x-sheet-sync-secret') || '';
+    const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    const isSheetSync = sheetSyncSecret && syncHeader === sheetSyncSecret;
+    if (!isCron && !isSheetSync) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const result = await runSheetPullSync();
+    res.status(result.ok ? 200 : 500).json(result);
   });
 
   app.get('/api/health', (_req, res) => {
