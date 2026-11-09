@@ -6,6 +6,7 @@ import zlib from 'zlib';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI, Type } from '@google/genai';
+import { google } from 'googleapis';
 import {
   type BillingCycle,
   type PlanId,
@@ -3861,6 +3862,243 @@ Return JSON array of objects with fields: targetSkill, question.`;
       res.json({ synced: synced.length, skipped });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'Sync failed.' });
+    }
+  });
+
+  // ============================================================
+  // Scheduled Google Sheets pull sync (service account)
+  // ============================================================
+  app.get('/api/sheet-sync/pull', async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.get('authorization');
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const sheetId = process.env.GOOGLE_SHEET_ID;
+    const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      res.status(503).json({ error: 'Supabase service role not configured.' });
+      return;
+    }
+    if (!sheetId || !serviceAccountJson) {
+      res.status(503).json({ error: 'Google Sheet sync not configured. Set GOOGLE_SHEET_ID and GOOGLE_SERVICE_ACCOUNT_JSON.' });
+      return;
+    }
+
+    let credentials: { client_email: string; private_key: string };
+    try {
+      credentials = JSON.parse(serviceAccountJson);
+    } catch {
+      res.status(503).json({ error: 'GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.' });
+      return;
+    }
+
+    const TABS = [
+      { name: 'Remote C2C', defaultWorkMode: 'remote', defaultEmploymentType: 'contract' },
+      { name: 'Onsite FTE & Contract Onsite', defaultWorkMode: 'onsite', defaultEmploymentType: 'full_time' },
+      { name: 'C2H', defaultWorkMode: null, defaultEmploymentType: 'contract_to_hire' },
+      { name: 'Public Active Requirements', defaultWorkMode: null, defaultEmploymentType: null },
+    ];
+
+    const STATUS_MAP: Record<string, string> = {
+      'on hold': 'on_hold',
+      'sourcing paused': 'open',
+      'got enough profiles': 'open',
+      'closed': 'closed',
+      'filled': 'filled',
+      'open': 'open',
+      'draft': 'draft',
+    };
+
+    const ENGAGEMENT_MAP: Record<string, string> = {
+      'contract': 'contract',
+      'fte': 'full_time',
+      'full time': 'full_time',
+      'contract to hire': 'contract_to_hire',
+      'c2h': 'contract_to_hire',
+      'part time': 'part_time',
+    };
+
+    function findCol(headers: string[], name: string): number {
+      return headers.findIndex((h) => String(h).trim().toLowerCase() === name.toLowerCase());
+    }
+
+    function parseExperience(text: string) {
+      const s = String(text || '').toLowerCase();
+      let m = s.match(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)/);
+      if (m) return { min: Number(m[1]), max: Number(m[2]) };
+      m = s.match(/(\d+(?:\.\d+)?)\s*\+/);
+      if (m) return { min: Number(m[1]), max: null };
+      m = s.match(/(\d+(?:\.\d+)?)/);
+      if (m) return { min: Number(m[1]), max: null };
+      return { min: null, max: null };
+    }
+
+    function parseBudget(text: string) {
+      const m = String(text || '').match(/(\d+(?:\.\d+)?)/);
+      return m ? Number(m[1]) : null;
+    }
+
+    function mapStatus(text: string): string {
+      const key = String(text || '').trim().toLowerCase();
+      return STATUS_MAP[key] || 'open';
+    }
+
+    function mapEmploymentType(text: string, fallback: string | null): string | null {
+      const key = String(text || '').trim().toLowerCase();
+      return ENGAGEMENT_MAP[key] || fallback || null;
+    }
+
+    try {
+      const auth = new google.auth.GoogleAuth({
+        credentials: {
+          client_email: credentials.client_email,
+          private_key: credentials.private_key,
+        },
+        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      });
+      const sheets = google.sheets({ version: 'v4', auth });
+
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+
+      const UNMAPPED_CLIENT_ORG_NAME = 'Internal / Unmapped';
+      let { data: org } = await adminClient
+        .from('organizations')
+        .select('id')
+        .eq('type', 'client')
+        .eq('name', UNMAPPED_CLIENT_ORG_NAME)
+        .maybeSingle();
+      if (!org) {
+        const { data: createdOrg, error: orgErr } = await adminClient
+          .from('organizations')
+          .insert({ name: UNMAPPED_CLIENT_ORG_NAME, type: 'client', status: 'approved' })
+          .select('id')
+          .single();
+        if (orgErr || !createdOrg) {
+          res.status(500).json({ error: `Could not resolve client org: ${orgErr?.message}` });
+          return;
+        }
+        org = createdOrg;
+      }
+
+      const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'hireatkind@gmail.com';
+      const { data: adminProfile } = await adminClient
+        .from('profiles')
+        .select('id')
+        .eq('email', ADMIN_EMAIL)
+        .maybeSingle();
+      if (!adminProfile) {
+        res.status(500).json({ error: `Could not resolve admin profile for ${ADMIN_EMAIL}.` });
+        return;
+      }
+
+      const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+      const sheetNames = spreadsheet.data.sheets?.map((s) => s.properties?.title) || [];
+
+      const synced: string[] = [];
+      const skipped: Array<{ ref: string; reason: string }> = [];
+      let totalRows = 0;
+
+      for (const tabConfig of TABS) {
+        if (!sheetNames.includes(tabConfig.name)) continue;
+
+        const range = `'${tabConfig.name}'!A1:Z`;
+        const resp = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range,
+          valueRenderOption: 'UNFORMATTED_VALUE',
+        });
+
+        const allRows = resp.data.values;
+        if (!allRows || allRows.length < 2) continue;
+
+        const headers = allRows[0].map((h: unknown) => String(h || ''));
+        const colTitle = findCol(headers, 'Role name');
+        const colJd = findCol(headers, 'Brief context about the role (JD)');
+        const colExperience = findCol(headers, 'Experience');
+        const colBudget = findCol(headers, 'Budget');
+        const colOpenings = findCol(headers, 'No of Openings');
+        const colLocation = findCol(headers, 'Location');
+        const colStatus = findCol(headers, 'Status');
+        const colEngagement = findCol(headers, 'Engagement');
+
+        if (colTitle < 0) continue;
+
+        const sheetGid = spreadsheet.data.sheets?.find(
+          (s) => s.properties?.title === tabConfig.name,
+        )?.properties?.sheetId ?? 0;
+
+        for (let i = 1; i < allRows.length; i++) {
+          const row = allRows[i];
+          const title = String(row[colTitle] || '').trim();
+          if (!title || title.length < 3 || title.length > 200) continue;
+          totalRows++;
+
+          const externalRef = `${sheetGid}-${i + 1}`;
+          const experienceText = colExperience >= 0 ? String(row[colExperience] || '') : '';
+          const budgetText = colBudget >= 0 ? String(row[colBudget] || '') : '';
+          const exp = parseExperience(experienceText);
+          const budget = parseBudget(budgetText);
+          const jdLink = colJd >= 0 ? String(row[colJd] || '') : '';
+
+          const descriptionParts: string[] = [];
+          if (jdLink && /^https?:\/\//.test(jdLink)) descriptionParts.push('JD: ' + jdLink);
+          if (experienceText) descriptionParts.push('Experience (as entered): ' + experienceText);
+          if (budgetText) descriptionParts.push('Budget (as entered): ' + budgetText);
+          let description = descriptionParts.join('\n\n').trim();
+          if (description.length < 20) {
+            description = (description + `\n\n(Imported from "${tabConfig.name}" tab, row ${i + 1}.)`).trim();
+          }
+
+          const { error: upsertErr } = await adminClient.from('requirements').upsert(
+            {
+              external_ref: externalRef,
+              client_org_id: org!.id,
+              created_by: adminProfile.id,
+              title,
+              description,
+              min_experience: exp.min,
+              max_experience: exp.max,
+              location: colLocation >= 0 ? String(row[colLocation] || '').trim() || null : null,
+              work_mode: tabConfig.defaultWorkMode,
+              employment_type: mapEmploymentType(
+                colEngagement >= 0 ? String(row[colEngagement] || '') : '',
+                tabConfig.defaultEmploymentType,
+              ),
+              openings: colOpenings >= 0 && row[colOpenings] ? Number(row[colOpenings]) : 1,
+              vendor_visible_budget: budget,
+              currency: 'INR',
+              status: colStatus >= 0 ? mapStatus(String(row[colStatus] || '')) : 'open',
+            },
+            { onConflict: 'external_ref' },
+          );
+
+          if (upsertErr) {
+            skipped.push({ ref: externalRef, reason: upsertErr.message });
+          } else {
+            synced.push(externalRef);
+          }
+        }
+      }
+
+      res.json({
+        ok: true,
+        synced: synced.length,
+        skipped: skipped.length,
+        totalRowsProcessed: totalRows,
+        skippedDetails: skipped.length > 0 ? skipped.slice(0, 10) : undefined,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[Sheet Pull Sync Error]:', err);
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Pull sync failed.' });
     }
   });
 

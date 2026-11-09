@@ -5,6 +5,7 @@ import { differenceInDays, parseISO } from 'date-fns';
 import {
   AlertTriangle,
   CheckCircle2,
+  CloudDownload,
   Layers,
   MessageSquare,
   Plus,
@@ -117,6 +118,27 @@ export const HqRequirementsListPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [createOpen, setCreateOpen] = useState(false);
   const [syncingVendors, setSyncingVendors] = useState(false);
+  const [syncingSheet, setSyncingSheet] = useState(false);
+  const [sheetSyncResult, setSheetSyncResult] = useState<string | null>(null);
+
+  const handleSheetSync = async () => {
+    setSyncingSheet(true);
+    setSheetSyncResult(null);
+    try {
+      const resp = await fetch('/api/sheet-sync/pull');
+      const data = await resp.json();
+      if (resp.ok) {
+        setSheetSyncResult(`Synced ${data.synced} rows, ${data.skipped} skipped`);
+        queryClient.invalidateQueries({ queryKey: ['requirements'] });
+      } else {
+        setSheetSyncResult(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      setSheetSyncResult('Sync failed — check server logs');
+    } finally {
+      setSyncingSheet(false);
+    }
+  };
 
   // Soft-Delete Confirmation Dialog state
   const [deleteTarget, setDeleteTarget] = useState<Requirement | null>(null);
@@ -364,6 +386,14 @@ export const HqRequirementsListPage: React.FC = () => {
             )}
             <Button
               variant="outline"
+              onClick={handleSheetSync}
+              loading={syncingSheet}
+            >
+              <CloudDownload className="h-3.5 w-3.5" />
+              Sync from Sheet
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleSyncWithVendors}
               loading={syncingVendors}
             >
@@ -377,6 +407,17 @@ export const HqRequirementsListPage: React.FC = () => {
           </div>
         }
       />
+
+      {sheetSyncResult && (
+        <div className={`rounded-[8px] border px-3 py-2 text-[12px] font-medium flex items-center justify-between ${
+          sheetSyncResult.startsWith('Error') || sheetSyncResult.startsWith('Sync failed')
+            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300'
+            : 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300'
+        }`}>
+          <span>{sheetSyncResult}</span>
+          <button type="button" onClick={() => setSheetSyncResult(null)} className="ml-2 text-current opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
+        </div>
+      )}
 
       {/* Simple Requirement Sharing Flow Strip (Matches User Diagram) */}
       <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">

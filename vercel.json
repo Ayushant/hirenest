@@ -1,8 +1,15 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/sheet-sync/pull",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "functions": {
     "api/index.ts": {
-      "includeFiles": "{dist-server.js,dist/**,index.html}"
+      "includeFiles": "{dist-server.js,dist/**,index.html}",
+      "maxDuration": 60
     }
   },
   "rewrites": [
