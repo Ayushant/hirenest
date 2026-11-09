@@ -4022,6 +4022,9 @@ Return JSON array of objects with fields: targetSkill, question.`;
       const skipped: Array<{ ref: string; reason: string }> = [];
       let totalRows = 0;
 
+      // Collect all rows from all tabs first
+      const pendingRows: Array<Record<string, any>> = [];
+
       for (const tabConfig of TABS) {
         if (!sheetNames.includes(tabConfig.name)) continue;
 
@@ -4047,6 +4050,8 @@ Return JSON array of objects with fields: targetSkill, question.`;
           (s: any) => s.properties?.title === tabConfig.name,
         )?.properties?.sheetId ?? 0;
 
+        const isPublicActiveTab = tabConfig.name === 'Public Active Requirements';
+
         for (let i = 1; i < allRows.length; i++) {
           const row = allRows[i];
           const title = String(row[colTitle] || '').trim();
@@ -4069,36 +4074,41 @@ Return JSON array of objects with fields: targetSkill, question.`;
             description = (description + `\n\n(Imported from "${tabConfig.name}" tab, row ${i + 1}.)`).trim();
           }
 
-          const isPublicActiveTab = tabConfig.name === 'Public Active Requirements';
-          const { error: upsertErr } = await adminClient.from('requirements').upsert(
-            {
-              external_ref: externalRef,
-              client_org_id: org!.id,
-              created_by: adminProfile.id,
-              title,
-              description,
-              min_experience: exp.min,
-              max_experience: exp.max,
-              location: colLocation >= 0 ? String(row[colLocation] || '').trim() || null : null,
-              work_mode: tabConfig.defaultWorkMode,
-              employment_type: mapEmploymentType(
-                colEngagement >= 0 ? String(row[colEngagement] || '') : '',
-                tabConfig.defaultEmploymentType,
-              ),
-              openings: colOpenings >= 0 && row[colOpenings] ? Number(row[colOpenings]) : 1,
-              vendor_visible_budget: budget,
-              currency: 'INR',
-              status: isPublicActiveTab ? 'open' : (colStatus >= 0 ? mapStatus(String(row[colStatus] || '')) : 'open'),
-              is_public: isPublicActiveTab ? true : undefined,
-            },
-            { onConflict: 'external_ref' },
-          );
+          pendingRows.push({
+            external_ref: externalRef,
+            client_org_id: org!.id,
+            created_by: adminProfile.id,
+            title,
+            description,
+            min_experience: exp.min,
+            max_experience: exp.max,
+            location: colLocation >= 0 ? String(row[colLocation] || '').trim() || null : null,
+            work_mode: tabConfig.defaultWorkMode,
+            employment_type: mapEmploymentType(
+              colEngagement >= 0 ? String(row[colEngagement] || '') : '',
+              tabConfig.defaultEmploymentType,
+            ),
+            openings: colOpenings >= 0 && row[colOpenings] ? Number(row[colOpenings]) : 1,
+            vendor_visible_budget: budget,
+            currency: 'INR',
+            status: isPublicActiveTab ? 'open' : (colStatus >= 0 ? mapStatus(String(row[colStatus] || '')) : 'open'),
+            is_public: isPublicActiveTab ? true : undefined,
+          });
+        }
+      }
 
-          if (upsertErr) {
-            skipped.push({ ref: externalRef, reason: upsertErr.message });
-          } else {
-            synced.push(externalRef);
-          }
+      // Batch upsert in chunks of 50 (single HTTP call per batch)
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < pendingRows.length; i += BATCH_SIZE) {
+        const batch = pendingRows.slice(i, i + BATCH_SIZE);
+        const { error: upsertErr } = await adminClient.from('requirements').upsert(
+          batch,
+          { onConflict: 'external_ref' },
+        );
+        if (upsertErr) {
+          skipped.push({ ref: `batch ${Math.floor(i / BATCH_SIZE) + 1}`, reason: upsertErr.message });
+        } else {
+          for (const r of batch) synced.push(r.external_ref);
         }
       }
 
