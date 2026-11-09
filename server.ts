@@ -3882,8 +3882,12 @@ Return JSON array of objects with fields: targetSkill, question.`;
     let credentials: { client_email: string; private_key: string };
     try {
       credentials = JSON.parse(serviceAccountJson);
-    } catch {
-      return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: 'GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.', timestamp: ts() };
+      // Vercel env vars may escape literal \n in the private key — restore them
+      if (credentials.private_key) {
+        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+      }
+    } catch (parseErr) {
+      return { ok: false, synced: 0, skipped: 0, totalRowsProcessed: 0, error: `GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON: ${parseErr instanceof Error ? parseErr.message : 'parse error'}`, timestamp: ts() };
     }
 
     const TABS = [

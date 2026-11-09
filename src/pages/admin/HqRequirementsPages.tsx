@@ -131,12 +131,14 @@ export const HqRequirementsListPage: React.FC = () => {
         method: 'POST',
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
       });
-      const data = await resp.json();
-      if (resp.ok) {
+      const text = await resp.text();
+      let data: any;
+      try { data = JSON.parse(text); } catch { data = { error: text.slice(0, 200) }; }
+      if (resp.ok && data.ok) {
         setSheetSyncResult(`Synced ${data.synced} rows, ${data.skipped} skipped`);
         queryClient.invalidateQueries({ queryKey: ['requirements'] });
       } else {
-        setSheetSyncResult(`Error: ${data.error}`);
+        setSheetSyncResult(`Error: ${data.error || `HTTP ${resp.status}`}`);
       }
     } catch (err: any) {
       setSheetSyncResult(`Sync failed: ${err?.message || 'check server logs'}`);
