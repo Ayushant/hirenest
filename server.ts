@@ -3870,24 +3870,14 @@ Return JSON array of objects with fields: targetSkill, question.`;
   // ============================================================
   app.get('/api/sheet-sync/pull', async (req, res) => {
     const cronSecret = process.env.CRON_SECRET;
+    const sheetSyncSecret = process.env.SHEET_SYNC_SECRET;
     const authHeader = req.get('authorization') || '';
+    const syncHeader = req.get('x-sheet-sync-secret') || '';
     const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
-    if (cronSecret && !isCron) {
-      // For non-cron requests, verify Supabase session (admin user)
-      const supabaseUrlCheck = process.env.VITE_SUPABASE_URL;
-      const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
-      if (supabaseUrlCheck && anonKey && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.slice(7);
-        const checkClient = createClient(supabaseUrlCheck, anonKey);
-        const { data: { user } } = await checkClient.auth.getUser(token);
-        if (!user) {
-          res.status(401).json({ error: 'Unauthorized' });
-          return;
-        }
-      } else {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-      }
+    const isSheetSync = sheetSyncSecret && syncHeader === sheetSyncSecret;
+    if (!isCron && !isSheetSync) {
+      res.status(401).json({ error: 'Unauthorized — set x-sheet-sync-secret header' });
+      return;
     }
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
