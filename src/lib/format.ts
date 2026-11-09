@@ -112,7 +112,7 @@ export function formatFinancialAmount(
 }
 
 export function formatRequirementBudgetWithSubtitle(
-  req: Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'> & { id?: string }
+  req: Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'> & { id?: string; employment_type?: string | null }
 ): {
   formatted: string;
   subtitle: string | null;
@@ -121,9 +121,15 @@ export function formatRequirementBudgetWithSubtitle(
   mappedClientOrgId: string | null;
 } {
   const meta = parseRequirementMeta(req);
+  // Infer LPA/LPM from employment_type when no structured metadata exists
+  let inferredUnit = meta.budgetUnit;
+  if (!inferredUnit && req.employment_type) {
+    inferredUnit = req.employment_type === 'contract' || req.employment_type === 'contract_to_hire'
+      ? 'LPM' : 'LPA';
+  }
   const display = formatBudgetDisplay({
     budgetMode: meta.budgetMode,
-    budgetUnit: meta.budgetUnit,
+    budgetUnit: inferredUnit,
     budgetMin: meta.budgetMin,
     budgetMax: meta.budgetMax,
     baseCurrency: meta.baseCurrency,
