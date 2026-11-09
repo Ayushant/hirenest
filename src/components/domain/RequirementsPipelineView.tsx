@@ -144,6 +144,8 @@ export const RequirementsPipelineGrid: React.FC<{
   onSelectRequirement: (req: Requirement) => void;
   onShareRequirement?: (req: Requirement) => void;
   onDeleteRequirement?: (req: Requirement) => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
   emptyTitle?: string;
   emptyDescription?: string;
   emptyActionLabel?: string;
@@ -156,6 +158,8 @@ export const RequirementsPipelineGrid: React.FC<{
   onSelectRequirement,
   onShareRequirement,
   onDeleteRequirement,
+  selectedIds,
+  onToggleSelect,
   emptyTitle = 'No requirements matching this filter',
   emptyDescription = 'Switch to All Requirements or adjust your search query.',
   emptyActionLabel,
@@ -244,6 +248,15 @@ export const RequirementsPipelineGrid: React.FC<{
                 {/* Card Top Header */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 min-w-0">
+                    {onToggleSelect && (
+                      <input
+                        type="checkbox"
+                        className="mt-2.5 shrink-0"
+                        checked={selectedIds?.has(req.id) || false}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => onToggleSelect(req.id)}
+                      />
+                    )}
                     <div className="h-9 w-9 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] flex items-center justify-center shrink-0 text-[var(--text-secondary)] group-hover:text-[#1F4CC4] transition-colors">
                       <Briefcase className="h-4 w-4" strokeWidth={1.75} />
                     </div>

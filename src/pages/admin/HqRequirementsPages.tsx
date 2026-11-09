@@ -120,6 +120,8 @@ export const HqRequirementsListPage: React.FC = () => {
   const [syncingVendors, setSyncingVendors] = useState(false);
   const [syncingSheet, setSyncingSheet] = useState(false);
   const [sheetSyncResult, setSheetSyncResult] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const handleSheetSync = async () => {
     setSyncingSheet(true);
@@ -148,6 +150,29 @@ export const HqRequirementsListPage: React.FC = () => {
     } finally {
       setSyncingSheet(false);
     }
+  };
+
+  const handleBulkStatus = async (newStatus: RequirementStatus) => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    let successCount = 0;
+    let failCount = 0;
+    for (const id of selectedIds) {
+      try {
+        await setRequirementStatus({ p_requirement_id: id, p_status: newStatus });
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+    toast({
+      title: `Bulk status update`,
+      description: `${successCount} updated to ${newStatus.replace(/_/g, ' ')}${failCount ? `, ${failCount} failed` : ''}`,
+      tone: failCount ? 'error' : 'success',
+    });
+    setSelectedIds(new Set());
+    setBulkLoading(false);
+    queryClient.invalidateQueries({ queryKey: ['requirements'] });
   };
 
   // Soft-Delete Confirmation Dialog state
@@ -584,6 +609,26 @@ export const HqRequirementsListPage: React.FC = () => {
         )}
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 mb-3 rounded-lg border border-[var(--brand)] bg-[var(--bg-subtle)]">
+          <span className="text-[13px] font-medium text-[var(--text-primary)]">
+            {selectedIds.size} selected
+          </span>
+          <Button size="sm" variant="outline" disabled={bulkLoading} onClick={() => handleBulkStatus('open')}>
+            Set Open
+          </Button>
+          <Button size="sm" variant="outline" disabled={bulkLoading} onClick={() => handleBulkStatus('on_hold')}>
+            Set On Hold
+          </Button>
+          <Button size="sm" variant="outline" disabled={bulkLoading} onClick={() => handleBulkStatus('closed')}>
+            Set Closed
+          </Button>
+          <Button size="sm" variant="ghost" disabled={bulkLoading} onClick={() => setSelectedIds(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <TableSkeleton rows={6} cols={6} />
       ) : error ? (
@@ -602,6 +647,12 @@ export const HqRequirementsListPage: React.FC = () => {
           onFilterChange={setQuickFilter}
           onSelectRequirement={(req) => navigate(`${prefix}/requirements/${req.id}`)}
           onShareRequirement={(req) => setShareModalTarget(req)}
+          selectedIds={selectedIds}
+          onToggleSelect={(id) => {
+            const next = new Set(selectedIds);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            setSelectedIds(next);
+          }}
           onDeleteRequirement={(req) => {
             setDeleteTarget(req);
             setDeleteReason('');
@@ -625,6 +676,19 @@ export const HqRequirementsListPage: React.FC = () => {
             <table>
               <thead>
                 <tr>
+                  <th className="w-8">
+                    <input
+                      type="checkbox"
+                      checked={filteredRows.length > 0 && selectedIds.size === filteredRows.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(new Set(filteredRows.map((r) => r.id)));
+                        } else {
+                          setSelectedIds(new Set());
+                        }
+                      }}
+                    />
+                  </th>
                   <th>Requirement</th>
                   <th>Client mapping</th>
                   <th>Status</th>
@@ -645,6 +709,18 @@ export const HqRequirementsListPage: React.FC = () => {
                       onClick={() => navigate(`${prefix}/requirements/${req.id}`)}
                       className="cursor-pointer"
                     >
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(req.id)}
+                          onChange={(e) => {
+                            const next = new Set(selectedIds);
+                            if (e.target.checked) next.add(req.id);
+                            else next.delete(req.id);
+                            setSelectedIds(next);
+                          }}
+                        />
+                      </td>
                       <td>
                         <div className="font-medium text-[var(--text-primary)]">
                           {req.title}
