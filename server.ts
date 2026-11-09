@@ -3872,10 +3872,22 @@ Return JSON array of objects with fields: targetSkill, question.`;
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.get('authorization') || '';
     const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
-    const isAdmin = authHeader.startsWith('Bearer ') && authHeader !== `Bearer ${cronSecret}`;
-    if (!isCron && !isAdmin) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+    if (cronSecret && !isCron) {
+      // For non-cron requests, verify Supabase session (admin user)
+      const supabaseUrlCheck = process.env.VITE_SUPABASE_URL;
+      const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+      if (supabaseUrlCheck && anonKey && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const checkClient = createClient(supabaseUrlCheck, anonKey);
+        const { data: { user } } = await checkClient.auth.getUser(token);
+        if (!user) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+      } else {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
     }
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL;

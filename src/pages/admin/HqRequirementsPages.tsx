@@ -127,9 +127,9 @@ export const HqRequirementsListPage: React.FC = () => {
     try {
       const { supabase } = await import('../../lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
-      const resp = await fetch('/api/sheet-sync/pull', {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-      });
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+      const resp = await fetch('/api/sheet-sync/pull', { headers });
       const data = await resp.json();
       if (resp.ok) {
         setSheetSyncResult(`Synced ${data.synced} rows, ${data.skipped} skipped`);
