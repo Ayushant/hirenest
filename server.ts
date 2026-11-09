@@ -4103,9 +4103,10 @@ Return JSON array of objects with fields: targetSkill, question.`;
         }
       }
 
-      // Batch upsert: chunks of 10, 5 in parallel to stay under both
-      // Supabase statement timeout (~8s) and Vercel function timeout (60s)
-      const BATCH_SIZE = 10;
+      // Upsert in parallel batches. Use ignoreDuplicates so existing rows
+      // are skipped (no UPDATE = no match-recompute trigger). New rows get
+      // inserted with the correct status.
+      const BATCH_SIZE = 25;
       const CONCURRENCY = 5;
       const batches: Array<Record<string, any>[]> = [];
       for (let i = 0; i < pendingRows.length; i += BATCH_SIZE) {
@@ -4115,7 +4116,10 @@ Return JSON array of objects with fields: targetSkill, question.`;
         const group = batches.slice(g, g + CONCURRENCY);
         const results = await Promise.allSettled(
           group.map((batch) =>
-            adminClient.from('requirements').upsert(batch, { onConflict: 'external_ref' }),
+            adminClient.from('requirements').upsert(batch, {
+              onConflict: 'external_ref',
+              ignoreDuplicates: true,
+            }),
           ),
         );
         results.forEach((res, idx) => {
