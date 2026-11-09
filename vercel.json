@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/sheet-sync/pull",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 6 * * *"
     }
   ],
   "functions": {
