@@ -165,7 +165,7 @@ export const HqRequirementsListPage: React.FC = () => {
     queryFn: () =>
       fetchRequirements({
         page,
-        pageSize: 100,
+        pageSize: 500,
         status,
         clientOrgId: clientOrgId || undefined,
         isPublic:

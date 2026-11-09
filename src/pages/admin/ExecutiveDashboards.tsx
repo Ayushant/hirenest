@@ -54,7 +54,7 @@ export const CeoDashboardPage: React.FC = () => {
 
   const { data: reqData } = useQuery({
     queryKey: ['ceo_requirements'],
-    queryFn: () => fetchRequirements({ page: 1, pageSize: 200 }),
+    queryFn: () => fetchRequirements({ page: 1, pageSize: 500 }),
     staleTime: 60_000,
   });
 
@@ -218,7 +218,7 @@ export const CfoDashboardPage: React.FC = () => {
 
   const { data: reqData } = useQuery({
     queryKey: ['cfo_requirements'],
-    queryFn: () => fetchRequirements({ page: 1, pageSize: 200 }),
+    queryFn: () => fetchRequirements({ page: 1, pageSize: 500 }),
     staleTime: 60_000,
   });
 
