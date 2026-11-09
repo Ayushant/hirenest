@@ -3864,6 +3864,38 @@ Return JSON array of objects with fields: targetSkill, question.`;
     }
   });
 
+  // Admin-facing manual sync trigger (validates Supabase JWT, then calls pull)
+  app.post('/api/sheet-sync/trigger', async (req, res) => {
+    try {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const authHeader = req.get('authorization') || '';
+      if (!authHeader.startsWith('Bearer ') || !supabaseUrl || !serviceRoleKey) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: { user } } = await adminClient.auth.getUser(authHeader.slice(7));
+      if (!user) {
+        res.status(401).json({ error: 'Invalid session' });
+        return;
+      }
+      // Forward internally with the sheet sync secret
+      const sheetSyncSecret = process.env.SHEET_SYNC_SECRET || '';
+      const protocol = req.protocol;
+      const host = req.get('host');
+      const pullResp = await fetch(`${protocol}://${host}/api/sheet-sync/pull`, {
+        headers: { 'x-sheet-sync-secret': sheetSyncSecret },
+      });
+      const data = await pullResp.json();
+      res.status(pullResp.status).json(data);
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Trigger failed' });
+    }
+  });
+
   // ============================================================
   // Scheduled Google Sheets pull sync (service account)
   // ============================================================
@@ -3875,7 +3907,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
     const isSheetSync = sheetSyncSecret && syncHeader === sheetSyncSecret;
     if (!isCron && !isSheetSync) {
-      res.status(401).json({ error: 'Unauthorized — set x-sheet-sync-secret header' });
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
