@@ -4103,19 +4103,32 @@ Return JSON array of objects with fields: targetSkill, question.`;
         }
       }
 
-      // Batch upsert in chunks of 50 (single HTTP call per batch)
+      // Batch upsert: chunks of 10, 5 in parallel to stay under both
+      // Supabase statement timeout (~8s) and Vercel function timeout (60s)
       const BATCH_SIZE = 10;
+      const CONCURRENCY = 5;
+      const batches: Array<Record<string, any>[]> = [];
       for (let i = 0; i < pendingRows.length; i += BATCH_SIZE) {
-        const batch = pendingRows.slice(i, i + BATCH_SIZE);
-        const { error: upsertErr } = await adminClient.from('requirements').upsert(
-          batch,
-          { onConflict: 'external_ref' },
+        batches.push(pendingRows.slice(i, i + BATCH_SIZE));
+      }
+      for (let g = 0; g < batches.length; g += CONCURRENCY) {
+        const group = batches.slice(g, g + CONCURRENCY);
+        const results = await Promise.allSettled(
+          group.map((batch) =>
+            adminClient.from('requirements').upsert(batch, { onConflict: 'external_ref' }),
+          ),
         );
-        if (upsertErr) {
-          skipped.push({ ref: `batch ${Math.floor(i / BATCH_SIZE) + 1}`, reason: upsertErr.message });
-        } else {
-          for (const r of batch) synced.push(r.external_ref);
-        }
+        results.forEach((res, idx) => {
+          const batchIdx = g + idx + 1;
+          const batch = group[idx];
+          if (res.status === 'rejected') {
+            skipped.push({ ref: `batch ${batchIdx}`, reason: String(res.reason) });
+          } else if (res.value.error) {
+            skipped.push({ ref: `batch ${batchIdx}`, reason: res.value.error.message });
+          } else {
+            for (const r of batch) synced.push(r.external_ref);
+          }
+        });
       }
 
       return {
