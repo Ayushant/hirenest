@@ -135,7 +135,10 @@ export const HqRequirementsListPage: React.FC = () => {
       let data: any;
       try { data = JSON.parse(text); } catch { data = { error: text.slice(0, 200) }; }
       if (resp.ok && data.ok) {
-        setSheetSyncResult(`Synced ${data.synced} rows, ${data.skipped} skipped`);
+        const details = data.skippedDetails?.length
+          ? ` — ${data.skippedDetails.map((d: any) => `${d.ref}: ${d.reason}`).join('; ')}`
+          : '';
+        setSheetSyncResult(`Synced ${data.synced} rows, ${data.skipped} skipped${details}`);
         queryClient.invalidateQueries({ queryKey: ['requirements'] });
       } else {
         setSheetSyncResult(`Error: ${data.error || `HTTP ${resp.status}`}`);

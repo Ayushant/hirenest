@@ -4092,7 +4092,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
             vendor_visible_budget: budget,
             currency: 'INR',
             status: isPublicActiveTab ? 'open' : (colStatus >= 0 ? mapStatus(String(row[colStatus] || '')) : 'open'),
-            is_public: isPublicActiveTab ? true : undefined,
+            ...(isPublicActiveTab ? { is_public: true } : {}),
           });
         }
       }
