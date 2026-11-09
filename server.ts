@@ -4086,8 +4086,8 @@ Return JSON array of objects with fields: targetSkill, question.`;
             created_by: adminProfile.id,
             title,
             description,
-            min_experience: exp.min,
-            max_experience: exp.max,
+            min_experience: exp.min !== null && exp.min <= 999 ? exp.min : null,
+            max_experience: exp.max !== null && exp.max <= 999 ? exp.max : null,
             location: colLocation >= 0 ? String(row[colLocation] || '').trim() || null : null,
             work_mode: tabConfig.defaultWorkMode,
             employment_type: mapEmploymentType(
@@ -4104,7 +4104,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
       }
 
       // Batch upsert in chunks of 50 (single HTTP call per batch)
-      const BATCH_SIZE = 50;
+      const BATCH_SIZE = 10;
       for (let i = 0; i < pendingRows.length; i += BATCH_SIZE) {
         const batch = pendingRows.slice(i, i + BATCH_SIZE);
         const { error: upsertErr } = await adminClient.from('requirements').upsert(
