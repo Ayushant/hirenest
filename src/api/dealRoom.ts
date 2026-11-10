@@ -6,13 +6,22 @@ import type {
   DealRoomAuditEvent,
   ContactRequestStatus,
 } from '../lib/dealRoom';
+import { supabase } from '../lib/supabase';
 
 const BASE = '/api/deal-rooms';
 
 async function apiFetch<T>(url: string, opts?: RequestInit): Promise<T> {
+  const { data: sessionData } = await supabase.auth.getSession().catch(() => ({
+    data: { session: null },
+  }));
+  const token = sessionData?.session?.access_token;
   const res = await fetch(url, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', ...opts?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...opts?.headers,
+    },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

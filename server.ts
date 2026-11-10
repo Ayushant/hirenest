@@ -1451,7 +1451,10 @@ function buildServerStaffingAiFallback(
   );
 }
 
-async function authenticateStaffingCaller(req: express.Request): Promise<
+async function authenticateStaffingCaller(
+  req: express.Request,
+  opts: { strict?: boolean } = {}
+): Promise<
   | { ok: true; userId: string; role: string; orgId: string | null }
   | { ok: false; status: number; message: string }
 > {
@@ -1510,6 +1513,10 @@ async function authenticateStaffingCaller(req: express.Request): Promise<
     } catch {
       // Fall through to workspace context so Vercel/demo sessions work without interruption
     }
+  }
+
+  if (opts.strict) {
+    return { ok: false, status: 401, message: 'Authentication required.' };
   }
 
   const headerOrgId =
@@ -4954,7 +4961,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // List all Deal Rooms the caller can access
   app.get('/api/deal-rooms', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const allRooms = await dealRoomDb.listRooms();
@@ -4981,7 +4988,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Get a single Deal Room with all its data
   app.get('/api/deal-rooms/:roomId', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const roomId = req.params.roomId;
@@ -5027,7 +5034,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Create a Deal Room (admin only, or auto-triggered)
   app.post('/api/deal-rooms/create', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const { submissionId, reason } = req.body || {};
@@ -5109,7 +5116,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Close a Deal Room
   app.post('/api/deal-rooms/:roomId/close', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can close a Deal Room' }); return; }
 
@@ -5137,7 +5144,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Reopen a Deal Room
   app.post('/api/deal-rooms/:roomId/reopen', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can reopen a Deal Room' }); return; }
 
@@ -5162,7 +5169,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Send a message (with contact leakage detection)
   app.post('/api/deal-rooms/:roomId/messages', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const roomId = req.params.roomId;
@@ -5247,7 +5254,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Poll messages since a timestamp
   app.get('/api/deal-rooms/:roomId/messages', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const roomId = req.params.roomId;
@@ -5268,7 +5275,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Submit a contact detail request
   app.post('/api/deal-rooms/:roomId/contact-requests', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const roomId = req.params.roomId;
@@ -5315,7 +5322,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Respond to a contact detail request (admin only)
   app.post('/api/deal-rooms/:roomId/contact-requests/:requestId/respond', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can respond to contact requests' }); return; }
 
@@ -5351,7 +5358,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Add participant (admin only)
   app.post('/api/deal-rooms/:roomId/participants', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can manage participants' }); return; }
 
@@ -5389,7 +5396,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // Remove participant (admin only)
   app.post('/api/deal-rooms/:roomId/participants/:participantId/remove', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
+    const auth = await authenticateStaffingCaller(req, { strict: true });
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can manage participants' }); return; }
 
