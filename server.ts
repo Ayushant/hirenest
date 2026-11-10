@@ -468,6 +468,184 @@ function dbRowToSubscription(row: Record<string, unknown>): AccountSubscriptionR
   };
 }
 
+// Deal Room DB helpers (Supabase with JSON fallback)
+function camelToSnake(obj: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    out[k.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())] = v;
+  }
+  return out;
+}
+
+function snakeToCamel(obj: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    out[k.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = v;
+  }
+  return out;
+}
+
+const dealRoomDb = {
+  async listRooms(): Promise<Array<Record<string, unknown>>> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deal_rooms').select('*').order('opened_at', { ascending: false });
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r));
+    }
+    return Object.values(enterpriseStore.dealRooms || {}) as Array<Record<string, unknown>>;
+  },
+
+  async getRoom(roomId: string): Promise<Record<string, unknown> | null> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deal_rooms').select('*').eq('id', roomId).single();
+      return data ? snakeToCamel(data) : null;
+    }
+    return (enterpriseStore.dealRooms?.[roomId] as Record<string, unknown>) || null;
+  },
+
+  async findRoomBySubmission(submissionId: string): Promise<Record<string, unknown> | null> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deal_rooms').select('*').eq('submission_id', submissionId).limit(1).single();
+      return data ? snakeToCamel(data) : null;
+    }
+    return (Object.values(enterpriseStore.dealRooms || {}).find(
+      (r: any) => r.submissionId === submissionId
+    ) as Record<string, unknown>) || null;
+  },
+
+  async saveRoom(room: Record<string, unknown>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('deal_rooms').upsert(camelToSnake(room), { onConflict: 'id' });
+    } else {
+      enterpriseStore.dealRooms[room.id as string] = room;
+      saveEnterpriseStore(enterpriseStore);
+    }
+  },
+
+  async getMessages(roomId: string): Promise<Array<Record<string, unknown>>> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deal_room_messages').select('*').eq('deal_room_id', roomId).order('created_at');
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r));
+    }
+    return (enterpriseStore.dealRoomMessages?.[roomId] || []) as Array<Record<string, unknown>>;
+  },
+
+  async addMessage(msg: Record<string, unknown>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('deal_room_messages').insert(camelToSnake(msg));
+    } else {
+      const roomId = msg.dealRoomId as string;
+      const messages = enterpriseStore.dealRoomMessages[roomId] || [];
+      messages.push(msg);
+      enterpriseStore.dealRoomMessages[roomId] = messages;
+      saveEnterpriseStore(enterpriseStore);
+    }
+  },
+
+  async getParticipants(roomId: string): Promise<Array<Record<string, unknown>>> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deal_room_participants').select('*').eq('deal_room_id', roomId);
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r));
+    }
+    return (enterpriseStore.dealRoomParticipants?.[roomId] || []) as Array<Record<string, unknown>>;
+  },
+
+  async addParticipant(p: Record<string, unknown>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('deal_room_participants').insert(camelToSnake(p));
+    } else {
+      const roomId = p.dealRoomId as string;
+      const parts = enterpriseStore.dealRoomParticipants[roomId] || [];
+      parts.push(p);
+      enterpriseStore.dealRoomParticipants[roomId] = parts;
+      saveEnterpriseStore(enterpriseStore);
+    }
+  },
+
+  async updateParticipant(roomId: string, participantId: string, updates: Record<string, unknown>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('deal_room_participants').update(camelToSnake(updates)).eq('id', participantId);
+    } else {
+      const parts = (enterpriseStore.dealRoomParticipants?.[roomId] || []) as Array<Record<string, unknown>>;
+      const p = parts.find((x) => x.id === participantId);
+      if (p) Object.assign(p, updates);
+      enterpriseStore.dealRoomParticipants[roomId] = parts;
+      saveEnterpriseStore(enterpriseStore);
+    }
+  },
+
+  async getContactRequests(roomId: string): Promise<Array<Record<string, unknown>>> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deal_room_contact_requests').select('*').eq('deal_room_id', roomId).order('created_at');
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r));
+    }
+    return (enterpriseStore.dealRoomContactRequests?.[roomId] || []) as Array<Record<string, unknown>>;
+  },
+
+  async addContactRequest(req: Record<string, unknown>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('deal_room_contact_requests').insert(camelToSnake(req));
+    } else {
+      const roomId = req.dealRoomId as string;
+      const reqs = enterpriseStore.dealRoomContactRequests[roomId] || [];
+      reqs.push(req);
+      enterpriseStore.dealRoomContactRequests[roomId] = reqs;
+      saveEnterpriseStore(enterpriseStore);
+    }
+  },
+
+  async updateContactRequest(requestId: string, updates: Record<string, unknown>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('deal_room_contact_requests').update(camelToSnake(updates)).eq('id', requestId);
+    } else {
+      for (const reqs of Object.values(enterpriseStore.dealRoomContactRequests)) {
+        const r = (reqs as Array<Record<string, unknown>>).find((x) => x.id === requestId);
+        if (r) { Object.assign(r, updates); break; }
+      }
+      saveEnterpriseStore(enterpriseStore);
+    }
+  },
+
+  async addAuditEvent(evt: Record<string, unknown>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const row = camelToSnake(evt);
+      if (row.metadata && typeof row.metadata === 'object') row.metadata = JSON.stringify(row.metadata);
+      await sb.from('deal_room_audit_events').insert(row);
+    } else {
+      const roomId = evt.dealRoomId as string;
+      const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
+      events.push(evt);
+      enterpriseStore.dealRoomAuditEvents[roomId] = events;
+      saveEnterpriseStore(enterpriseStore);
+    }
+  },
+
+  async getAuditEvents(roomId: string): Promise<Array<Record<string, unknown>>> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deal_room_audit_events').select('*').eq('deal_room_id', roomId).order('timestamp');
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r));
+    }
+    return (enterpriseStore.dealRoomAuditEvents?.[roomId] || []) as Array<Record<string, unknown>>;
+  },
+
+  async saveStore(): Promise<void> {
+    if (!getSupabaseAdmin()) saveEnterpriseStore(enterpriseStore);
+  },
+};
+
 async function saveSubscriptionToDb(sub: AccountSubscriptionRecord): Promise<void> {
   const sb = getSupabaseAdmin();
   if (sb) {
@@ -4441,7 +4619,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     const auth = await authenticateStaffingCaller(req);
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
-    const allRooms = Object.values(enterpriseStore.dealRooms || {}) as Array<Record<string, unknown>>;
+    const allRooms = await dealRoomDb.listRooms();
     const isHq = auth.role === 'admin' || auth.role === 'recruiter';
     const isClient = auth.role === 'client_manager' || auth.role === 'client_member';
     const isVendor = auth.role === 'vendor_admin' || auth.role === 'vendor_recruiter';
@@ -4453,7 +4631,6 @@ Return JSON array of objects with fields: targetSkill, question.`;
       return false;
     });
 
-    // Mask org names for external participants
     const masked = filtered.map((r) => {
       if (isHq) return r;
       if (isClient) return { ...r, vendorOrgName: null, vendorOrgId: '' };
@@ -4470,7 +4647,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const roomId = req.params.roomId;
-    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    const room = await dealRoomDb.getRoom(roomId);
     if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
 
     const isHq = auth.role === 'admin' || auth.role === 'recruiter';
@@ -4483,22 +4660,19 @@ Return JSON array of objects with fields: targetSkill, question.`;
       if (!isClient && !isVendor) { res.status(403).json({ error: 'Access denied' }); return; }
     }
 
-    // Mask room data
     let maskedRoom = room;
     if (isClient) maskedRoom = { ...room, vendorOrgName: null, vendorOrgId: '' };
     if (isVendor) maskedRoom = { ...room, clientOrgName: 'Client Organization', clientOrgId: '' };
 
-    const messages = (enterpriseStore.dealRoomMessages?.[roomId] || []) as Array<Record<string, unknown>>;
-    const participants = (enterpriseStore.dealRoomParticipants?.[roomId] || []) as Array<Record<string, unknown>>;
-    const contactRequests = (enterpriseStore.dealRoomContactRequests?.[roomId] || []) as Array<Record<string, unknown>>;
-    const auditEvents = (enterpriseStore.dealRoomAuditEvents?.[roomId] || []) as Array<Record<string, unknown>>;
+    const messages = await dealRoomDb.getMessages(roomId);
+    const participants = await dealRoomDb.getParticipants(roomId);
+    const contactRequests = await dealRoomDb.getContactRequests(roomId);
+    const auditEvents = await dealRoomDb.getAuditEvents(roomId);
 
-    // Filter out blocked messages for non-admin
     const filteredMessages = isHq
       ? messages
       : messages.filter((m) => m.moderationStatus !== 'blocked');
 
-    // Filter contact requests: non-admin only sees their own
     const filteredContactRequests = isHq
       ? contactRequests
       : contactRequests.filter((cr) => cr.requestedBy === auth.userId);
@@ -4521,10 +4695,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     const { submissionId, reason } = req.body || {};
     if (!submissionId) { res.status(400).json({ error: 'submissionId is required' }); return; }
 
-    // Check if room already exists for this submission
-    const existing = Object.values(enterpriseStore.dealRooms || {}).find(
-      (r: any) => r.submissionId === submissionId
-    );
+    const existing = await dealRoomDb.findRoomBySubmission(submissionId);
     if (existing) { res.json({ ok: true, room: existing, existing: true }); return; }
 
     // Fetch submission data from Supabase to build the room
@@ -4571,40 +4742,29 @@ Return JSON array of objects with fields: targetSkill, question.`;
       currentStage: (submissionData as any)?.stage || 'interviewing',
     };
 
-    enterpriseStore.dealRooms[roomId] = room;
+    await dealRoomDb.saveRoom(room);
 
-    // Auto-add participants
-    const participants: Array<Record<string, unknown>> = [];
-    const addPart = (type: string, userId: string, orgId: string | null) => {
-      const labels: Record<string, string> = {
-        admin: 'HireNest Admin', recruiter: 'HireNest Recruiter',
-        client: 'Client Representative', vendor: 'Vendor Representative',
-      };
-      participants.push({
-        id: crypto.randomUUID(),
-        dealRoomId: roomId, userId, orgId,
-        participantType: type,
-        displayLabel: labels[type] || type,
-        status: 'active',
-        invitedAt: now, joinedAt: now, revokedAt: null,
-      });
+    const labels: Record<string, string> = {
+      admin: 'HireNest Admin', recruiter: 'HireNest Recruiter',
+      client: 'Client Representative', vendor: 'Vendor Representative',
     };
+    const partType = auth.role === 'recruiter' ? 'recruiter' : 'admin';
+    await dealRoomDb.addParticipant({
+      id: crypto.randomUUID(),
+      dealRoomId: roomId, userId: auth.userId, orgId: null,
+      participantType: partType,
+      displayLabel: labels[partType],
+      status: 'active',
+      invitedAt: now, joinedAt: now, revokedAt: null,
+    });
 
-    addPart(auth.role === 'recruiter' ? 'recruiter' : 'admin', auth.userId, null);
-    enterpriseStore.dealRoomParticipants[roomId] = participants;
-    enterpriseStore.dealRoomMessages[roomId] = [];
-    enterpriseStore.dealRoomContactRequests[roomId] = [];
-
-    // Audit event
-    const auditEvent = {
+    await dealRoomDb.addAuditEvent({
       id: crypto.randomUUID(), dealRoomId: roomId,
       actorId: auth.userId, actorName: auth.role, actorRole: auth.role,
       eventType: 'room_created',
       metadata: { submissionId, reason: reason || 'Auto-opened after interview selection' },
       timestamp: now,
-    };
-    enterpriseStore.dealRoomAuditEvents[roomId] = [auditEvent];
-    saveEnterpriseStore(enterpriseStore);
+    });
 
     res.json({ ok: true, room });
   });
@@ -4616,7 +4776,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can close a Deal Room' }); return; }
 
     const roomId = req.params.roomId;
-    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    const room = await dealRoomDb.getRoom(roomId);
     if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
 
     const { reason } = req.body || {};
@@ -4626,16 +4786,13 @@ Return JSON array of objects with fields: targetSkill, question.`;
     room.status = 'closed';
     room.closedAt = now;
     room.closureReason = reason;
-    enterpriseStore.dealRooms[roomId] = room;
+    await dealRoomDb.saveRoom(room);
 
-    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
-    events.push({
+    await dealRoomDb.addAuditEvent({
       id: crypto.randomUUID(), dealRoomId: roomId,
       actorId: auth.userId, actorName: auth.role, actorRole: auth.role,
       eventType: 'room_closed', metadata: { reason }, timestamp: now,
     });
-    enterpriseStore.dealRoomAuditEvents[roomId] = events;
-    saveEnterpriseStore(enterpriseStore);
 
     res.json({ ok: true });
   });
@@ -4647,23 +4804,20 @@ Return JSON array of objects with fields: targetSkill, question.`;
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can reopen a Deal Room' }); return; }
 
     const roomId = req.params.roomId;
-    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    const room = await dealRoomDb.getRoom(roomId);
     if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
 
     const now = new Date().toISOString();
     room.status = 'active';
     room.closedAt = null;
     room.closureReason = null;
-    enterpriseStore.dealRooms[roomId] = room;
+    await dealRoomDb.saveRoom(room);
 
-    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
-    events.push({
+    await dealRoomDb.addAuditEvent({
       id: crypto.randomUUID(), dealRoomId: roomId,
       actorId: auth.userId, actorName: auth.role, actorRole: auth.role,
       eventType: 'room_reopened', metadata: {}, timestamp: now,
     });
-    enterpriseStore.dealRoomAuditEvents[roomId] = events;
-    saveEnterpriseStore(enterpriseStore);
 
     res.json({ ok: true });
   });
@@ -4674,11 +4828,10 @@ Return JSON array of objects with fields: targetSkill, question.`;
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const roomId = req.params.roomId;
-    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    const room = await dealRoomDb.getRoom(roomId);
     if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
     if (room.status === 'closed') { res.status(400).json({ error: 'Deal Room is closed' }); return; }
 
-    // Access check
     const isHq = auth.role === 'admin' || auth.role === 'recruiter';
     const isClient = auth.role === 'client_manager' || auth.role === 'client_member';
     const isVendor = auth.role === 'vendor_admin' || auth.role === 'vendor_recruiter';
@@ -4691,7 +4844,6 @@ Return JSON array of objects with fields: targetSkill, question.`;
       res.status(400).json({ error: 'Message content is required' }); return;
     }
 
-    // Contact leakage detection
     const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
     const PHONE_RE = /(?:\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/;
     const WHATSAPP_RE = /whatsapp|wa\.me|chat\.whatsapp/i;
@@ -4703,18 +4855,13 @@ Return JSON array of objects with fields: targetSkill, question.`;
     let moderationNote: string | null = null;
 
     if (!isHq && (hasEmail || hasPhone)) {
-      moderationStatus = 'blocked';
-      moderationNote = 'Message blocked: contains contact information (email or phone number). Use the "Request Contact Details" feature instead.';
-      const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
-      events.push({
+      await dealRoomDb.addAuditEvent({
         id: crypto.randomUUID(), dealRoomId: roomId,
         actorId: auth.userId, actorName: auth.role, actorRole: auth.role,
         eventType: 'message_blocked',
         metadata: { hasEmail, hasPhone, preview: content.slice(0, 100) },
         timestamp: new Date().toISOString(),
       });
-      enterpriseStore.dealRoomAuditEvents[roomId] = events;
-      saveEnterpriseStore(enterpriseStore);
 
       res.status(400).json({
         error: 'Message blocked: sharing contact information (email addresses, phone numbers) is not permitted in the Deal Room. Please use the "Request Contact Details" feature to request information through HireNest Admin.',
@@ -4728,7 +4875,6 @@ Return JSON array of objects with fields: targetSkill, question.`;
       moderationNote = 'Message flagged: contains reference to external messaging platform.';
     }
 
-    // Admin override: allow everything
     if (isHq) {
       moderationStatus = 'clean';
       moderationNote = null;
@@ -4756,10 +4902,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
       editedAt: null,
     };
 
-    const messages = enterpriseStore.dealRoomMessages[roomId] || [];
-    messages.push(message);
-    enterpriseStore.dealRoomMessages[roomId] = messages;
-    saveEnterpriseStore(enterpriseStore);
+    await dealRoomDb.addMessage(message);
 
     res.json({ ok: true, message });
   });
@@ -4770,12 +4913,12 @@ Return JSON array of objects with fields: targetSkill, question.`;
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const roomId = req.params.roomId;
-    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    const room = await dealRoomDb.getRoom(roomId);
     if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
 
     const isHq = auth.role === 'admin' || auth.role === 'recruiter';
     const since = typeof req.query.since === 'string' ? req.query.since : '';
-    const allMessages = (enterpriseStore.dealRoomMessages?.[roomId] || []) as Array<Record<string, unknown>>;
+    const allMessages = await dealRoomDb.getMessages(roomId);
 
     let filtered = isHq ? allMessages : allMessages.filter((m) => m.moderationStatus !== 'blocked');
     if (since) {
@@ -4791,7 +4934,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
 
     const roomId = req.params.roomId;
-    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    const room = await dealRoomDb.getRoom(roomId);
     if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
 
     const { contactType, reason } = req.body || {};
@@ -4819,20 +4962,15 @@ Return JSON array of objects with fields: targetSkill, question.`;
       createdAt: now,
     };
 
-    const requests = enterpriseStore.dealRoomContactRequests[roomId] || [];
-    requests.push(request);
-    enterpriseStore.dealRoomContactRequests[roomId] = requests;
+    await dealRoomDb.addContactRequest(request);
 
-    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
-    events.push({
+    await dealRoomDb.addAuditEvent({
       id: crypto.randomUUID(), dealRoomId: roomId,
       actorId: auth.userId, actorName: participantType, actorRole: auth.role,
       eventType: 'contact_request_submitted',
       metadata: { contactType, reason },
       timestamp: now,
     });
-    enterpriseStore.dealRoomAuditEvents[roomId] = events;
-    saveEnterpriseStore(enterpriseStore);
 
     res.json({ ok: true, request });
   });
@@ -4844,7 +4982,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can respond to contact requests' }); return; }
 
     const { roomId, requestId } = req.params;
-    const requests = (enterpriseStore.dealRoomContactRequests?.[roomId] || []) as Array<Record<string, unknown>>;
+    const requests = await dealRoomDb.getContactRequests(roomId);
     const request = requests.find((r) => r.id === requestId);
     if (!request) { res.status(404).json({ error: 'Contact request not found' }); return; }
 
@@ -4854,24 +4992,21 @@ Return JSON array of objects with fields: targetSkill, question.`;
     }
 
     const now = new Date().toISOString();
-    request.status = status;
-    request.approvedBy = auth.userId;
-    request.approvedByName = 'HireNest Admin';
-    request.disclosureChannel = disclosureChannel || null;
-    request.respondedAt = now;
+    await dealRoomDb.updateContactRequest(requestId, {
+      status,
+      approvedBy: auth.userId,
+      approvedByName: 'HireNest Admin',
+      disclosureChannel: disclosureChannel || null,
+      respondedAt: now,
+    });
 
-    enterpriseStore.dealRoomContactRequests[roomId] = requests;
-
-    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
-    events.push({
+    await dealRoomDb.addAuditEvent({
       id: crypto.randomUUID(), dealRoomId: roomId,
       actorId: auth.userId, actorName: 'HireNest Admin', actorRole: auth.role,
       eventType: status === 'approved' ? 'contact_request_approved' : 'contact_request_rejected',
       metadata: { requestId, contactType: request.contactType, disclosureChannel },
       timestamp: now,
     });
-    enterpriseStore.dealRoomAuditEvents[roomId] = events;
-    saveEnterpriseStore(enterpriseStore);
 
     res.json({ ok: true });
   });
@@ -4901,20 +5036,15 @@ Return JSON array of objects with fields: targetSkill, question.`;
       invitedAt: now, joinedAt: now, revokedAt: null,
     };
 
-    const participants = enterpriseStore.dealRoomParticipants[roomId] || [];
-    participants.push(participant);
-    enterpriseStore.dealRoomParticipants[roomId] = participants;
+    await dealRoomDb.addParticipant(participant);
 
-    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
-    events.push({
+    await dealRoomDb.addAuditEvent({
       id: crypto.randomUUID(), dealRoomId: roomId,
       actorId: auth.userId, actorName: 'HireNest Admin', actorRole: auth.role,
       eventType: 'participant_added',
       metadata: { userId, participantType },
       timestamp: now,
     });
-    enterpriseStore.dealRoomAuditEvents[roomId] = events;
-    saveEnterpriseStore(enterpriseStore);
 
     res.json({ ok: true, participant });
   });
@@ -4926,24 +5056,20 @@ Return JSON array of objects with fields: targetSkill, question.`;
     if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can manage participants' }); return; }
 
     const { roomId, participantId } = req.params;
-    const participants = (enterpriseStore.dealRoomParticipants?.[roomId] || []) as Array<Record<string, unknown>>;
+    const participants = await dealRoomDb.getParticipants(roomId);
     const participant = participants.find((p) => p.id === participantId);
     if (!participant) { res.status(404).json({ error: 'Participant not found' }); return; }
 
-    participant.status = 'removed';
-    participant.revokedAt = new Date().toISOString();
-    enterpriseStore.dealRoomParticipants[roomId] = participants;
+    const now = new Date().toISOString();
+    await dealRoomDb.updateParticipant(roomId, participantId, { status: 'removed', revokedAt: now });
 
-    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
-    events.push({
+    await dealRoomDb.addAuditEvent({
       id: crypto.randomUUID(), dealRoomId: roomId,
       actorId: auth.userId, actorName: 'HireNest Admin', actorRole: auth.role,
       eventType: 'participant_removed',
       metadata: { participantId, userId: participant.userId },
-      timestamp: new Date().toISOString(),
+      timestamp: now,
     });
-    enterpriseStore.dealRoomAuditEvents[roomId] = events;
-    saveEnterpriseStore(enterpriseStore);
 
     res.json({ ok: true });
   });
