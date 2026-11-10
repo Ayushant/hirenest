@@ -31,6 +31,7 @@ import {
   Inbox,
   Crown,
   Landmark,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -196,6 +197,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           },
           { label: 'Offers', to: `${basePrefix}/offers`, icon: ClipboardCheck },
           { label: 'Onboarded', to: `${basePrefix}/onboarded`, icon: UserCheck },
+          { label: 'Deal Rooms', to: `${basePrefix}/deal-rooms`, icon: MessageSquare },
           { label: 'Duplicates & ownership', to: `${basePrefix}/duplicates`, icon: Flag },
           { label: 'Vendor performance', to: `${basePrefix}/vendor-performance`, icon: BarChart3 },
         ],
@@ -250,6 +252,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         },
         { label: 'Offers', to: '/client/offers', icon: ClipboardCheck },
         { label: 'Onboarded', to: '/client/onboarded', icon: UserCheck },
+        { label: 'Deal Rooms', to: '/client/deal-rooms', icon: MessageSquare },
       ];
       if (platformSettings?.share_vendor_summary_with_clients) {
         items.push({
@@ -289,6 +292,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Interviews', to: '/vendor/interviews', icon: Calendar },
             { label: 'Offers', to: '/vendor/offers', icon: ClipboardCheck },
             { label: 'Onboarded', to: '/vendor/onboarded', icon: UserCheck },
+            { label: 'Deal Rooms', to: '/vendor/deal-rooms', icon: MessageSquare },
             { label: 'Ratings & performance', to: '/vendor/performance', icon: BarChart3 },
             { label: 'Subscription & billing', to: '/vendor/subscription', icon: CreditCard },
             { label: 'Privacy & DPDP', to: '/vendor/privacy', icon: Lock },

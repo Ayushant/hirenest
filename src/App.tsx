@@ -87,6 +87,7 @@ import {
   OffersManagementPage,
   OnboardedCandidatesPage,
 } from './pages/offers/OffersAndOnboardingPages';
+import { DealRoomsListPage } from './pages/dealroom/DealRoomPages';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -217,6 +218,7 @@ function AppRoutes() {
         <Route path="interviews" element={<HqInterviewsPage />} />
         <Route path="offers" element={<OffersManagementPage />} />
         <Route path="onboarded" element={<OnboardedCandidatesPage />} />
+        <Route path="deal-rooms" element={<DealRoomsListPage />} />
         <Route path="duplicates" element={<HqDuplicatesPage />} />
         <Route path="vendors" element={<HqVendorPerformancePage />} />
         <Route path="vendor-performance" element={<HqVendorPerformancePage />} />
@@ -252,6 +254,7 @@ function AppRoutes() {
         <Route path="interviews" element={<HqInterviewsPage />} />
         <Route path="offers" element={<OffersManagementPage />} />
         <Route path="onboarded" element={<OnboardedCandidatesPage />} />
+        <Route path="deal-rooms" element={<DealRoomsListPage />} />
         <Route path="duplicates" element={<HqDuplicatesPage />} />
         <Route path="vendors" element={<HqVendorPerformancePage />} />
         <Route path="vendor-performance" element={<HqVendorPerformancePage />} />
@@ -277,6 +280,7 @@ function AppRoutes() {
         <Route path="interviews" element={<ClientInterviewsPage />} />
         <Route path="offers" element={<OffersManagementPage />} />
         <Route path="onboarded" element={<OnboardedCandidatesPage />} />
+        <Route path="deal-rooms" element={<DealRoomsListPage />} />
         <Route path="vendors" element={<ClientVendorSummaryPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="privacy" element={<PrivacyGovernancePage />} />
@@ -304,6 +308,7 @@ function AppRoutes() {
         <Route path="interviews" element={<VendorInterviewsPage />} />
         <Route path="offers" element={<OffersManagementPage />} />
         <Route path="onboarded" element={<OnboardedCandidatesPage />} />
+        <Route path="deal-rooms" element={<DealRoomsListPage />} />
         <Route path="ratings" element={<VendorRatingsPage />} />
         <Route path="performance" element={<VendorRatingsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
