@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, Users, CalendarCheck, Send, CheckCircle, Clock, AlertTriangle, Star } from 'lucide-react';
+import { Briefcase, Users, CalendarCheck, Send, CheckCircle, Clock, AlertTriangle, Star, ShieldCheck } from 'lucide-react';
 import {
   PageHeader,
   MetricStrip,
@@ -146,6 +146,18 @@ export const VendorDashboardPage: React.FC = () => {
     enabled: Boolean(profile?.org_id),
   });
 
+  const { data: orgPlan } = useQuery({
+    queryKey: ['vendor_org_plan', profile?.org_id],
+    queryFn: async () => {
+      const res = await fetch(`/api/subscriptions/org-plan?orgId=${encodeURIComponent(profile!.org_id!)}`);
+      if (!res.ok) throw new Error('Failed to fetch plan');
+      return res.json() as Promise<{
+        ok: boolean; orgId: string; planId: string; planName: string; subscriptionStatus: string;
+      }>;
+    },
+    enabled: Boolean(profile?.org_id),
+  });
+
   const offerMetrics = useMemo(
     () => computeOfferOnboardingMetrics(subsData?.data || [], offerRecordsMap),
     [subsData?.data, offerRecordsMap]
@@ -176,6 +188,21 @@ export const VendorDashboardPage: React.FC = () => {
           Open requirements pipeline
         </Button>
       </div>
+
+      {/* Active Plan Banner */}
+      {orgPlan && orgPlan.planId !== 'free_trial' && (
+        <div className="rounded-[10px] border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-5 py-3.5 flex items-center gap-3">
+          <ShieldCheck className="h-5 w-5 text-[var(--accent)] shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[14px] leading-[20px] font-semibold text-[var(--text-primary)]">
+              {orgPlan.planName} Plan — Active
+            </p>
+            <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+              Your organisation is on the {orgPlan.planName} plan. Contact your HireNest admin to manage or upgrade.
+            </p>
+          </div>
+        </div>
+      )}
 
       <SinceLastVisit
         items={[

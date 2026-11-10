@@ -8,6 +8,7 @@ import {
   Sparkles,
   AlertTriangle,
   CalendarPlus,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   PageHeader,
@@ -94,6 +95,9 @@ export const AdminSubscriptionPage: React.FC = () => {
   const [showBetaPricing, setShowBetaPricing] = useState(false);
   const [extendOrgId, setExtendOrgId] = useState<string | null>(null);
   const [extendDays, setExtendDays] = useState<string>('30');
+  const [assignOrgId, setAssignOrgId] = useState<string | null>(null);
+  const [assignPlan, setAssignPlan] = useState<string>('growth');
+  const [assignCycle, setAssignCycle] = useState<string>('annual');
 
   const { data: orgs, isLoading, error, refetch } = useQuery({
     queryKey: ['admin_org_subscriptions'],
@@ -117,6 +121,48 @@ export const AdminSubscriptionPage: React.FC = () => {
       toast({ title: 'Failed to extend trial', description: err instanceof Error ? err.message : 'Unknown error', tone: 'error' });
     },
   });
+
+  const assignMutation = useMutation({
+    mutationFn: async ({ orgId, planId, billingCycle }: { orgId: string; planId: string; billingCycle: string }) => {
+      const res = await fetch('/api/subscriptions/assign-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId, planId, billingCycle }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(body.error || 'Failed to assign plan');
+      }
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin_org_subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['admin_org_plans'] });
+      setAssignOrgId(null);
+      const planLabel = variables.planId === 'free_trial' ? 'Free Trial'
+        : variables.planId.charAt(0).toUpperCase() + variables.planId.slice(1);
+      toast({ title: `Plan assigned: ${planLabel}`, tone: 'success' });
+    },
+    onError: (err) => {
+      toast({ title: 'Failed to assign plan', description: err instanceof Error ? err.message : 'Unknown error', tone: 'error' });
+    },
+  });
+
+  const { data: allPlans } = useQuery({
+    queryKey: ['admin_org_plans'],
+    queryFn: async () => {
+      const res = await fetch('/api/subscriptions/all-plans');
+      if (!res.ok) throw new Error('Failed to load plans');
+      return res.json() as Promise<{ ok: boolean; plans: Array<{
+        orgId: string; orgName: string; planId: string; planName: string;
+        subscriptionStatus: string; billingCycle: string; paidActivatedAt: string | null;
+      }> }>;
+    },
+  });
+
+  const orgPlanMap = new Map(
+    (allPlans?.plans || []).map((p) => [p.orgId, p])
+  );
 
   const totalOrgs = orgs?.length ?? 0;
   const trialOrgs = orgs?.filter((o) => !computeTrialInfo(o).isExpired).length ?? 0;
@@ -177,6 +223,7 @@ export const AdminSubscriptionPage: React.FC = () => {
                   <th>Status</th>
                   <th>Trial duration</th>
                   <th>Days remaining</th>
+                  <th>Active plan</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -219,17 +266,43 @@ export const AdminSubscriptionPage: React.FC = () => {
                         </span>
                       </td>
                       <td>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setExtendOrgId(org.id);
-                            setExtendDays(String(Math.max(trial.trialDuration, 30)));
-                          }}
-                        >
-                          <CalendarPlus className="h-3.5 w-3.5" />
-                          Extend
-                        </Button>
+                        {(() => {
+                          const plan = orgPlanMap.get(org.id);
+                          const planId = plan?.planId || 'free_trial';
+                          const planName = plan?.planName || 'Free Trial';
+                          const tone = planId === 'free_trial' ? 'slate'
+                            : planId === 'growth' ? 'sky'
+                            : planId === 'scale' ? 'indigo'
+                            : 'violet';
+                          return <Badge tone={tone}>{planName}</Badge>;
+                        })()}
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setExtendOrgId(org.id);
+                              setExtendDays(String(Math.max(trial.trialDuration, 30)));
+                            }}
+                          >
+                            <CalendarPlus className="h-3.5 w-3.5" />
+                            Extend
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setAssignOrgId(org.id);
+                              const existing = orgPlanMap.get(org.id);
+                              setAssignPlan(existing?.planId || 'growth');
+                            }}
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            Assign Plan
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -298,6 +371,73 @@ export const AdminSubscriptionPage: React.FC = () => {
               >
                 <CalendarPlus className="h-3.5 w-3.5" />
                 Extend to {extendDays} days
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Assign Plan Dialog */}
+      <Dialog
+        open={Boolean(assignOrgId)}
+        onClose={() => setAssignOrgId(null)}
+        title="Assign subscription plan"
+        description={assignOrgId ? `Assign a plan to ${orgs?.find((o) => o.id === assignOrgId)?.name || 'this organisation'}` : ''}
+        maxWidth="max-w-[420px]"
+      >
+        {assignOrgId && (
+          <div className="space-y-4">
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[13px] space-y-1">
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Organisation</span>
+                <span className="font-medium text-[var(--text-primary)]">{orgs?.find((o) => o.id === assignOrgId)?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Current plan</span>
+                <span className="font-medium text-[var(--text-primary)]">{orgPlanMap.get(assignOrgId)?.planName || 'Free Trial'}</span>
+              </div>
+            </div>
+
+            <Select
+              label="Plan"
+              value={assignPlan}
+              onChange={(e) => setAssignPlan(e.target.value)}
+              options={[
+                { value: 'free_trial', label: 'Free Trial' },
+                { value: 'growth', label: 'Growth' },
+                { value: 'scale', label: 'Scale' },
+                { value: 'enterprise', label: 'Enterprise' },
+              ]}
+            />
+
+            {assignPlan !== 'free_trial' && (
+              <Select
+                label="Billing cycle"
+                value={assignCycle}
+                onChange={(e) => setAssignCycle(e.target.value)}
+                options={[
+                  { value: 'annual', label: 'Annual' },
+                  { value: 'monthly', label: 'Monthly' },
+                ]}
+              />
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+              <Button variant="outline" onClick={() => setAssignOrgId(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() =>
+                  assignMutation.mutate({
+                    orgId: assignOrgId,
+                    planId: assignPlan,
+                    billingCycle: assignCycle,
+                  })
+                }
+                loading={assignMutation.isPending}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Assign {assignPlan === 'free_trial' ? 'Free Trial' : assignPlan.charAt(0).toUpperCase() + assignPlan.slice(1)}
               </Button>
             </div>
           </div>

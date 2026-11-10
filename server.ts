@@ -219,6 +219,11 @@ interface EnterpriseServerStore {
   submissionValidations: Record<string, Record<string, unknown>>;
   offerOnboardingRecords: Record<string, Record<string, unknown>>;
   earlyAccessApplications: EarlyAccessRecord[];
+  dealRooms: Record<string, Record<string, unknown>>;
+  dealRoomMessages: Record<string, Array<Record<string, unknown>>>;
+  dealRoomParticipants: Record<string, Array<Record<string, unknown>>>;
+  dealRoomContactRequests: Record<string, Array<Record<string, unknown>>>;
+  dealRoomAuditEvents: Record<string, Array<Record<string, unknown>>>;
 }
 
 const DATA_DIR = process.env.VERCEL
@@ -282,6 +287,11 @@ function loadEnterpriseStore(): EnterpriseServerStore {
         submissionValidations: parsed.submissionValidations || {},
         offerOnboardingRecords: parsed.offerOnboardingRecords || {},
         earlyAccessApplications: Array.isArray(parsed.earlyAccessApplications) ? parsed.earlyAccessApplications : [],
+        dealRooms: parsed.dealRooms || {},
+        dealRoomMessages: parsed.dealRoomMessages || {},
+        dealRoomParticipants: parsed.dealRoomParticipants || {},
+        dealRoomContactRequests: parsed.dealRoomContactRequests || {},
+        dealRoomAuditEvents: parsed.dealRoomAuditEvents || {},
       };
     }
   } catch {
@@ -310,6 +320,11 @@ function loadEnterpriseStore(): EnterpriseServerStore {
     submissionValidations: {},
     offerOnboardingRecords: {},
     earlyAccessApplications: [],
+    dealRooms: {},
+    dealRoomMessages: {},
+    dealRoomParticipants: {},
+    dealRoomContactRequests: {},
+    dealRoomAuditEvents: {},
   };
 }
 
@@ -877,11 +892,16 @@ async function authenticateStaffingCaller(req: express.Request): Promise<
     }
   }
 
+  const headerOrgId =
+    typeof req.headers['x-hirenest-org-id'] === 'string'
+      ? req.headers['x-hirenest-org-id'].trim()
+      : null;
+
   return {
     ok: true,
     userId: headerUserId || 'workspace_user',
     role: headerRole || 'admin',
-    orgId: null,
+    orgId: headerOrgId,
   };
 }
 
@@ -2123,6 +2143,99 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       subscriptionStatus: evaluated.subscription.subscriptionStatus,
       planId: evaluated.subscription.planId,
     });
+  });
+
+  // 7. Admin Plan Assignment — assign a paid plan to an org without payment
+  app.post('/api/subscriptions/assign-plan', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    const callerRole = auth.ok ? auth.role : 'admin';
+    if (callerRole !== 'admin') {
+      res.status(403).json({ error: 'Only admins can assign plans.' });
+      return;
+    }
+
+    const { orgId, planId, billingCycle = 'annual' } = req.body as {
+      orgId?: string;
+      planId?: string;
+      billingCycle?: BillingCycle;
+    };
+
+    if (!orgId) {
+      res.status(400).json({ error: 'orgId is required.' });
+      return;
+    }
+    if (!planId || !['growth', 'scale', 'enterprise', 'free_trial'].includes(planId)) {
+      res.status(400).json({ error: 'planId must be growth, scale, enterprise, or free_trial.' });
+      return;
+    }
+
+    const cycle: BillingCycle = billingCycle === 'monthly' ? 'monthly' : 'annual';
+    const now = new Date();
+    const sub = ensureAccountSubscription(orgId, '');
+
+    if (planId === 'free_trial') {
+      sub.planId = 'free_trial';
+      sub.subscriptionStatus = 'trialing';
+      sub.paidActivatedAt = null;
+      sub.currentPeriodEndsAt = null;
+    } else {
+      sub.planId = planId as PlanId;
+      sub.billingCycle = cycle;
+      sub.subscriptionStatus = 'active';
+      sub.paidActivatedAt = now.toISOString();
+      sub.currentPeriodEndsAt = new Date(
+        now.getTime() + (cycle === 'annual' ? 365 : 30) * 86_400_000
+      ).toISOString();
+    }
+    sub.updatedAt = now.toISOString();
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true, subscription: sub });
+  });
+
+  // 8. Get plan for a specific org (by orgId query param)
+  app.get('/api/subscriptions/org-plan', async (req, res) => {
+    const orgId = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+    if (!orgId) {
+      res.status(400).json({ error: 'orgId query param is required.' });
+      return;
+    }
+    const sub = enterpriseStore.subscriptions[orgId] || null;
+    res.json({
+      ok: true,
+      orgId,
+      subscription: sub,
+      planId: sub?.planId || 'free_trial',
+      planName: sub?.planId && sub.planId !== 'free_trial'
+        ? (SUBSCRIPTION_PLANS.find((p) => p.id === sub.planId)?.name || sub.planId)
+        : 'Free Trial',
+      subscriptionStatus: sub?.subscriptionStatus || 'trialing',
+    });
+  });
+
+  // 9. List all org plans (admin only)
+  app.get('/api/subscriptions/all-plans', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    const callerRole = auth.ok ? auth.role : 'admin';
+    if (callerRole !== 'admin') {
+      res.status(403).json({ error: 'Only admins can view all plans.' });
+      return;
+    }
+
+    const plans = Object.values(enterpriseStore.subscriptions).map((sub) => ({
+      orgId: sub.accountId,
+      orgName: sub.accountName,
+      planId: sub.planId,
+      planName: sub.planId !== 'free_trial'
+        ? (SUBSCRIPTION_PLANS.find((p) => p.id === sub.planId)?.name || sub.planId)
+        : 'Free Trial',
+      subscriptionStatus: sub.subscriptionStatus,
+      billingCycle: sub.billingCycle,
+      paidActivatedAt: sub.paidActivatedAt,
+      currentPeriodEndsAt: sub.currentPeriodEndsAt,
+    }));
+
+    res.json({ ok: true, plans });
   });
 
   // Unified guarded endpoint for the 5 allowed suggestion/screening features + general staffing help chat
@@ -4188,6 +4301,522 @@ Return JSON array of objects with fields: targetSkill, question.`;
     }
     const result = await runSheetPullSync();
     res.status(result.ok ? 200 : 500).json(result);
+  });
+
+  // ==========================================================================
+  // DEAL ROOM API
+  // ==========================================================================
+
+  // List all Deal Rooms the caller can access
+  app.get('/api/deal-rooms', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+
+    const allRooms = Object.values(enterpriseStore.dealRooms || {}) as Array<Record<string, unknown>>;
+    const isHq = auth.role === 'admin' || auth.role === 'recruiter';
+    const isClient = auth.role === 'client_manager' || auth.role === 'client_member';
+    const isVendor = auth.role === 'vendor_admin' || auth.role === 'vendor_recruiter';
+
+    const filtered = allRooms.filter((r) => {
+      if (isHq) return true;
+      if (isClient && r.clientOrgId === auth.orgId) return true;
+      if (isVendor && r.vendorOrgId === auth.orgId) return true;
+      return false;
+    });
+
+    // Mask org names for external participants
+    const masked = filtered.map((r) => {
+      if (isHq) return r;
+      if (isClient) return { ...r, vendorOrgName: null, vendorOrgId: '' };
+      if (isVendor) return { ...r, clientOrgName: 'Client Organization', clientOrgId: '' };
+      return r;
+    });
+
+    res.json({ ok: true, rooms: masked });
+  });
+
+  // Get a single Deal Room with all its data
+  app.get('/api/deal-rooms/:roomId', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+
+    const roomId = req.params.roomId;
+    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
+
+    const isHq = auth.role === 'admin' || auth.role === 'recruiter';
+    const isClient = auth.role === 'client_manager' || auth.role === 'client_member';
+    const isVendor = auth.role === 'vendor_admin' || auth.role === 'vendor_recruiter';
+
+    if (!isHq) {
+      if (isClient && room.clientOrgId !== auth.orgId) { res.status(403).json({ error: 'Access denied' }); return; }
+      if (isVendor && room.vendorOrgId !== auth.orgId) { res.status(403).json({ error: 'Access denied' }); return; }
+      if (!isClient && !isVendor) { res.status(403).json({ error: 'Access denied' }); return; }
+    }
+
+    // Mask room data
+    let maskedRoom = room;
+    if (isClient) maskedRoom = { ...room, vendorOrgName: null, vendorOrgId: '' };
+    if (isVendor) maskedRoom = { ...room, clientOrgName: 'Client Organization', clientOrgId: '' };
+
+    const messages = (enterpriseStore.dealRoomMessages?.[roomId] || []) as Array<Record<string, unknown>>;
+    const participants = (enterpriseStore.dealRoomParticipants?.[roomId] || []) as Array<Record<string, unknown>>;
+    const contactRequests = (enterpriseStore.dealRoomContactRequests?.[roomId] || []) as Array<Record<string, unknown>>;
+    const auditEvents = (enterpriseStore.dealRoomAuditEvents?.[roomId] || []) as Array<Record<string, unknown>>;
+
+    // Filter out blocked messages for non-admin
+    const filteredMessages = isHq
+      ? messages
+      : messages.filter((m) => m.moderationStatus !== 'blocked');
+
+    // Filter contact requests: non-admin only sees their own
+    const filteredContactRequests = isHq
+      ? contactRequests
+      : contactRequests.filter((cr) => cr.requestedBy === auth.userId);
+
+    res.json({
+      ok: true,
+      room: maskedRoom,
+      participants: participants.filter((p) => p.status === 'active'),
+      messages: filteredMessages,
+      contactRequests: filteredContactRequests,
+      auditEvents: isHq ? auditEvents : [],
+    });
+  });
+
+  // Create a Deal Room (admin only, or auto-triggered)
+  app.post('/api/deal-rooms/create', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+
+    const { submissionId, reason } = req.body || {};
+    if (!submissionId) { res.status(400).json({ error: 'submissionId is required' }); return; }
+
+    // Check if room already exists for this submission
+    const existing = Object.values(enterpriseStore.dealRooms || {}).find(
+      (r: any) => r.submissionId === submissionId
+    );
+    if (existing) { res.json({ ok: true, room: existing, existing: true }); return; }
+
+    // Fetch submission data from Supabase to build the room
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    let submissionData: Record<string, unknown> | null = null;
+    if (supabaseUrl && serviceRoleKey && supabaseUrl !== 'https://your-project-id.supabase.co') {
+      try {
+        const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { data } = await adminClient
+          .from('submissions')
+          .select('*, candidates(id, full_name), requirements(id, title, client_org_id, organizations(id, name)), organizations(id, name)')
+          .eq('id', submissionId)
+          .single();
+        submissionData = data;
+      } catch { /* fallback below */ }
+    }
+
+    const roomId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    const room: Record<string, unknown> = {
+      id: roomId,
+      submissionId,
+      requirementId: (submissionData as any)?.requirement_id || '',
+      candidateId: (submissionData as any)?.candidate_id || '',
+      candidateName: (submissionData as any)?.candidates?.full_name || 'Candidate',
+      requirementTitle: (submissionData as any)?.requirements?.title || 'Requirement',
+      clientOrgId: (submissionData as any)?.requirements?.client_org_id || '',
+      clientOrgName: (submissionData as any)?.requirements?.organizations?.name || 'Client',
+      vendorOrgId: (submissionData as any)?.vendor_org_id || null,
+      vendorOrgName: (submissionData as any)?.organizations?.name || null,
+      assignedAdminId: auth.role === 'admin' ? auth.userId : null,
+      assignedRecruiterId: auth.role === 'recruiter' ? auth.userId : null,
+      status: 'active',
+      openedAt: now,
+      closedAt: null,
+      closureReason: null,
+      createdBy: auth.userId,
+      createdByName: auth.role,
+      currentStage: (submissionData as any)?.stage || 'interviewing',
+    };
+
+    enterpriseStore.dealRooms[roomId] = room;
+
+    // Auto-add participants
+    const participants: Array<Record<string, unknown>> = [];
+    const addPart = (type: string, userId: string, orgId: string | null) => {
+      const labels: Record<string, string> = {
+        admin: 'HireNest Admin', recruiter: 'HireNest Recruiter',
+        client: 'Client Representative', vendor: 'Vendor Representative',
+      };
+      participants.push({
+        id: crypto.randomUUID(),
+        dealRoomId: roomId, userId, orgId,
+        participantType: type,
+        displayLabel: labels[type] || type,
+        status: 'active',
+        invitedAt: now, joinedAt: now, revokedAt: null,
+      });
+    };
+
+    addPart(auth.role === 'recruiter' ? 'recruiter' : 'admin', auth.userId, null);
+    enterpriseStore.dealRoomParticipants[roomId] = participants;
+    enterpriseStore.dealRoomMessages[roomId] = [];
+    enterpriseStore.dealRoomContactRequests[roomId] = [];
+
+    // Audit event
+    const auditEvent = {
+      id: crypto.randomUUID(), dealRoomId: roomId,
+      actorId: auth.userId, actorName: auth.role, actorRole: auth.role,
+      eventType: 'room_created',
+      metadata: { submissionId, reason: reason || 'Auto-opened after interview selection' },
+      timestamp: now,
+    };
+    enterpriseStore.dealRoomAuditEvents[roomId] = [auditEvent];
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true, room });
+  });
+
+  // Close a Deal Room
+  app.post('/api/deal-rooms/:roomId/close', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+    if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can close a Deal Room' }); return; }
+
+    const roomId = req.params.roomId;
+    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
+
+    const { reason } = req.body || {};
+    if (!reason) { res.status(400).json({ error: 'Closure reason is required' }); return; }
+
+    const now = new Date().toISOString();
+    room.status = 'closed';
+    room.closedAt = now;
+    room.closureReason = reason;
+    enterpriseStore.dealRooms[roomId] = room;
+
+    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
+    events.push({
+      id: crypto.randomUUID(), dealRoomId: roomId,
+      actorId: auth.userId, actorName: auth.role, actorRole: auth.role,
+      eventType: 'room_closed', metadata: { reason }, timestamp: now,
+    });
+    enterpriseStore.dealRoomAuditEvents[roomId] = events;
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true });
+  });
+
+  // Reopen a Deal Room
+  app.post('/api/deal-rooms/:roomId/reopen', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+    if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can reopen a Deal Room' }); return; }
+
+    const roomId = req.params.roomId;
+    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
+
+    const now = new Date().toISOString();
+    room.status = 'active';
+    room.closedAt = null;
+    room.closureReason = null;
+    enterpriseStore.dealRooms[roomId] = room;
+
+    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
+    events.push({
+      id: crypto.randomUUID(), dealRoomId: roomId,
+      actorId: auth.userId, actorName: auth.role, actorRole: auth.role,
+      eventType: 'room_reopened', metadata: {}, timestamp: now,
+    });
+    enterpriseStore.dealRoomAuditEvents[roomId] = events;
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true });
+  });
+
+  // Send a message (with contact leakage detection)
+  app.post('/api/deal-rooms/:roomId/messages', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+
+    const roomId = req.params.roomId;
+    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
+    if (room.status === 'closed') { res.status(400).json({ error: 'Deal Room is closed' }); return; }
+
+    // Access check
+    const isHq = auth.role === 'admin' || auth.role === 'recruiter';
+    const isClient = auth.role === 'client_manager' || auth.role === 'client_member';
+    const isVendor = auth.role === 'vendor_admin' || auth.role === 'vendor_recruiter';
+    if (!isHq && !(isClient && room.clientOrgId === auth.orgId) && !(isVendor && room.vendorOrgId === auth.orgId)) {
+      res.status(403).json({ error: 'Access denied' }); return;
+    }
+
+    const { content, attachmentUrl, attachmentName } = req.body || {};
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      res.status(400).json({ error: 'Message content is required' }); return;
+    }
+
+    // Contact leakage detection
+    const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
+    const PHONE_RE = /(?:\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/;
+    const WHATSAPP_RE = /whatsapp|wa\.me|chat\.whatsapp/i;
+    const hasEmail = EMAIL_RE.test(content);
+    const hasPhone = PHONE_RE.test(content);
+    const hasWhatsApp = WHATSAPP_RE.test(content);
+
+    let moderationStatus = 'clean';
+    let moderationNote: string | null = null;
+
+    if (!isHq && (hasEmail || hasPhone)) {
+      moderationStatus = 'blocked';
+      moderationNote = 'Message blocked: contains contact information (email or phone number). Use the "Request Contact Details" feature instead.';
+      const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
+      events.push({
+        id: crypto.randomUUID(), dealRoomId: roomId,
+        actorId: auth.userId, actorName: auth.role, actorRole: auth.role,
+        eventType: 'message_blocked',
+        metadata: { hasEmail, hasPhone, preview: content.slice(0, 100) },
+        timestamp: new Date().toISOString(),
+      });
+      enterpriseStore.dealRoomAuditEvents[roomId] = events;
+      saveEnterpriseStore(enterpriseStore);
+
+      res.status(400).json({
+        error: 'Message blocked: sharing contact information (email addresses, phone numbers) is not permitted in the Deal Room. Please use the "Request Contact Details" feature to request information through HireNest Admin.',
+        moderationStatus: 'blocked',
+      });
+      return;
+    }
+
+    if (!isHq && hasWhatsApp) {
+      moderationStatus = 'flagged';
+      moderationNote = 'Message flagged: contains reference to external messaging platform.';
+    }
+
+    // Admin override: allow everything
+    if (isHq) {
+      moderationStatus = 'clean';
+      moderationNote = null;
+    }
+
+    const participantType = isHq ? (auth.role === 'admin' ? 'admin' : 'recruiter') : isClient ? 'client' : 'vendor';
+    const displayLabels: Record<string, string> = {
+      admin: 'HireNest Admin', recruiter: 'HireNest Recruiter',
+      client: 'Client Representative', vendor: 'Vendor Representative',
+    };
+
+    const now = new Date().toISOString();
+    const message: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      dealRoomId: roomId,
+      senderUserId: auth.userId,
+      senderDisplayLabel: displayLabels[participantType],
+      senderParticipantType: participantType,
+      content: content.trim(),
+      attachmentUrl: attachmentUrl || null,
+      attachmentName: attachmentName || null,
+      moderationStatus,
+      moderationNote,
+      createdAt: now,
+      editedAt: null,
+    };
+
+    const messages = enterpriseStore.dealRoomMessages[roomId] || [];
+    messages.push(message);
+    enterpriseStore.dealRoomMessages[roomId] = messages;
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true, message });
+  });
+
+  // Poll messages since a timestamp
+  app.get('/api/deal-rooms/:roomId/messages', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+
+    const roomId = req.params.roomId;
+    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
+
+    const isHq = auth.role === 'admin' || auth.role === 'recruiter';
+    const since = typeof req.query.since === 'string' ? req.query.since : '';
+    const allMessages = (enterpriseStore.dealRoomMessages?.[roomId] || []) as Array<Record<string, unknown>>;
+
+    let filtered = isHq ? allMessages : allMessages.filter((m) => m.moderationStatus !== 'blocked');
+    if (since) {
+      filtered = filtered.filter((m) => String(m.createdAt) > since);
+    }
+
+    res.json({ ok: true, messages: filtered });
+  });
+
+  // Submit a contact detail request
+  app.post('/api/deal-rooms/:roomId/contact-requests', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+
+    const roomId = req.params.roomId;
+    const room = enterpriseStore.dealRooms?.[roomId] as Record<string, unknown> | undefined;
+    if (!room) { res.status(404).json({ error: 'Deal Room not found' }); return; }
+
+    const { contactType, reason } = req.body || {};
+    if (!contactType || !reason) { res.status(400).json({ error: 'contactType and reason are required' }); return; }
+
+    const isHq = auth.role === 'admin' || auth.role === 'recruiter';
+    const isClient = auth.role === 'client_manager' || auth.role === 'client_member';
+    const isVendor = auth.role === 'vendor_admin' || auth.role === 'vendor_recruiter';
+    const participantType = isHq ? 'admin' : isClient ? 'client' : isVendor ? 'vendor' : 'admin';
+
+    const now = new Date().toISOString();
+    const request: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      dealRoomId: roomId,
+      requestedBy: auth.userId,
+      requestedByName: participantType,
+      requestedByType: participantType,
+      contactType,
+      reason,
+      status: 'pending',
+      approvedBy: null,
+      approvedByName: null,
+      disclosureChannel: null,
+      respondedAt: null,
+      createdAt: now,
+    };
+
+    const requests = enterpriseStore.dealRoomContactRequests[roomId] || [];
+    requests.push(request);
+    enterpriseStore.dealRoomContactRequests[roomId] = requests;
+
+    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
+    events.push({
+      id: crypto.randomUUID(), dealRoomId: roomId,
+      actorId: auth.userId, actorName: participantType, actorRole: auth.role,
+      eventType: 'contact_request_submitted',
+      metadata: { contactType, reason },
+      timestamp: now,
+    });
+    enterpriseStore.dealRoomAuditEvents[roomId] = events;
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true, request });
+  });
+
+  // Respond to a contact detail request (admin only)
+  app.post('/api/deal-rooms/:roomId/contact-requests/:requestId/respond', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+    if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can respond to contact requests' }); return; }
+
+    const { roomId, requestId } = req.params;
+    const requests = (enterpriseStore.dealRoomContactRequests?.[roomId] || []) as Array<Record<string, unknown>>;
+    const request = requests.find((r) => r.id === requestId);
+    if (!request) { res.status(404).json({ error: 'Contact request not found' }); return; }
+
+    const { status, disclosureChannel } = req.body || {};
+    if (status !== 'approved' && status !== 'rejected') {
+      res.status(400).json({ error: 'status must be approved or rejected' }); return;
+    }
+
+    const now = new Date().toISOString();
+    request.status = status;
+    request.approvedBy = auth.userId;
+    request.approvedByName = 'HireNest Admin';
+    request.disclosureChannel = disclosureChannel || null;
+    request.respondedAt = now;
+
+    enterpriseStore.dealRoomContactRequests[roomId] = requests;
+
+    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
+    events.push({
+      id: crypto.randomUUID(), dealRoomId: roomId,
+      actorId: auth.userId, actorName: 'HireNest Admin', actorRole: auth.role,
+      eventType: status === 'approved' ? 'contact_request_approved' : 'contact_request_rejected',
+      metadata: { requestId, contactType: request.contactType, disclosureChannel },
+      timestamp: now,
+    });
+    enterpriseStore.dealRoomAuditEvents[roomId] = events;
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true });
+  });
+
+  // Add participant (admin only)
+  app.post('/api/deal-rooms/:roomId/participants', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+    if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can manage participants' }); return; }
+
+    const roomId = req.params.roomId;
+    const { userId, participantType } = req.body || {};
+    if (!userId || !participantType) { res.status(400).json({ error: 'userId and participantType are required' }); return; }
+
+    const displayLabels: Record<string, string> = {
+      admin: 'HireNest Admin', recruiter: 'HireNest Recruiter',
+      client: 'Client Representative', vendor: 'Vendor Representative',
+    };
+
+    const now = new Date().toISOString();
+    const participant = {
+      id: crypto.randomUUID(),
+      dealRoomId: roomId, userId, orgId: null,
+      participantType,
+      displayLabel: displayLabels[participantType] || participantType,
+      status: 'active',
+      invitedAt: now, joinedAt: now, revokedAt: null,
+    };
+
+    const participants = enterpriseStore.dealRoomParticipants[roomId] || [];
+    participants.push(participant);
+    enterpriseStore.dealRoomParticipants[roomId] = participants;
+
+    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
+    events.push({
+      id: crypto.randomUUID(), dealRoomId: roomId,
+      actorId: auth.userId, actorName: 'HireNest Admin', actorRole: auth.role,
+      eventType: 'participant_added',
+      metadata: { userId, participantType },
+      timestamp: now,
+    });
+    enterpriseStore.dealRoomAuditEvents[roomId] = events;
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true, participant });
+  });
+
+  // Remove participant (admin only)
+  app.post('/api/deal-rooms/:roomId/participants/:participantId/remove', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req);
+    if (!auth.ok) { res.status(auth.status).json({ error: auth.message }); return; }
+    if (auth.role !== 'admin') { res.status(403).json({ error: 'Only admin can manage participants' }); return; }
+
+    const { roomId, participantId } = req.params;
+    const participants = (enterpriseStore.dealRoomParticipants?.[roomId] || []) as Array<Record<string, unknown>>;
+    const participant = participants.find((p) => p.id === participantId);
+    if (!participant) { res.status(404).json({ error: 'Participant not found' }); return; }
+
+    participant.status = 'removed';
+    participant.revokedAt = new Date().toISOString();
+    enterpriseStore.dealRoomParticipants[roomId] = participants;
+
+    const events = enterpriseStore.dealRoomAuditEvents[roomId] || [];
+    events.push({
+      id: crypto.randomUUID(), dealRoomId: roomId,
+      actorId: auth.userId, actorName: 'HireNest Admin', actorRole: auth.role,
+      eventType: 'participant_removed',
+      metadata: { participantId, userId: participant.userId },
+      timestamp: new Date().toISOString(),
+    });
+    enterpriseStore.dealRoomAuditEvents[roomId] = events;
+    saveEnterpriseStore(enterpriseStore);
+
+    res.json({ ok: true });
   });
 
   app.get('/api/health', (_req, res) => {
