@@ -4595,13 +4595,36 @@ Return JSON array of objects with fields: targetSkill, question.`;
               .map((s) => s.trim())
               .filter(Boolean);
 
+        // The sheet must not reopen a requirement that was closed / put on hold / filled in the app.
+        // Sheet "open"/"draft" never overrides such a status; sheet "closed"/"on_hold"/"filled" still applies.
+        const incomingStatus = String(row?.status || 'draft');
+        const { data: existingReq } = await adminClient
+          .from('requirements')
+          .select('status, description')
+          .eq('external_ref', externalRef)
+          .maybeSingle();
+        // Keep the sheet's "Additional information" notes on the description even if the script omits them.
+        let finalDescription = description;
+        const notesFromRow = String(row?.notes || '').trim();
+        if (notesFromRow && !finalDescription.includes('Additional information:')) {
+          finalDescription = `${finalDescription}\n\nAdditional information:\n${notesFromRow}`;
+        } else if (!notesFromRow && !finalDescription.includes('Additional information:')) {
+          const keep = String(existingReq?.description || '').match(/Additional information:[\s\S]*$/);
+          if (keep) finalDescription = `${finalDescription}\n\n${keep[0]}`;
+        }
+        const platformManaged = ['closed', 'on_hold', 'filled', 'cancelled'];
+        const keepExistingStatus =
+          !!existingReq &&
+          platformManaged.includes(String(existingReq.status)) &&
+          (incomingStatus === 'open' || incomingStatus === 'draft');
+
         const { error: upsertErr } = await adminClient.from('requirements').upsert(
           {
             external_ref: externalRef,
             client_org_id: org.id,
             created_by: adminProfile.id,
             title,
-            description,
+            description: finalDescription,
             skills,
             min_experience: row?.minExperience != null ? Number(row.minExperience) : null,
             max_experience: row?.maxExperience != null ? Number(row.maxExperience) : null,
@@ -4611,7 +4634,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
             openings: row?.openings != null ? Number(row.openings) : 1,
             vendor_visible_budget: row?.budget != null ? Number(row.budget) : null,
             currency: row?.currency ? String(row.currency) : 'INR',
-            status: row?.status || 'draft',
+            ...(keepExistingStatus ? {} : { status: incomingStatus }),
           },
           { onConflict: 'external_ref' },
         );
@@ -4630,7 +4653,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
   });
 
   // Core sheet sync logic (shared by cron and manual trigger)
-  async function runSheetPullSync(): Promise<{ ok: boolean; synced: number; skipped: number; totalRowsProcessed: number; skippedDetails?: Array<{ ref: string; reason: string }>; error?: string; timestamp: string }> {
+  async function runSheetPullSync(): Promise<{ ok: boolean; synced: number; skipped: number; totalRowsProcessed: number; skippedDetails?: Array<{ ref: string; reason: string }>; jdBackfilled?: number; error?: string; timestamp: string }> {
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const sheetId = process.env.GOOGLE_SHEET_ID;
@@ -4795,6 +4818,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
       // Collect all rows from all tabs first
       const pendingRows: Array<Record<string, any>> = [];
+      const jdBackfill: Array<{ ref: string; jd: string; notes: string }> = [];
 
       for (const tabConfig of TABS) {
         if (!sheetNames.includes(tabConfig.name)) continue;
@@ -4814,6 +4838,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
         const colLocation = findCol(headers, 'Location');
         const colStatus = findCol(headers, 'Status');
         const colEngagement = findCol(headers, 'Engagement');
+        const colNotes = findCol(headers, 'Additional/Important information');
 
         if (colTitle < 0) continue;
 
@@ -4822,6 +4847,29 @@ Return JSON array of objects with fields: targetSkill, question.`;
         )?.properties?.sheetId ?? 0;
 
         const isPublicActiveTab = tabConfig.name === 'Public Active Requirements';
+
+        // The values API returns only a hyperlinked cell's label, so read the real link separately.
+        const jdLinks: Record<number, string> = {};
+        if (colJd >= 0) {
+          try {
+            let n = colJd;
+            let col = '';
+            do {
+              col = String.fromCharCode(65 + (n % 26)) + col;
+              n = Math.floor(n / 26) - 1;
+            } while (n >= 0);
+            const grid = await sheetsGet(
+              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?ranges=${encodeURIComponent(`'${tabConfig.name}'!${col}1:${col}`)}&fields=sheets.data.rowData.values.hyperlink`,
+            );
+            const rowData = grid.sheets?.[0]?.data?.[0]?.rowData || [];
+            rowData.forEach((r: any, idx: number) => {
+              const u = r?.values?.[0]?.hyperlink;
+              if (u) jdLinks[idx] = String(u);
+            });
+          } catch {
+            // Fall back to the cell text only
+          }
+        }
 
         for (let i = 1; i < allRows.length; i++) {
           const row = allRows[i];
@@ -4834,12 +4882,20 @@ Return JSON array of objects with fields: targetSkill, question.`;
           const budgetText = colBudget >= 0 ? String(row[colBudget] || '') : '';
           const exp = parseExperience(experienceText);
           const budget = parseBudget(budgetText);
-          const jdLink = colJd >= 0 ? String(row[colJd] || '') : '';
+          const jdCell = colJd >= 0 ? String(row[colJd] || '').trim() : '';
+          const jdUrl = jdLinks[i] || (/^https?:\/\//.test(jdCell) ? jdCell : '');
+          const jdPieces: string[] = [];
+          if (jdUrl) jdPieces.push('JD: ' + jdUrl);
+          if (jdCell && jdCell !== jdUrl && jdCell.length > 15) jdPieces.push(jdCell);
+          const jdBlock = jdPieces.join('\n\n');
+          const notesText = colNotes >= 0 ? String(row[colNotes] || '').trim() : '';
+          if (jdBlock || notesText) jdBackfill.push({ ref: externalRef, jd: jdBlock, notes: notesText });
 
           const descriptionParts: string[] = [];
-          if (jdLink && /^https?:\/\//.test(jdLink)) descriptionParts.push('JD: ' + jdLink);
+          if (jdBlock) descriptionParts.push(jdBlock);
           if (experienceText) descriptionParts.push('Experience (as entered): ' + experienceText);
           if (budgetText) descriptionParts.push('Budget (as entered): ' + budgetText);
+          if (notesText) descriptionParts.push('Additional information:\n' + notesText);
           let description = descriptionParts.join('\n\n').trim();
           if (description.length < 20) {
             description = (description + `\n\n(Imported from "${tabConfig.name}" tab, row ${i + 1}.)`).trim();
@@ -4900,12 +4956,40 @@ Return JSON array of objects with fields: targetSkill, question.`;
         });
       }
 
+      // Existing rows are skipped above, so add the JD and sheet notes to ones that never got them
+      // (description only, status untouched).
+      let jdBackfilled = 0;
+      for (let i = 0; i < jdBackfill.length; i += 100) {
+        const chunk = jdBackfill.slice(i, i + 100);
+        const { data: existing } = await adminClient
+          .from('requirements')
+          .select('external_ref, description')
+          .in('external_ref', chunk.map((c) => c.ref));
+        const byRef = new Map(chunk.map((c) => [c.ref, c]));
+        for (const r of existing || []) {
+          const item = byRef.get(String(r.external_ref));
+          if (!item) continue;
+          const current = String(r.description || '');
+          let next = current;
+          if (item.jd && !/(^|\n)JD:/.test(next) && !next.includes(item.jd)) next = `${item.jd}\n\n${next}`;
+          if (item.notes && !next.includes('Additional information:')) next = `${next}\n\nAdditional information:\n${item.notes}`;
+          next = next.trim();
+          if (next === current.trim()) continue;
+          const { error: updErr } = await adminClient
+            .from('requirements')
+            .update({ description: next })
+            .eq('external_ref', r.external_ref);
+          if (!updErr) jdBackfilled++;
+        }
+      }
+
       return {
         ok: true,
         synced: synced.length,
         skipped: skipped.length,
         totalRowsProcessed: totalRows,
         skippedDetails: skipped.length > 0 ? skipped.slice(0, 10) : undefined,
+        jdBackfilled,
         timestamp: new Date().toISOString(),
       };
     } catch (err) {
@@ -5465,7 +5549,12 @@ async function buildJobOgHtml(slug: string, baseHtml: string): Promise<string> {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
     const title = `${job.title} - ${job.client_org_name || 'HireNest'}`;
-    const desc = (job.description || '').slice(0, 200);
+    const desc = String(job.description || '')
+      .split(/\n*Additional information:/)[0]
+      .replace(/JD:\s*https?:\/\/\S+/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
     const url = `/jobs/${encodeURIComponent(slug)}`;
     const ogBlock = `
     <title>${esc(title)}</title>

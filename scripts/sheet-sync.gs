@@ -153,6 +153,7 @@ function buildRowPayload(sheet, tabConfig, rowNum, includeJdText) {
   var colLocation = findCol(headers, 'Location');
   var colStatus = findCol(headers, 'Status');
   var colEngagement = findCol(headers, 'Engagement');
+  var colNotes = findCol(headers, 'Additional/Important information');
 
   var title = colTitle >= 0 ? String(values[colTitle] || '').trim() : '';
   var experienceText = colExperience >= 0 ? values[colExperience] : '';
@@ -171,6 +172,7 @@ function buildRowPayload(sheet, tabConfig, rowNum, includeJdText) {
   }
   if (experienceText) descriptionParts.push('Experience (as entered): ' + experienceText);
   if (budgetText) descriptionParts.push('Budget (as entered): ' + budgetText);
+  var notes = colNotes >= 0 ? String(values[colNotes] || '').trim() : '';
   var description = descriptionParts.join('\n\n').trim();
   if (description.length < 20) {
     description = (description + '\n\n(Imported from "' + tabConfig.name + '" tab, row ' + rowNum + '.)').trim();
@@ -180,6 +182,7 @@ function buildRowPayload(sheet, tabConfig, rowNum, includeJdText) {
     externalRef: sheet.getSheetId() + '-' + rowNum,
     title: title,
     description: description,
+    notes: notes,
     minExperience: exp.min,
     maxExperience: exp.max,
     location: colLocation >= 0 ? String(values[colLocation] || '').trim() || null : null,

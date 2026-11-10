@@ -1,3 +1,4 @@
+import { parseJobDescription } from '../../lib/jobDescription';
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1509,13 +1510,28 @@ export const HqRequirementDetailPage: React.FC = () => {
                   Description
                 </h3>
                 {(() => {
-                  const gdocMatch = req.description?.match(/https:\/\/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
-                  const descText = req.description?.replace(/https:\/\/docs\.google\.com\/document\/d\/[^\s]+/g, '').trim();
+                  const parsed = parseJobDescription(req.description);
+                  const gdocMatch = parsed.docId ? [parsed.docUrl as string, parsed.docId] : null;
+                  const descText = parsed.body;
                   return (
                     <>
                       {descText && (
                         <p className="text-[14px] leading-[20px] text-[var(--text-primary)] whitespace-pre-line">
-                          {descText}
+                          {descText.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                            /^https?:\/\//.test(part) ? (
+                              <a
+                                key={i}
+                                href={part}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[var(--accent)] hover:underline break-all"
+                              >
+                                {part}
+                              </a>
+                            ) : (
+                              part
+                            ),
+                          )}
                         </p>
                       )}
                       {gdocMatch && (
@@ -1539,7 +1555,17 @@ export const HqRequirementDetailPage: React.FC = () => {
                           />
                         </div>
                       )}
-                      {!descText && !gdocMatch && (
+                      {parsed.notes && (
+                        <div className="mt-3 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2.5">
+                          <div className="text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)] mb-1">
+                            Additional information
+                          </div>
+                          <p className="text-[14px] leading-[20px] text-[var(--text-primary)] whitespace-pre-line">
+                            {parsed.notes}
+                          </p>
+                        </div>
+                      )}
+                      {!descText && !gdocMatch && !parsed.notes && (
                         <p className="text-[14px] leading-[20px] text-[var(--text-tertiary)] italic">
                           No description provided.
                         </p>

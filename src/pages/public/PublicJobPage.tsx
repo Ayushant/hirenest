@@ -16,6 +16,7 @@ import { fetchPublicJob } from '../../api/publicJobs';
 import { useAuth } from '../../auth/AuthProvider';
 import { applyToRequirementRpc } from '../../api/submissions';
 import { supabase } from '../../lib/supabase';
+import { parseJobDescription } from '../../lib/jobDescription';
 import { mapSupabaseError } from '../../lib/errors';
 import { Button, Card, Badge, Dialog, Input } from '../../components/ui/kit';
 
@@ -284,14 +285,86 @@ export const PublicJobPage: React.FC = () => {
           >
             About the role
           </h2>
-          <Card className="p-6 sm:p-8">
-            <p
-              className="whitespace-pre-wrap text-base leading-relaxed"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {job.description}
-            </p>
-          </Card>
+          {(() => {
+            const parsed = parseJobDescription(job.description);
+            return (
+              <>
+                {parsed.body && (
+                  <Card className="p-6 sm:p-8">
+                    <p
+                      className="whitespace-pre-wrap text-base leading-relaxed"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {parsed.body.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                        /^https?:\/\//.test(part) ? (
+                          <a
+                            key={i}
+                            href={part}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline break-all"
+                          >
+                            {part}
+                          </a>
+                        ) : (
+                          part
+                        ),
+                      )}
+                    </p>
+                  </Card>
+                )}
+                {parsed.docId && (
+                  <Card className="overflow-hidden">
+                    <div
+                      className="flex items-center justify-between px-4 py-2 border-b"
+                      style={{ borderColor: 'var(--border)' }}
+                    >
+                      <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        Job description
+                      </span>
+                      <a
+                        href={parsed.docUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm underline"
+                      >
+                        Open in new tab ↗
+                      </a>
+                    </div>
+                    <iframe
+                      src={`https://docs.google.com/document/d/${parsed.docId}/preview`}
+                      className="w-full border-0"
+                      style={{ height: '600px' }}
+                      title="Job description"
+                    />
+                  </Card>
+                )}
+                {parsed.notes && (
+                  <Card className="p-6 sm:p-8">
+                    <h3
+                      className="text-xs font-semibold uppercase tracking-wider mb-2"
+                      style={{ color: 'var(--text-tertiary)' }}
+                    >
+                      Additional information
+                    </h3>
+                    <p
+                      className="whitespace-pre-wrap text-base leading-relaxed"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {parsed.notes}
+                    </p>
+                  </Card>
+                )}
+                {!parsed.body && !parsed.docId && !parsed.notes && (
+                  <Card className="p-6 sm:p-8">
+                    <p className="text-base" style={{ color: 'var(--text-tertiary)' }}>
+                      Details for this role are available on request.
+                    </p>
+                  </Card>
+                )}
+              </>
+            );
+          })()}
         </section>
 
         {/* Skills */}
