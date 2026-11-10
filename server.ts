@@ -341,6 +341,18 @@ function saveEnterpriseStore(store: EnterpriseServerStore): void {
 
 const enterpriseStore = loadEnterpriseStore();
 
+// Supabase admin client for subscription DB operations
+function getSupabaseAdmin() {
+  const url = process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key || url === 'https://your-project-id.supabase.co') {
+    return null;
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 // In-memory concurrency mutex for idempotent requirement creation so simultaneous requests cannot race
 const inFlightFingerprintLocks = new Map<
   string,
@@ -352,10 +364,64 @@ const inFlightFingerprintLocks = new Map<
   }>
 >();
 
-function ensureAccountSubscription(
+async function ensureAccountSubscription(
   accountId: string,
   accountName = 'HireNest Workspace'
-): AccountSubscriptionRecord {
+): Promise<AccountSubscriptionRecord> {
+  const sb = getSupabaseAdmin();
+
+  if (sb) {
+    const { data: existing } = await sb
+      .from('account_subscriptions')
+      .select('*')
+      .eq('account_id', accountId)
+      .single();
+
+    if (existing) {
+      const record = dbRowToSubscription(existing);
+      if (accountName && accountName !== '' && record.accountName === 'HireNest Workspace') {
+        record.accountName = accountName;
+        await sb.from('account_subscriptions').update({ account_name: accountName }).eq('account_id', accountId);
+      }
+      return record;
+    }
+
+    const now = new Date();
+    const startedAt = now.toISOString();
+    const endsAt = new Date(now.getTime() + 14 * 86_400_000).toISOString();
+
+    const newRow = {
+      account_id: accountId,
+      account_name: accountName || 'HireNest Workspace',
+      plan_id: 'free_trial',
+      billing_cycle: 'annual',
+      subscription_status: 'trialing',
+      trial_duration_days: 14,
+      trial_started_at: startedAt,
+      trial_ends_at: endsAt,
+      paid_activated_at: null,
+      current_period_ends_at: null,
+      updated_at: startedAt,
+    };
+
+    await sb.from('account_subscriptions').insert(newRow);
+
+    return {
+      accountId,
+      accountName: accountName || 'HireNest Workspace',
+      planId: 'free_trial',
+      billingCycle: 'annual',
+      subscriptionStatus: 'trialing',
+      trialDurationDays: 14,
+      trialStartedAt: startedAt,
+      trialEndsAt: endsAt,
+      paidActivatedAt: null,
+      currentPeriodEndsAt: null,
+      updatedAt: startedAt,
+    };
+  }
+
+  // Fallback to JSON store if Supabase not configured
   const existing = enterpriseStore.subscriptions[accountId];
   if (existing) {
     if (accountName && existing.accountName === 'HireNest Workspace') {
@@ -364,7 +430,6 @@ function ensureAccountSubscription(
     return existing;
   }
 
-  // Default 14-day active trial calculated from authoritative server timestamp
   const now = new Date();
   const startedAt = now.toISOString();
   const endsAt = new Date(now.getTime() + 14 * 86_400_000).toISOString();
@@ -387,15 +452,53 @@ function ensureAccountSubscription(
   return created;
 }
 
+function dbRowToSubscription(row: Record<string, unknown>): AccountSubscriptionRecord {
+  return {
+    accountId: row.account_id as string,
+    accountName: (row.account_name as string) || 'HireNest Workspace',
+    planId: (row.plan_id as PlanId) || 'free_trial',
+    billingCycle: (row.billing_cycle as BillingCycle) || 'annual',
+    subscriptionStatus: (row.subscription_status as SubscriptionStatus) || 'trialing',
+    trialDurationDays: (row.trial_duration_days as number) || 14,
+    trialStartedAt: (row.trial_started_at as string) || new Date().toISOString(),
+    trialEndsAt: (row.trial_ends_at as string) || new Date().toISOString(),
+    paidActivatedAt: (row.paid_activated_at as string) || null,
+    currentPeriodEndsAt: (row.current_period_ends_at as string) || null,
+    updatedAt: (row.updated_at as string) || new Date().toISOString(),
+  };
+}
+
+async function saveSubscriptionToDb(sub: AccountSubscriptionRecord): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (sb) {
+    await sb.from('account_subscriptions').upsert({
+      account_id: sub.accountId,
+      account_name: sub.accountName,
+      plan_id: sub.planId,
+      billing_cycle: sub.billingCycle,
+      subscription_status: sub.subscriptionStatus,
+      trial_duration_days: sub.trialDurationDays,
+      trial_started_at: sub.trialStartedAt,
+      trial_ends_at: sub.trialEndsAt,
+      paid_activated_at: sub.paidActivatedAt,
+      current_period_ends_at: sub.currentPeriodEndsAt,
+      updated_at: sub.updatedAt,
+    }, { onConflict: 'account_id' });
+  } else {
+    enterpriseStore.subscriptions[sub.accountId] = sub;
+    saveEnterpriseStore(enterpriseStore);
+  }
+}
+
 /**
  * Evaluates authoritative server-side subscription state, transitions expired trials,
  * and runs idempotent milestone reminder evaluation (`7d`, `3d`, `1d`).
  */
-export function evaluateAccountSubscriptionLifecycle(
+export async function evaluateAccountSubscriptionLifecycle(
   accountId: string,
   accountName?: string,
   referenceServerNowIso?: string
-): {
+): Promise<{
   subscription: AccountSubscriptionRecord;
   serverNow: string;
   daysRemaining: number;
@@ -408,9 +511,9 @@ export function evaluateAccountSubscriptionLifecycle(
     restrictionReason: string | null;
   };
   newlyTriggeredReminders: ReminderDeliveryRecord[];
-} {
+}> {
   const serverNow = referenceServerNowIso || new Date().toISOString();
-  const sub = ensureAccountSubscription(accountId, accountName);
+  const sub = await ensureAccountSubscription(accountId, accountName);
   const newlyTriggeredReminders: ReminderDeliveryRecord[] = [];
 
   if (sub.subscriptionStatus === 'active') {
@@ -438,7 +541,7 @@ export function evaluateAccountSubscriptionLifecycle(
     if (sub.subscriptionStatus !== 'expired') {
       sub.subscriptionStatus = 'expired';
       sub.updatedAt = serverNow;
-      saveEnterpriseStore(enterpriseStore);
+      await saveSubscriptionToDb(sub);
     }
     return {
       subscription: sub,
@@ -508,17 +611,26 @@ export function evaluateAccountSubscriptionLifecycle(
   };
 }
 
-function runScheduledExpiryReminderJob(): {
+async function runScheduledExpiryReminderJob(): Promise<{
   checkedAccounts: number;
   triggeredCount: number;
   triggered: ReminderDeliveryRecord[];
-} {
-  const accountIds = Object.keys(enterpriseStore.subscriptions);
+}> {
+  const sb = getSupabaseAdmin();
+  let accountIds: string[];
+
+  if (sb) {
+    const { data } = await sb.from('account_subscriptions').select('account_id');
+    accountIds = (data || []).map((r: { account_id: string }) => r.account_id);
+  } else {
+    accountIds = Object.keys(enterpriseStore.subscriptions);
+  }
+
   const allTriggered: ReminderDeliveryRecord[] = [];
   const serverNow = new Date().toISOString();
 
   for (const accId of accountIds) {
-    const res = evaluateAccountSubscriptionLifecycle(accId, undefined, serverNow);
+    const res = await evaluateAccountSubscriptionLifecycle(accId, undefined, serverNow);
     allTriggered.push(...res.newlyTriggeredReminders);
   }
 
@@ -1854,7 +1966,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   // 1. Get authoritative subscription status, server-computed days remaining, reminders, and receipts
   app.get('/api/subscriptions/status', async (req, res) => {
     const ctx = await resolveAccountContext(req);
-    const evaluated = evaluateAccountSubscriptionLifecycle(ctx.accountId, ctx.accountName);
+    const evaluated = await evaluateAccountSubscriptionLifecycle(ctx.accountId, ctx.accountName);
     const accountReminders = enterpriseStore.reminders.filter(
       (r) => r.accountId === ctx.accountId
     );
@@ -1922,10 +2034,9 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       updatedAt: now.toISOString(),
     };
 
-    enterpriseStore.subscriptions[ctx.accountId] = updatedSub;
-    saveEnterpriseStore(enterpriseStore);
+    await saveSubscriptionToDb(updatedSub);
 
-    const evaluated = evaluateAccountSubscriptionLifecycle(ctx.accountId, updatedSub.accountName);
+    const evaluated = await evaluateAccountSubscriptionLifecycle(ctx.accountId, updatedSub.accountName);
     res.json({
       ok: true,
       serverNow: evaluated.serverNow,
@@ -1943,7 +2054,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     const { simulatedServerNow } = req.body as { simulatedServerNow?: string };
 
     if (simulatedServerNow) {
-      const evalRes = evaluateAccountSubscriptionLifecycle(
+      const evalRes = await evaluateAccountSubscriptionLifecycle(
         ctx.accountId,
         ctx.accountName,
         simulatedServerNow
@@ -2073,7 +2184,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     order.status = 'paid';
     order.paidAt = paidAt;
 
-    const sub = ensureAccountSubscription(ctx.accountId, ctx.accountName);
+    const sub = await ensureAccountSubscription(ctx.accountId, ctx.accountName);
     const periodDays = order.billingCycle === 'annual' ? 365 : 30;
     const periodEndsAt = new Date(Date.now() + periodDays * 86_400_000).toISOString();
 
@@ -2109,8 +2220,9 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
     enterpriseStore.receipts.unshift(receipt);
     saveEnterpriseStore(enterpriseStore);
+    await saveSubscriptionToDb(sub);
 
-    const evaluated = evaluateAccountSubscriptionLifecycle(ctx.accountId, sub.accountName);
+    const evaluated = await evaluateAccountSubscriptionLifecycle(ctx.accountId, sub.accountName);
     res.json({
       verified: true,
       receipt,
@@ -2123,7 +2235,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   app.post('/api/subscriptions/enforce', async (req, res) => {
     const ctx = await resolveAccountContext(req);
     const { action = 'write_action' } = req.body as { action?: string };
-    const evaluated = evaluateAccountSubscriptionLifecycle(ctx.accountId, ctx.accountName);
+    const evaluated = await evaluateAccountSubscriptionLifecycle(ctx.accountId, ctx.accountName);
 
     if (evaluated.entitlements.isReadOnlyRestricted) {
       res.status(402).json({
@@ -2171,7 +2283,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
     const cycle: BillingCycle = billingCycle === 'monthly' ? 'monthly' : 'annual';
     const now = new Date();
-    const sub = ensureAccountSubscription(orgId, '');
+    const sub = await ensureAccountSubscription(orgId, '');
 
     if (planId === 'free_trial') {
       sub.planId = 'free_trial';
@@ -2188,7 +2300,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       ).toISOString();
     }
     sub.updatedAt = now.toISOString();
-    saveEnterpriseStore(enterpriseStore);
+    await saveSubscriptionToDb(sub);
 
     res.json({ ok: true, subscription: sub });
   });
@@ -2200,7 +2312,15 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       res.status(400).json({ error: 'orgId query param is required.' });
       return;
     }
-    const sub = enterpriseStore.subscriptions[orgId] || null;
+    const sb = getSupabaseAdmin();
+    let sub: AccountSubscriptionRecord | null = null;
+    if (sb) {
+      const { data } = await sb.from('account_subscriptions').select('*').eq('account_id', orgId).single();
+      if (data) sub = dbRowToSubscription(data);
+    } else {
+      const stored = enterpriseStore.subscriptions[orgId];
+      if (stored) sub = stored;
+    }
     res.json({
       ok: true,
       orgId,
@@ -2222,7 +2342,16 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       return;
     }
 
-    const plans = Object.values(enterpriseStore.subscriptions).map((sub) => ({
+    const sb = getSupabaseAdmin();
+    let allSubs: AccountSubscriptionRecord[];
+    if (sb) {
+      const { data } = await sb.from('account_subscriptions').select('*');
+      allSubs = (data || []).map((r: Record<string, unknown>) => dbRowToSubscription(r));
+    } else {
+      allSubs = Object.values(enterpriseStore.subscriptions);
+    }
+
+    const plans = allSubs.map((sub) => ({
       orgId: sub.accountId,
       orgName: sub.accountName,
       planId: sub.planId,
