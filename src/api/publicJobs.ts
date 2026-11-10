@@ -19,6 +19,7 @@ export interface PublicJob {
   openings: number;
   currency: string;
   client_org_name: string | null;
+  status?: string;
   posted_at: string;
 }
 
@@ -41,7 +42,16 @@ export async function fetchPublicJob(slug: string): Promise<PublicJob | null> {
   });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
-  return (row || null) as PublicJob | null;
+  if (row) return row as PublicJob;
+  // Closed, on-hold or non-public requirements are still valid shared links.
+  try {
+    const res = await fetch(`/api/public-job/${encodeURIComponent(slug)}`);
+    if (!res.ok) return null;
+    const body = (await res.json()) as { job?: PublicJob };
+    return body.job || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function listPublicJobs(

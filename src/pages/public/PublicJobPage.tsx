@@ -88,6 +88,7 @@ export const PublicJobPage: React.FC = () => {
     openings: typeof routeJobData.openings === 'number' ? routeJobData.openings : 1,
     currency: String(routeJobData.currency || 'INR'),
     client_org_name: null,
+    status: typeof routeJobData.status === 'string' ? routeJobData.status : undefined,
     posted_at: String(routeJobData.created_at || new Date().toISOString()),
   } : null);
 
@@ -104,7 +105,7 @@ export const PublicJobPage: React.FC = () => {
   useEffect(() => {
     if (!job) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('apply') === '1') setApplyOpen(true);
+    if (params.get('apply') === '1' && !(job.status && job.status !== 'open')) setApplyOpen(true);
   }, [job]);
 
   const handleShare = async () => {
@@ -130,6 +131,8 @@ export const PublicJobPage: React.FC = () => {
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }, [job]);
 
+  const isClosedJob = Boolean(job?.status && job.status !== 'open');
+
   if (isLoading && !job) {
     return (
       <div
@@ -148,13 +151,20 @@ export const PublicJobPage: React.FC = () => {
         style={{ background: 'var(--app-bg)', color: 'var(--text-primary)' }}
       >
         <div className="max-w-md text-center space-y-3">
-          <h1 className="text-xl font-semibold">Job not found</h1>
+          <h1 className="text-xl font-semibold">We couldn&apos;t find this role</h1>
           <p
             className="text-sm"
             style={{ color: 'var(--text-secondary)' }}
           >
-            This opening may have been closed or the link is incorrect.
+            The link may be incomplete. Browse the roles we&apos;re hiring for right now.
           </p>
+          <Link
+            to="/jobs"
+            className="inline-block mt-2 mr-4 text-sm font-medium underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            View open roles
+          </Link>
           <Link
             to="/"
             className="inline-block mt-2 text-sm underline"
@@ -235,7 +245,12 @@ export const PublicJobPage: React.FC = () => {
 
           {/* CTAs */}
           <div className="flex flex-wrap gap-3 pt-5">
-            <Button size="lg" className="h-11 w-full sm:w-auto" onClick={() => setApplyOpen(true)}>
+            <Button
+              size="lg"
+              className="h-11 w-full sm:w-auto"
+              disabled={isClosedJob}
+              onClick={() => setApplyOpen(true)}
+            >
               Apply Now
             </Button>
             <Button size="lg" variant="secondary" onClick={handleShare} className="h-11 flex-1 sm:flex-none">
@@ -276,6 +291,17 @@ export const PublicJobPage: React.FC = () => {
             <OverviewCell icon={<Building2 className="w-4 h-4" />} label="Compensation" value="On request" />
           </Card>
         </section>
+
+        {isClosedJob && (
+          <Card className="p-4 sm:p-5">
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              This position is no longer accepting applications.
+            </p>
+            <Link to="/jobs" className="text-sm underline" style={{ color: 'var(--accent)' }}>
+              View roles we&apos;re hiring for now
+            </Link>
+          </Card>
+        )}
 
         {/* About */}
         <section className="space-y-4">
@@ -405,7 +431,12 @@ export const PublicJobPage: React.FC = () => {
               Create a free candidate account to apply in minutes.
             </div>
           </div>
-          <Button size="lg" className="h-11 w-full sm:w-auto" onClick={() => setApplyOpen(true)}>
+          <Button
+              size="lg"
+              className="h-11 w-full sm:w-auto"
+              disabled={isClosedJob}
+              onClick={() => setApplyOpen(true)}
+            >
             Apply Now
           </Button>
         </section>

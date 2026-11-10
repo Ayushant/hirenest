@@ -134,7 +134,7 @@ function ShortLinkRedirect() {
         if (!res.ok) { setError(true); return; }
         const data = await res.json();
         if (data.slug) {
-          navigate(`/jobs/${data.slug}?apply=1`, { replace: true });
+          navigate(`/jobs/${data.slug}?apply=1`, { replace: true, state: { jobData: data } });
         } else if (data.id) {
           navigate(`/jobs/${data.id}?apply=1`, { replace: true, state: { jobData: data } });
         } else {

@@ -1671,6 +1671,17 @@ async function startServer() {
   // ==========================================================================
   // SHORT LINK RESOLVER (e.g. /r/HN-49A0DD → requirement UUID)
   // ==========================================================================
+  app.get('/api/public-job/:slug', async (req, res) => {
+    try {
+      const job = await fetchShareableJobBySlug(String(req.params.slug || ''));
+      if (!job) return res.status(404).json({ error: 'Job not found' });
+      return res.json({ job });
+    } catch (err) {
+      console.error('[public-job] Exception:', err);
+      return res.status(500).json({ error: 'Lookup failed' });
+    }
+  });
+
   app.get('/api/r/:code', async (req, res) => {
     try {
       const code = req.params.code || '';
@@ -1690,7 +1701,7 @@ async function startServer() {
       const upper = `${upperHex}-0000-0000-0000-000000000000`;
 
       // Use direct fetch to PostgREST REST API with and() for UUID range query
-      const fields = 'id,slug,title,description,skills,min_experience,max_experience,location,work_mode,employment_type,openings,currency,created_at';
+      const fields = 'id,slug,title,description,skills,min_experience,max_experience,location,work_mode,employment_type,openings,currency,status,created_at';
       const restUrl = `${supabaseUrl}/rest/v1/requirements?select=${fields}&and=(id.gte.${lower},id.lt.${upper})&limit=1`;
       const response = await fetch(restUrl, {
         headers: {
@@ -5528,6 +5539,51 @@ export async function getServerApp(): Promise<express.Express> {
   return cachedExpressApp;
 }
 
+// Shareable job lookup by slug: works for any existing requirement (open, closed, on hold, public or not),
+// so links people already shared never dead-end. Returns only non-financial fields.
+async function fetchShareableJobBySlug(slug: string): Promise<Record<string, unknown> | null> {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey || !slug) return null;
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data } = await admin
+    .from('requirements')
+    .select(
+      'id, slug, title, description, skills, min_experience, max_experience, location, work_mode, employment_type, openings, currency, status, client_org_id, opened_at, created_at'
+    )
+    .eq('slug', slug)
+    .maybeSingle();
+  if (!data) return null;
+  let clientOrgName: string | null = null;
+  if (data.client_org_id) {
+    const { data: org } = await admin
+      .from('organizations')
+      .select('name')
+      .eq('id', data.client_org_id)
+      .maybeSingle();
+    clientOrgName = org?.name ?? null;
+  }
+  return {
+    id: data.id,
+    slug: data.slug,
+    title: data.title,
+    description: data.description,
+    skills: data.skills || [],
+    min_experience: data.min_experience,
+    max_experience: data.max_experience,
+    location: data.location,
+    work_mode: data.work_mode,
+    employment_type: data.employment_type,
+    openings: data.openings,
+    currency: data.currency,
+    status: data.status,
+    client_org_name: clientOrgName,
+    posted_at: data.opened_at || data.created_at,
+  };
+}
+
 // Build per-job HTML with OpenGraph meta tags injected. Used by both the
 // standalone dev server and the Vercel serverless function so crawlers get
 // per-page tags regardless of where the app is hosted.
@@ -5540,7 +5596,8 @@ async function buildJobOgHtml(slug: string, baseHtml: string): Promise<string> {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data } = await anon.rpc('get_public_requirement', { p_slug: slug });
-    const job = Array.isArray(data) ? data[0] : data;
+    let job: Record<string, any> | null = Array.isArray(data) ? data[0] : data;
+    if (!job) job = await fetchShareableJobBySlug(slug);
     if (!job) return baseHtml;
     const esc = (s: string) =>
       String(s || '')
