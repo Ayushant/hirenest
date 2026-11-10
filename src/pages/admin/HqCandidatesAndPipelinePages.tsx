@@ -33,6 +33,7 @@ import {
 import { MatchEvidencePanel } from '../../components/domain/MatchEvidence';
 import { CandidateFormModal } from '../../components/domain/CandidateFormModal';
 import { SubmissionDetailDrawer } from '../../components/domain/SubmissionDetailDrawer';
+import { createDealRoom } from '../../api/dealRoom';
 import { InterviewFeedbackModal } from '../../components/domain/InterviewModals';
 import { DuplicateDialog } from '../../components/domain/DuplicateDialog';
 import {
@@ -1253,6 +1254,7 @@ export const HqCandidateDetailPage: React.FC = () => {
 // 3. HQ Submissions Global Pipeline Table Page
 export const HqSubmissionsPage: React.FC = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [stage, setStage] = useState<SubmissionStage | ''>(
@@ -1559,6 +1561,22 @@ export const HqSubmissionsPage: React.FC = () => {
                           }}
                         >
                           Validate
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-1 ml-1"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await createDealRoom({ submissionId: sub.id });
+                              navigate(`${profile?.role === 'admin' ? '/admin' : '/recruiter'}/deal-rooms`);
+                            } catch (err) {
+                              window.alert(err instanceof Error ? err.message : 'Could not open deal room.');
+                            }
+                          }}
+                        >
+                          Deal Room
                         </Button>
                       </td>
                     </tr>
