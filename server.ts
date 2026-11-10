@@ -328,7 +328,13 @@ function loadEnterpriseStore(): EnterpriseServerStore {
   };
 }
 
+let enterpriseDbReady = false;
+
 function saveEnterpriseStore(store: EnterpriseServerStore): void {
+  if (enterpriseDbReady) {
+    queueEnterpriseDbSync(store);
+    return;
+  }
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -340,6 +346,132 @@ function saveEnterpriseStore(store: EnterpriseServerStore): void {
 }
 
 const enterpriseStore = loadEnterpriseStore();
+
+const ENTERPRISE_MAP_COLLECTIONS = [
+  'requirementMappings',
+  'publishedRequirements',
+  'vendorAcknowledgements',
+  'deletedRequirements',
+  'requirementFingerprints',
+  'orders',
+  'submissionValidations',
+  'offerOnboardingRecords',
+] as const;
+const ENTERPRISE_ARRAY_COLLECTIONS = [
+  'requirementAuditTrail',
+  'requirementShareActivities',
+  'reminders',
+  'receipts',
+  'earlyAccessApplications',
+] as const;
+const ENTERPRISE_ARRAY_KEY = '__array__';
+const enterpriseSyncSnapshot = new Map<string, string>();
+let enterpriseSyncChain: Promise<void> = Promise.resolve();
+
+function buildEnterpriseRows(store: EnterpriseServerStore): Map<string, { collection: string; record_key: string; json: string }> {
+  const rows = new Map<string, { collection: string; record_key: string; json: string }>();
+  const s = store as unknown as Record<string, unknown>;
+  for (const c of ENTERPRISE_MAP_COLLECTIONS) {
+    for (const [k, v] of Object.entries((s[c] as Record<string, unknown>) || {})) {
+      rows.set(`${c}\u0000${k}`, { collection: c, record_key: k, json: JSON.stringify(v) });
+    }
+  }
+  for (const c of ENTERPRISE_ARRAY_COLLECTIONS) {
+    const arr = Array.isArray(s[c]) ? (s[c] as unknown[]) : [];
+    rows.set(`${c}\u0000${ENTERPRISE_ARRAY_KEY}`, { collection: c, record_key: ENTERPRISE_ARRAY_KEY, json: JSON.stringify(arr) });
+  }
+  return rows;
+}
+
+async function pushEnterpriseDiff(store: EnterpriseServerStore): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  const rows = buildEnterpriseRows(store);
+  const upserts: Array<{ id: string; collection: string; record_key: string; data: unknown; json: string }> = [];
+  for (const [id, r] of rows) {
+    if (enterpriseSyncSnapshot.get(id) !== r.json) {
+      upserts.push({ id, collection: r.collection, record_key: r.record_key, data: JSON.parse(r.json), json: r.json });
+    }
+  }
+  for (let i = 0; i < upserts.length; i += 200) {
+    const batch = upserts.slice(i, i + 200);
+    const { error } = await sb.from('enterprise_records').upsert(
+      batch.map((u) => ({ collection: u.collection, record_key: u.record_key, data: u.data, updated_at: new Date().toISOString() })),
+      { onConflict: 'collection,record_key' }
+    );
+    if (error) throw error;
+    for (const u of batch) enterpriseSyncSnapshot.set(u.id, u.json);
+  }
+  const removed = new Map<string, string[]>();
+  for (const id of enterpriseSyncSnapshot.keys()) {
+    if (!rows.has(id)) {
+      const [collection, key] = id.split('\u0000');
+      if (!removed.has(collection)) removed.set(collection, []);
+      removed.get(collection)!.push(key);
+    }
+  }
+  for (const [collection, keys] of removed) {
+    for (let i = 0; i < keys.length; i += 100) {
+      const chunk = keys.slice(i, i + 100);
+      const { error } = await sb.from('enterprise_records').delete().eq('collection', collection).in('record_key', chunk);
+      if (error) throw error;
+      for (const k of chunk) enterpriseSyncSnapshot.delete(`${collection}\u0000${k}`);
+    }
+  }
+}
+
+function queueEnterpriseDbSync(store: EnterpriseServerStore): void {
+  enterpriseSyncChain = enterpriseSyncChain
+    .then(() => pushEnterpriseDiff(store))
+    .catch((err) => {
+      console.error('[enterprise-store] Supabase sync failed:', err instanceof Error ? err.message : err);
+    });
+}
+
+async function hydrateEnterpriseStoreFromDb(): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  try {
+    const all: Array<{ collection: string; record_key: string; data: unknown }> = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb
+        .from('enterprise_records')
+        .select('collection, record_key, data')
+        .order('collection')
+        .order('record_key')
+        .range(from, from + 999);
+      if (error) throw error;
+      all.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    if (all.length === 0) {
+      await pushEnterpriseDiff(enterpriseStore);
+      console.log('[enterprise-store] Copied existing JSON data into Supabase enterprise_records.');
+    } else {
+      const s = enterpriseStore as unknown as Record<string, unknown>;
+      for (const c of ENTERPRISE_MAP_COLLECTIONS) s[c] = {};
+      for (const c of ENTERPRISE_ARRAY_COLLECTIONS) s[c] = [];
+      for (const row of all) {
+        const id = `${row.collection}\u0000${row.record_key}`;
+        enterpriseSyncSnapshot.set(id, JSON.stringify(row.data));
+        if (row.record_key === ENTERPRISE_ARRAY_KEY) {
+          if ((ENTERPRISE_ARRAY_COLLECTIONS as readonly string[]).includes(row.collection)) {
+            s[row.collection] = Array.isArray(row.data) ? row.data : [];
+          }
+        } else if ((ENTERPRISE_MAP_COLLECTIONS as readonly string[]).includes(row.collection)) {
+          (s[row.collection] as Record<string, unknown>)[row.record_key] = row.data;
+        }
+      }
+      console.log(`[enterprise-store] Loaded ${all.length} records from Supabase.`);
+    }
+    enterpriseDbReady = true;
+  } catch (err) {
+    console.warn(
+      '[enterprise-store] Supabase enterprise_records unavailable, using local JSON file instead:',
+      err instanceof Error ? err.message : err
+    );
+  }
+}
 
 // Supabase admin client for subscription DB operations
 function getSupabaseAdmin() {
@@ -642,6 +774,204 @@ const dealRoomDb = {
   },
 
   async saveStore(): Promise<void> {
+    if (!getSupabaseAdmin()) saveEnterpriseStore(enterpriseStore);
+  },
+};
+
+const privacyDb = {
+  async listNotices(): Promise<PrivacyNoticeRecord[]> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('privacy_notices').select('*').order('created_at', { ascending: false });
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r) as unknown as PrivacyNoticeRecord);
+    }
+    return enterpriseStore.privacyNotices;
+  },
+  async addNotice(notice: PrivacyNoticeRecord): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('privacy_notices').insert(camelToSnake(notice as unknown as Record<string, unknown>));
+    } else {
+      enterpriseStore.privacyNotices.unshift(notice);
+    }
+  },
+  async listAcknowledgements(): Promise<PrivacyAcknowledgementRecord[]> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('privacy_acknowledgements').select('*').order('timestamp', { ascending: false });
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r) as unknown as PrivacyAcknowledgementRecord);
+    }
+    return enterpriseStore.privacyAcknowledgements;
+  },
+  async findAcknowledgement(subjectRef: string): Promise<PrivacyAcknowledgementRecord | undefined> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('privacy_acknowledgements').select('*').eq('subject_ref', subjectRef).order('timestamp', { ascending: false }).limit(1);
+      if (data && data.length > 0) return snakeToCamel(data[0] as Record<string, unknown>) as unknown as PrivacyAcknowledgementRecord;
+      return undefined;
+    }
+    return enterpriseStore.privacyAcknowledgements.find((a) => a.subjectRef === subjectRef);
+  },
+  async addAcknowledgement(ack: PrivacyAcknowledgementRecord): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('privacy_acknowledgements').insert(camelToSnake(ack as unknown as Record<string, unknown>));
+    } else {
+      enterpriseStore.privacyAcknowledgements.unshift(ack);
+    }
+  },
+  async listProcessingRecords(): Promise<DataProcessingRecord[]> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('data_processing_records').select('*');
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r) as unknown as DataProcessingRecord);
+    }
+    return enterpriseStore.dataProcessingRecords;
+  },
+  async listRequests(): Promise<PrivacyRequestRecord[]> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('privacy_requests').select('*').order('received_at', { ascending: false });
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r) as unknown as PrivacyRequestRecord);
+    }
+    return enterpriseStore.privacyRequests;
+  },
+  async findRequest(requestId: string): Promise<PrivacyRequestRecord | undefined> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('privacy_requests').select('*').eq('request_id', requestId).limit(1);
+      if (data && data.length > 0) return snakeToCamel(data[0] as Record<string, unknown>) as unknown as PrivacyRequestRecord;
+      return undefined;
+    }
+    return enterpriseStore.privacyRequests.find((r) => r.requestId === requestId);
+  },
+  async addRequest(req: PrivacyRequestRecord): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('privacy_requests').insert(camelToSnake(req as unknown as Record<string, unknown>));
+    } else {
+      enterpriseStore.privacyRequests.unshift(req);
+    }
+  },
+  async updateRequest(requestId: string, updates: Partial<Record<string, unknown>>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('privacy_requests').update(camelToSnake(updates as Record<string, unknown>)).eq('request_id', requestId);
+    }
+  },
+  async listRetentionPolicies(): Promise<RetentionPolicyRecord[]> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('retention_policies').select('*');
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r) as unknown as RetentionPolicyRecord);
+    }
+    return enterpriseStore.retentionPolicies;
+  },
+  async findRetentionPolicy(policyId: string): Promise<RetentionPolicyRecord | undefined> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('retention_policies').select('*').eq('policy_id', policyId).limit(1);
+      if (data && data.length > 0) return snakeToCamel(data[0] as Record<string, unknown>) as unknown as RetentionPolicyRecord;
+      return undefined;
+    }
+    return enterpriseStore.retentionPolicies.find((p) => p.policyId === policyId);
+  },
+  async hasLegalHold(policyId: string): Promise<boolean> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('retention_policies').select('legal_hold_exception').eq('policy_id', policyId).eq('legal_hold_exception', true).limit(1);
+      return (data || []).length > 0;
+    }
+    return enterpriseStore.retentionPolicies.some((p) => p.legalHoldException && p.policyId === policyId);
+  },
+  async updateRetentionPolicy(policyId: string, updates: Partial<Record<string, unknown>>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('retention_policies').update(camelToSnake(updates as Record<string, unknown>)).eq('policy_id', policyId);
+    }
+  },
+  async listDeletionJobs(): Promise<DeletionJobRecord[]> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deletion_jobs').select('*').order('requested_at', { ascending: false });
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r) as unknown as DeletionJobRecord);
+    }
+    return enterpriseStore.deletionJobs;
+  },
+  async findDeletionJob(jobId: string): Promise<DeletionJobRecord | undefined> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('deletion_jobs').select('*').eq('job_id', jobId).limit(1);
+      if (data && data.length > 0) return snakeToCamel(data[0] as Record<string, unknown>) as unknown as DeletionJobRecord;
+      return undefined;
+    }
+    return enterpriseStore.deletionJobs.find((j) => j.jobId === jobId);
+  },
+  async addDeletionJob(job: DeletionJobRecord): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('deletion_jobs').insert(camelToSnake(job as unknown as Record<string, unknown>));
+    } else {
+      enterpriseStore.deletionJobs.unshift(job);
+    }
+  },
+  async updateDeletionJob(jobId: string, updates: Partial<Record<string, unknown>>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('deletion_jobs').update(camelToSnake(updates as Record<string, unknown>)).eq('job_id', jobId);
+    }
+  },
+  async listIncidents(): Promise<PrivacyIncidentRecord[]> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('privacy_incidents').select('*').order('detected_at', { ascending: false });
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r) as unknown as PrivacyIncidentRecord);
+    }
+    return enterpriseStore.privacyIncidents;
+  },
+  async findIncident(incidentId: string): Promise<PrivacyIncidentRecord | undefined> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('privacy_incidents').select('*').eq('incident_id', incidentId).limit(1);
+      if (data && data.length > 0) return snakeToCamel(data[0] as Record<string, unknown>) as unknown as PrivacyIncidentRecord;
+      return undefined;
+    }
+    return enterpriseStore.privacyIncidents.find((i) => i.incidentId === incidentId);
+  },
+  async addIncident(incident: PrivacyIncidentRecord): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('privacy_incidents').insert(camelToSnake(incident as unknown as Record<string, unknown>));
+    } else {
+      enterpriseStore.privacyIncidents.unshift(incident);
+    }
+  },
+  async updateIncident(incidentId: string, updates: Partial<Record<string, unknown>>): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('privacy_incidents').update(camelToSnake(updates as Record<string, unknown>)).eq('incident_id', incidentId);
+    }
+  },
+  async listAuditEvents(): Promise<PrivacyAuditEventRecord[]> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      const { data } = await sb.from('privacy_audit_events').select('*').order('timestamp', { ascending: false }).limit(250);
+      return (data || []).map((r: Record<string, unknown>) => snakeToCamel(r) as unknown as PrivacyAuditEventRecord);
+    }
+    return enterpriseStore.privacyAuditEvents;
+  },
+  async addAuditEvent(evt: PrivacyAuditEventRecord): Promise<void> {
+    const sb = getSupabaseAdmin();
+    if (sb) {
+      await sb.from('privacy_audit_events').insert(camelToSnake(evt as unknown as Record<string, unknown>));
+    } else {
+      enterpriseStore.privacyAuditEvents.unshift(evt);
+      if (enterpriseStore.privacyAuditEvents.length > 250) {
+        enterpriseStore.privacyAuditEvents = enterpriseStore.privacyAuditEvents.slice(0, 250);
+      }
+    }
+  },
+  saveStore(): void {
     if (!getSupabaseAdmin()) saveEnterpriseStore(enterpriseStore);
   },
 };
@@ -1318,6 +1648,7 @@ function extractTextFromResumeBuffer(buf: Buffer, fileName: string): string {
 }
 
 async function startServer() {
+  await hydrateEnterpriseStoreFromDb();
   const app = express();
   app.use(express.json({ limit: '15mb' }));
 
@@ -2854,11 +3185,11 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   // DPDP ACT, 2023 - PRIVACY & DATA GOVERNANCE MODULE APIs
   // ==========================================================================
 
-  function appendPrivacyAuditEvent(
+  async function appendPrivacyAuditEvent(
     params: Omit<PrivacyAuditEventRecord, 'eventId' | 'timestamp' | 'correlationId'> & {
       correlationId?: string;
     }
-  ): PrivacyAuditEventRecord {
+  ): Promise<PrivacyAuditEventRecord> {
     const evt: PrivacyAuditEventRecord = {
       eventId: `evt_dpdp_${crypto.randomBytes(4).toString('hex')}`,
       actorRef: params.actorRef,
@@ -2873,26 +3204,33 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       correlationId:
         params.correlationId || `corr_dpdp_${crypto.randomBytes(5).toString('hex')}`,
     };
-    enterpriseStore.privacyAuditEvents.unshift(evt);
-    if (enterpriseStore.privacyAuditEvents.length > 250) {
-      enterpriseStore.privacyAuditEvents = enterpriseStore.privacyAuditEvents.slice(0, 250);
-    }
+    await privacyDb.addAuditEvent(evt);
     return evt;
   }
 
   // 1. Unified DPDP Governance Dashboard State
   app.get('/api/privacy/dashboard', async (_req, res) => {
+    const [notices, acknowledgements, processingRecords, requests, retPolicies, delJobs, incidents, auditEvents] = await Promise.all([
+      privacyDb.listNotices(),
+      privacyDb.listAcknowledgements(),
+      privacyDb.listProcessingRecords(),
+      privacyDb.listRequests(),
+      privacyDb.listRetentionPolicies(),
+      privacyDb.listDeletionJobs(),
+      privacyDb.listIncidents(),
+      privacyDb.listAuditEvents(),
+    ]);
     res.json({
       ok: true,
       serverNow: new Date().toISOString(),
-      notices: enterpriseStore.privacyNotices,
-      acknowledgements: enterpriseStore.privacyAcknowledgements,
-      processingRecords: enterpriseStore.dataProcessingRecords,
-      requests: enterpriseStore.privacyRequests,
-      retentionPolicies: enterpriseStore.retentionPolicies,
-      deletionJobs: enterpriseStore.deletionJobs,
-      incidents: enterpriseStore.privacyIncidents,
-      auditEvents: enterpriseStore.privacyAuditEvents,
+      notices,
+      acknowledgements,
+      processingRecords,
+      requests,
+      retentionPolicies: retPolicies,
+      deletionJobs: delJobs,
+      incidents,
+      auditEvents,
       subProcessors: SUB_PROCESSOR_INVENTORY,
       roadmapPhases: DPDP_ROADMAP_PHASES,
     });
@@ -2949,8 +3287,8 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       grievanceOfficerContact: 'dpo-grievance@hirenestworkforce.com',
     };
 
-    enterpriseStore.privacyNotices.unshift(newNotice);
-    appendPrivacyAuditEvent({
+    await privacyDb.addNotice(newNotice);
+    await appendPrivacyAuditEvent({
       actorRef: auth.ok ? auth.userId : 'hq_admin',
       actorRole: auth.ok ? auth.role : 'admin',
       tenantId: auth.ok && auth.orgId ? auth.orgId : 'hirenest_hq',
@@ -2960,7 +3298,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       purpose: `Published DPDP Notice ${noticeId} (v${newNotice.version})`,
       outcome: 'completed',
     });
-    saveEnterpriseStore(enterpriseStore);
+    privacyDb.saveStore();
 
     res.json({ ok: true, notice: newNotice });
   });
@@ -3010,9 +3348,9 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         .slice(0, 18)}`,
     };
 
-    enterpriseStore.privacyAcknowledgements.unshift(ackRecord);
+    await privacyDb.addAcknowledgement(ackRecord);
 
-    appendPrivacyAuditEvent({
+    await appendPrivacyAuditEvent({
       actorRef: auth.ok ? auth.userId : ackRecord.subjectRef,
       actorRole: auth.ok ? auth.role : 'candidate',
       tenantId: ackRecord.tenantId,
@@ -3023,7 +3361,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       outcome: 'completed',
     });
 
-    saveEnterpriseStore(enterpriseStore);
+    privacyDb.saveStore();
     res.json({ ok: true, acknowledgement: ackRecord });
   });
 
@@ -3064,9 +3402,9 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       notes: 'Request logged in HireNestOS Rights & Grievance Desk.',
     };
 
-    enterpriseStore.privacyRequests.unshift(reqRecord);
+    await privacyDb.addRequest(reqRecord);
 
-    appendPrivacyAuditEvent({
+    await appendPrivacyAuditEvent({
       actorRef: auth.ok ? auth.userId : reqRecord.requesterRef,
       actorRole: auth.ok ? auth.role : 'candidate',
       tenantId: reqRecord.tenantId,
@@ -3077,7 +3415,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       outcome: 'completed',
     });
 
-    saveEnterpriseStore(enterpriseStore);
+    privacyDb.saveStore();
     res.json({ ok: true, request: reqRecord });
   });
 
@@ -3102,7 +3440,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       triggerDeletionJob?: boolean;
     };
 
-    const target = enterpriseStore.privacyRequests.find((r) => r.requestId === requestId);
+    const target = await privacyDb.findRequest(requestId!);
     if (!target) {
       res.status(404).json({ error: 'Privacy request not found.' });
       return;
@@ -3118,12 +3456,11 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     if (assignedTo !== undefined) target.assignedTo = assignedTo;
     if (decision !== undefined) target.decision = decision;
     if (notes !== undefined) target.notes = notes;
+    await privacyDb.updateRequest(target.requestId, target as unknown as Record<string, unknown>);
 
     let createdDeletionJob: DeletionJobRecord | undefined;
     if (triggerDeletionJob || (target.requestType === 'erasure' && status === 'completed')) {
-      const hasLegalHold = enterpriseStore.retentionPolicies.some(
-        (p) => p.legalHoldException && p.policyId === 'RET-SUBMISSION-RECORD'
-      );
+      const hasLegalHold = await privacyDb.hasLegalHold('RET-SUBMISSION-RECORD');
       const nowIso = new Date().toISOString();
       createdDeletionJob = {
         jobId: `DEL-JOB-2026-${crypto.randomBytes(2).toString('hex').toUpperCase()}`,
@@ -3147,10 +3484,10 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
           ? 'Profile & resume purged; minimal commercial submission timestamp retained under Legal Hold RET-SUBMISSION-RECORD.'
           : null,
       };
-      enterpriseStore.deletionJobs.unshift(createdDeletionJob);
+      await privacyDb.addDeletionJob(createdDeletionJob);
     }
 
-    appendPrivacyAuditEvent({
+    await appendPrivacyAuditEvent({
       actorRef: auth.ok ? auth.userId : 'hq_privacy_officer',
       actorRole: auth.ok ? auth.role : 'admin',
       tenantId: target.tenantId,
@@ -3161,7 +3498,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       outcome: 'completed',
     });
 
-    saveEnterpriseStore(enterpriseStore);
+    privacyDb.saveStore();
     res.json({ ok: true, request: target, deletionJob: createdDeletionJob });
   });
 
@@ -3173,7 +3510,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       legalHoldReason?: string;
     };
 
-    const policy = enterpriseStore.retentionPolicies.find((p) => p.policyId === policyId);
+    const policy = await privacyDb.findRetentionPolicy(policyId!);
     if (!policy) {
       res.status(404).json({ error: 'Retention policy not found.' });
       return;
@@ -3184,7 +3521,8 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       ? legalHoldReason || 'Active legal/commercial dispute hold applied by HQ Governance.'
       : null;
 
-    saveEnterpriseStore(enterpriseStore);
+    await privacyDb.updateRetentionPolicy(policy.policyId, { legalHoldException: policy.legalHoldException, legalHoldReason: policy.legalHoldReason });
+    privacyDb.saveStore();
     res.json({ ok: true, policy });
   });
 
@@ -3206,7 +3544,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     };
 
     const nowIso = new Date().toISOString();
-    let job = jobId ? enterpriseStore.deletionJobs.find((j) => j.jobId === jobId) : undefined;
+    let job = jobId ? await privacyDb.findDeletionJob(jobId) : undefined;
 
     if (job) {
       job.status = 'completed';
@@ -3220,6 +3558,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         operational_logs: 'retained_audit_minimal',
         external_processors: 'purged',
       };
+      await privacyDb.updateDeletionJob(job.jobId, { status: job.status, attempts: job.attempts, verifiedAt: job.verifiedAt, targetSystems: job.targetSystems });
     } else {
       const ref = subjectRef || `cand_${crypto.randomBytes(3).toString('hex')}`;
       job = {
@@ -3242,10 +3581,10 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         verifiedAt: nowIso,
         exceptionReason: null,
       };
-      enterpriseStore.deletionJobs.unshift(job);
+      await privacyDb.addDeletionJob(job);
     }
 
-    appendPrivacyAuditEvent({
+    await appendPrivacyAuditEvent({
       actorRef: auth.ok ? auth.userId : 'hq_privacy_engine',
       actorRole: auth.ok ? auth.role : 'admin',
       tenantId: job.tenantId,
@@ -3256,7 +3595,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       outcome: 'completed',
     });
 
-    saveEnterpriseStore(enterpriseStore);
+    privacyDb.saveStore();
     res.json({ ok: true, job });
   });
 
@@ -3299,11 +3638,9 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     };
 
     // Check 1: Has candidate withdrawn consent?
-    const latestAck = enterpriseStore.privacyAcknowledgements.find(
-      (a) => a.subjectRef === candidateRef
-    );
+    const latestAck = await privacyDb.findAcknowledgement(candidateRef);
     if (latestAck && latestAck.action === 'withdrawn') {
-      const auditEvent = appendPrivacyAuditEvent({
+      const auditEvent = await appendPrivacyAuditEvent({
         actorRef,
         actorRole,
         tenantId: callerTenantId,
@@ -3313,7 +3650,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         purpose: `Blocked ${actionType}: Data Principal has withdrawn consent (${latestAck.id})`,
         outcome: 'denied_consent_withdrawn',
       });
-      saveEnterpriseStore(enterpriseStore);
+      privacyDb.saveStore();
       res.json({
         allowed: false,
         outcome: 'denied_consent_withdrawn',
@@ -3337,7 +3674,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       callerTenantId !== targetTenantId;
 
     if (isCrossTenantUnauthorized) {
-      const auditEvent = appendPrivacyAuditEvent({
+      const auditEvent = await appendPrivacyAuditEvent({
         actorRef,
         actorRole,
         tenantId: callerTenantId,
@@ -3347,7 +3684,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         purpose: `Blocked unauthorized cross-tenant ${actionType} from ${callerTenantId} to ${targetTenantId}`,
         outcome: 'denied_cross_tenant',
       });
-      saveEnterpriseStore(enterpriseStore);
+      privacyDb.saveStore();
       res.json({
         allowed: false,
         outcome: 'denied_cross_tenant',
@@ -3366,7 +3703,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
     // Check 3: Human approval gate & contact masking before stage authorization
     if (!humanRecruiterApproved) {
-      const auditEvent = appendPrivacyAuditEvent({
+      const auditEvent = await appendPrivacyAuditEvent({
         actorRef,
         actorRole,
         tenantId: callerTenantId,
@@ -3376,7 +3713,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         purpose: `Gated ${actionType} with masked contact PII (awaiting human recruiter approval)`,
         outcome: 'masked_pii',
       });
-      saveEnterpriseStore(enterpriseStore);
+      privacyDb.saveStore();
       res.json({
         allowed: true,
         outcome: 'masked_pii',
@@ -3395,7 +3732,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     }
 
     // Fully authorized share/export
-    const auditEvent = appendPrivacyAuditEvent({
+    const auditEvent = await appendPrivacyAuditEvent({
       actorRef,
       actorRole,
       tenantId: callerTenantId,
@@ -3410,7 +3747,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       purpose: `Authorised ${actionType} for requirement ${requirementId} with verified ownership & human approval`,
       outcome: 'allowed',
     });
-    saveEnterpriseStore(enterpriseStore);
+    privacyDb.saveStore();
 
     res.json({
       allowed: true,
@@ -3446,7 +3783,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     } = req.body as Partial<PrivacyIncidentRecord>;
 
     if (incidentId) {
-      const existing = enterpriseStore.privacyIncidents.find((i) => i.incidentId === incidentId);
+      const existing = await privacyDb.findIncident(incidentId);
       if (existing) {
         if (title) existing.title = title;
         if (severity) existing.severity = severity;
@@ -3454,7 +3791,8 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
         if (containment) existing.containment = containment;
         if (notificationStatus) existing.notificationStatus = notificationStatus;
         if (closureEvidence !== undefined) existing.closureEvidence = closureEvidence;
-        saveEnterpriseStore(enterpriseStore);
+        await privacyDb.updateIncident(incidentId, { title: existing.title, severity: existing.severity, assessment: existing.assessment, containment: existing.containment, notificationStatus: existing.notificationStatus, closureEvidence: existing.closureEvidence });
+        privacyDb.saveStore();
         res.json({ ok: true, incident: existing });
         return;
       }
@@ -3480,8 +3818,8 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       closureEvidence: closureEvidence ? String(closureEvidence) : null,
     };
 
-    enterpriseStore.privacyIncidents.unshift(created);
-    appendPrivacyAuditEvent({
+    await privacyDb.addIncident(created);
+    await appendPrivacyAuditEvent({
       actorRef: auth.ok ? auth.userId : 'security_officer',
       actorRole: auth.ok ? auth.role : 'admin',
       tenantId: created.tenantId,
@@ -3491,7 +3829,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       purpose: `Logged DPDP privacy incident ${created.incidentId} (severity=${created.severity})`,
       outcome: 'completed',
     });
-    saveEnterpriseStore(enterpriseStore);
+    privacyDb.saveStore();
 
     res.json({ ok: true, incident: created });
   });
