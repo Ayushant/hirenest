@@ -24,6 +24,7 @@ import {
 } from './src/lib/enterpriseLifecycle';
 import { extractStructuredFieldsFromText } from './src/lib/resumeParser';
 import { registerStaffRoutes, registerStaffEnforcement } from './staffRoutes';
+import { runSlaAlerts, runMorningDigest, runComplianceAlerts } from './alertsEngine';
 import {
   type PrivacyNoticeRecord,
   type PrivacyAcknowledgementRecord,
@@ -5056,6 +5057,32 @@ Return JSON array of objects with fields: targetSkill, question.`;
   // ==========================================================================
   // DEAL ROOM API
   // ==========================================================================
+
+  // Alerts (cron / external scheduler). job = sla | morning | compliance | all
+  app.get('/api/alerts/run', async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.get('authorization') || '';
+    const headerSecret = req.get('x-alert-secret') || '';
+    if (!cronSecret || (authHeader !== `Bearer ${cronSecret}` && headerSecret !== cronSecret)) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const admin = getSupabaseAdmin();
+    if (!admin) {
+      res.status(503).json({ error: 'Supabase not configured.' });
+      return;
+    }
+    const job = typeof req.query.job === 'string' ? req.query.job : 'all';
+    const out: Record<string, unknown> = {};
+    try {
+      if (job === 'sla' || job === 'all') out.sla = await runSlaAlerts(admin);
+      if (job === 'morning' || job === 'all') out.morning = await runMorningDigest(admin);
+      if (job === 'compliance' || job === 'all') out.compliance = await runComplianceAlerts(admin);
+      res.json({ ok: true, emailConfigured: Boolean(process.env.RESEND_API_KEY), ...out });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Alert run failed' });
+    }
+  });
 
   // User & Team Management (RBAC) — server-enforced
   registerStaffRoutes(app, { authenticate: authenticateStaffingCaller, getAdmin: getSupabaseAdmin });

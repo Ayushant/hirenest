@@ -88,7 +88,8 @@ export const HqDashboardPage: React.FC = () => {
 
   const { data: recentReqs } = useQuery({
     queryKey: ['requirements', 'dashboard_overview'],
-    queryFn: () => fetchRequirements({ page: 1, pageSize: 20 }),
+    // Canonical list (deduped, soft-deleted removed): the single source for every number below.
+    queryFn: () => fetchRequirements({ page: 1, pageSize: 1000 }),
   });
 
   const { data: allHqSubs } = useQuery({
@@ -108,7 +109,15 @@ export const HqDashboardPage: React.FC = () => {
 
   const summary = data || {};
   const candBySource = summary.candidates_by_source || {};
-  const reqByStatus = summary.requirements_by_status || {};
+  // Derive status counts from the same canonical list the requirements page shows,
+  // so dashboard numbers always match (no more 356 vs 21).
+  const reqByStatus: Record<string, number> = useMemo(() => {
+    if (!recentReqs?.data) return summary.requirements_by_status || {};
+    const counts: Record<string, number> = {};
+    for (const r of recentReqs.data) counts[r.status] = (counts[r.status] || 0) + 1;
+    return counts;
+  }, [recentReqs?.data, summary.requirements_by_status]);
+  const openReqsList = (recentReqs?.data || []).filter((r) => r.status === 'open');
   const subByStage = summary.submissions_by_stage || {};
 
   const reqDonutData = useMemo(() => [
@@ -230,7 +239,7 @@ export const HqDashboardPage: React.FC = () => {
       <SinceLastVisit
         items={[
           { label: 'new candidates', count: summary.pending_users ?? 0 },
-          { label: 'open reqs', count: totalReqs },
+          { label: 'open reqs', count: reqByStatus.open ?? 0 },
           { label: 'pending feedback', count: summary.interviews_pending_feedback ?? 0 },
         ]}
       />
@@ -406,9 +415,9 @@ export const HqDashboardPage: React.FC = () => {
       </div>
 
       {/* Active Requirements Table */}
-      {recentReqs?.data && recentReqs.data.length > 0 && (
+      {openReqsList.length > 0 && (
         <DashboardSection
-          title={`Active requirements (${recentReqs.data.length})`}
+          title={`Active requirements (${openReqsList.length})`}
           action={
             <Link to={`${prefix}/requirements`} className="text-[12px] font-medium text-[var(--accent)] hover:underline">
               Open requirements pipeline →
@@ -416,7 +425,7 @@ export const HqDashboardPage: React.FC = () => {
           }
         >
           <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
-            {recentReqs.data.slice(0, 6).map((req) => {
+            {openReqsList.slice(0, 6).map((req) => {
               const budgetInfo = formatRequirementBudgetWithSubtitle(req);
               return (
                 <div
