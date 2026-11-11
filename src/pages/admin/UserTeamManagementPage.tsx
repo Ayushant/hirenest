@@ -19,6 +19,7 @@ import {
   RECORD_SCOPES,
   STAFF_ROLES,
   STAFF_ROLE_LABEL,
+  STAFF_ROLE_DESCRIPTION,
   type PermissionSet,
   type StaffRole,
 } from '../../lib/staffRbac';
@@ -282,6 +283,9 @@ const AddUserForm: React.FC<{
         options={[{ value: '', label: 'Select…' }, ...depts.map((d) => ({ value: d.id, label: d.name }))]} />
       <Input label="Designation" value={f.designation} onChange={set('designation')} />
       <Select label="System role / permission template" value={f.role} onChange={set('role')} options={roleOptions} />
+      <p className="sm:col-span-2 -mt-2 text-[12px] text-[var(--text-tertiary)]">
+        {STAFF_ROLE_DESCRIPTION[f.role as StaffRole]} Vendor Recruiters are added by their Vendor Admin inside the vendor organisation.
+      </p>
       <Select label="Reporting manager" value={f.reportingManagerId} onChange={set('reportingManagerId')}
         options={[{ value: '', label: 'None' }, ...users.map((u) => ({ value: u.id, label: u.name || u.email }))]} />
       <Input label="Joining date" type="date" value={f.joiningDate} onChange={set('joiningDate')} />

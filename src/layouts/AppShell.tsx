@@ -72,6 +72,15 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  // Time-on-platform heartbeat: one ping per minute while the tab is visible.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void fetch('/api/presence/ping', { method: 'POST' }).catch(() => undefined);
+      }
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
   useEffect(() => {
     const onResume = () => {
       for (const key of ['requirement_matches', 'my_candidate_matches', 'my_candidate_profile']) {

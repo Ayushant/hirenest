@@ -5058,6 +5058,66 @@ Return JSON array of objects with fields: targetSkill, question.`;
   // DEAL ROOM API
   // ==========================================================================
 
+  // Presence heartbeat: accumulates active time on platform per user per day.
+  app.post('/api/presence/ping', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req, { strict: true });
+    const admin = getSupabaseAdmin();
+    if (!auth.ok || !admin) {
+      res.status(auth.ok ? 503 : auth.status).json({ ok: false });
+      return;
+    }
+    const day = new Date().toISOString().slice(0, 10);
+    const { data: row } = await admin
+      .from('platform_usage')
+      .select('seconds')
+      .eq('user_id', auth.userId)
+      .eq('day', day)
+      .maybeSingle();
+    // Heartbeats arrive every 60s; cap each ping so a stuck client cannot inflate usage.
+    await admin
+      .from('platform_usage')
+      .upsert({ user_id: auth.userId, day, seconds: (row?.seconds || 0) + 60 });
+    res.json({ ok: true });
+  });
+
+  // Admin: vendor time-on-platform (last 30 days) grouped by organisation.
+  app.get('/api/presence/vendors', async (req, res) => {
+    const auth = await authenticateStaffingCaller(req, { strict: true });
+    const admin = getSupabaseAdmin();
+    if (!auth.ok || !admin) {
+      res.status(auth.ok ? 503 : auth.status).json({ error: 'Unavailable' });
+      return;
+    }
+    if (auth.role !== 'admin' && auth.role !== 'recruiter') {
+      res.status(403).json({ error: 'Internal staff access required.' });
+      return;
+    }
+    const since = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+    const { data: usage } = await admin.from('platform_usage').select('user_id, day, seconds').gte('day', since);
+    const ids = Array.from(new Set((usage || []).map((u) => u.user_id as string)));
+    const { data: profs } = ids.length
+      ? await admin.from('profiles').select('id, org_id, role').in('id', ids)
+      : { data: [] as Array<{ id: string; org_id: string | null; role: string }> };
+    const orgOf = new Map((profs || []).filter((p) => p.role.startsWith('vendor')).map((p) => [p.id, p.org_id as string]));
+    const totals = new Map<string, { seconds: number; lastDay: string }>();
+    for (const u of usage || []) {
+      const org = orgOf.get(u.user_id as string);
+      if (!org) continue;
+      const t = totals.get(org) || { seconds: 0, lastDay: '' };
+      t.seconds += u.seconds as number;
+      if ((u.day as string) > t.lastDay) t.lastDay = u.day as string;
+      totals.set(org, t);
+    }
+    res.json({
+      ok: true,
+      vendors: Array.from(totals.entries()).map(([orgId, t]) => ({
+        orgId,
+        minutes: Math.round(t.seconds / 60),
+        lastActive: t.lastDay,
+      })),
+    });
+  });
+
   // Alerts (cron / external scheduler). job = sla | morning | compliance | all
   app.get('/api/alerts/run', async (req, res) => {
     const cronSecret = process.env.CRON_SECRET;

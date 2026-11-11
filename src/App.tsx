@@ -30,6 +30,7 @@ import {
 } from './pages/admin/HqDashboardAndGov';
 import { EarlyAccessDashboardPage } from './pages/admin/EarlyAccessDashboardPage';
 import { AdminSubscriptionPage } from './pages/admin/AdminSubscriptionPage';
+import { RecruiterHome } from './pages/admin/BdmDashboardPage';
 import { UserTeamManagementPage } from './pages/admin/UserTeamManagementPage';
 import { MyAccessPage } from './pages/shared/MyAccessPage';
 import { CeoDashboardPage, CfoDashboardPage } from './pages/admin/ExecutiveDashboards';
@@ -259,7 +260,7 @@ function AppRoutes() {
         }
       >
         <Route path="my-access" element={<MyAccessPage />} />
-        <Route index element={<HqDashboardPage />} />
+        <Route index element={<RecruiterHome />} />
         <Route path="requirements" element={<HqRequirementsListPage />} />
         <Route path="requirements/:id" element={<HqRequirementDetailPage />} />
         <Route path="candidates" element={<HqCandidatesListPage />} />

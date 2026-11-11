@@ -40,6 +40,41 @@ import type {
 } from '../../types/db';
 
 // 1. HQ Vendor Performance Leaderboard Page
+/** Time on platform (last 30 days) per vendor, from the presence heartbeat. */
+const VendorUsageStrip: React.FC<{ rows: AdminVendorPerformanceRow[] }> = ({ rows }) => {
+  const usageQ = useQuery({
+    queryKey: ['vendor_platform_usage'],
+    queryFn: async () => {
+      const res = await fetch('/api/presence/vendors');
+      if (!res.ok) return [] as Array<{ orgId: string; minutes: number; lastActive: string }>;
+      return ((await res.json()).vendors || []) as Array<{ orgId: string; minutes: number; lastActive: string }>;
+    },
+  });
+  const usage = usageQ.data || [];
+  if (usage.length === 0) return null;
+  const nameOf = (orgId: string) =>
+    (rows as unknown as Array<Record<string, unknown>>).find(
+      (r) => r.vendor_org_id === orgId || r.org_id === orgId
+    )?.vendor_name ?? orgId.slice(0, 8);
+  return (
+    <div className="mb-4 rounded-[8px] border border-[var(--border)] p-3">
+      <div className="text-[12px] font-medium text-[var(--text-tertiary)] mb-2">
+        Time on platform · last 30 days
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
+        {usage
+          .sort((a, b) => b.minutes - a.minutes)
+          .map((u) => (
+            <span key={u.orgId}>
+              {String(nameOf(u.orgId))}: <b>{Math.floor(u.minutes / 60)}h {u.minutes % 60}m</b>
+              <span className="text-[var(--text-tertiary)]"> · last active {u.lastActive}</span>
+            </span>
+          ))}
+      </div>
+    </div>
+  );
+};
+
 export const HqVendorPerformancePage: React.FC = () => {
   const [page, setPage] = useState(1);
   const pageSize = 25;
@@ -60,6 +95,7 @@ export const HqVendorPerformancePage: React.FC = () => {
         title="Vendor performance"
         description="Three-pillar vendor evaluation: submission timing, candidate quality, and process compliance."
       />
+      <VendorUsageStrip rows={data} />
 
       {isLoading ? (
         <TableSkeleton rows={6} cols={7} />

@@ -24,6 +24,17 @@ export const STAFF_ROLE_LABEL: Record<StaffRole, string> = {
   recruiter: 'Recruiter',
 };
 
+export const STAFF_ROLE_DESCRIPTION: Record<StaffRole, string> = {
+  platform_admin: 'Full platform control, including security, billing and creating other admins.',
+  super_admin: 'Runs day-to-day operations and manages users below admin level. No security or billing.',
+  senior_bom: 'Cross-functional operations lead: business development, recruitment, follow-ups and task assignment. Cannot edit financial terms or access admin settings.',
+  bdm: 'Business development: leads, client relationships, sales pipeline and follow-ups for assigned clients.',
+  hr: 'Employee records, onboarding, attendance, leave and HR documents.',
+  admin_recruiter: 'Runs recruitment: requirements, candidates, screening approvals, submissions and interviews.',
+  recruiter: 'Works assigned requirements: sourcing, screening, matching and submissions.',
+};
+// Vendor Recruiters are created inside a vendor organisation by its Vendor Admin (separate, org-scoped role).
+
 export const PERMISSION_ACTIONS = [
   'view',
   'create',

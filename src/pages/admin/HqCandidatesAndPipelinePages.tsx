@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ScheduleInterviewModal } from '../../components/domain/InterviewModals';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Plus, Upload, ExternalLink } from 'lucide-react';
@@ -1599,8 +1600,72 @@ export const HqSubmissionsPage: React.FC = () => {
 };
 
 // 4. HQ Interviews & Pending Feedback Queue Page
+/** Stand-alone interview creation: pick a submission, then use the standard scheduling form. */
+const CreateInterviewFlow: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  onScheduled: () => void;
+}> = ({ open, onClose, onScheduled }) => {
+  const [submissionId, setSubmissionId] = useState('');
+  const subsQ = useQuery({
+    queryKey: ['interview_create_submissions'],
+    queryFn: () => fetchSubmissions({ page: 1, pageSize: 200 }),
+    enabled: open,
+  });
+  const subs = (subsQ.data?.data || []).filter(
+    (x) => x.is_valid !== false && !['rejected', 'withdrawn', 'joined'].includes(String(x.stage))
+  );
+  const chosen = subs.find((x) => x.id === submissionId);
+
+  if (!open) return null;
+  if (chosen) {
+    return (
+      <ScheduleInterviewModal
+        open
+        onClose={() => {
+          setSubmissionId('');
+          onClose();
+        }}
+        submissionId={chosen.id}
+        requirementTitle={chosen.requirements?.title || ''}
+        requirementDescription={chosen.requirements?.description || ''}
+        requirementSkills={chosen.requirements?.skills || []}
+        candidateSkills={chosen.candidates?.skills || []}
+        candidateExperienceYears={chosen.candidates?.total_experience_years ?? null}
+        candidateCurrentTitle={chosen.candidates?.current_title ?? null}
+        onScheduled={() => {
+          setSubmissionId('');
+          onScheduled();
+        }}
+      />
+    );
+  }
+  return (
+    <Dialog open onClose={onClose} title="Schedule interview">
+      <div className="space-y-3">
+        <Select
+          label="Candidate submission"
+          value={submissionId}
+          onChange={(e) => setSubmissionId(e.target.value)}
+          options={[
+            { value: '', label: subsQ.isLoading ? 'Loading…' : 'Select a candidate / requirement…' },
+            ...subs.map((x) => ({
+              value: x.id,
+              label: `${x.candidates?.full_name || 'Candidate'} — ${x.requirements?.title || 'Requirement'}`,
+            })),
+          ]}
+        />
+        <p className="text-[12px] text-[var(--text-tertiary)]">
+          Interviews are created against a candidate submission. Submit the candidate to a requirement first if they are not listed.
+        </p>
+      </div>
+    </Dialog>
+  );
+};
+
 export const HqInterviewsPage: React.FC = () => {
   const { toast } = useToast();
+  const [createOpen, setCreateOpen] = useState(false);
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<InterviewStatus | ''>('');
@@ -1647,6 +1712,15 @@ export const HqInterviewsPage: React.FC = () => {
       <PageHeader
         title="Interviews"
         description="Scheduled interview rounds and mandatory post-interview structured feedback."
+        actions={<Button onClick={() => setCreateOpen(true)}>Schedule interview</Button>}
+      />
+      <CreateInterviewFlow
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onScheduled={() => {
+          setCreateOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['interviews'] });
+        }}
       />
 
       {/* Needs attention: Pending Feedback Queue */}
