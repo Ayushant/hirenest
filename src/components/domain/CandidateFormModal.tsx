@@ -383,7 +383,7 @@ export const CandidateFormModal: React.FC<{
         }
 
         if (item.file && item.resumeHash) {
-          await uploadCandidateResume(result.candidate_id, item.file, item.resumeHash).catch(
+          await uploadCandidateResume(result.candidate_id, item.file, item.resumeHash, { reparse: false }).catch(
             () => undefined
           );
         }
@@ -494,7 +494,7 @@ export const CandidateFormModal: React.FC<{
       }
 
       if (resumeFile && resumeHash) {
-        await uploadCandidateResume(result.candidate_id, resumeFile, resumeHash);
+        await uploadCandidateResume(result.candidate_id, resumeFile, resumeHash, { reparse: false });
       }
 
       if (dpdpNoticeAccepted) {

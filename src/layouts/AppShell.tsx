@@ -72,6 +72,16 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  useEffect(() => {
+    const onResume = () => {
+      for (const key of ['requirement_matches', 'my_candidate_matches', 'my_candidate_profile']) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes('match') });
+    };
+    window.addEventListener('hirenest:resume-updated', onResume);
+    return () => window.removeEventListener('hirenest:resume-updated', onResume);
+  }, [queryClient]);
   const profileRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!profileOpen) return;

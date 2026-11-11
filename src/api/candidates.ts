@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { buildSafeResumeStoragePath } from '../lib/hash';
+import { parseResumeFile } from '../lib/resumeParser';
 import {
   computeFineTunedCandidateMatch,
   decomposeCompoundSkills,
@@ -192,7 +193,8 @@ export async function updateCandidateContacts(
 export async function uploadCandidateResume(
   candidateId: string,
   file: File,
-  resumeHash: string
+  resumeHash: string,
+  options: { reparse?: boolean } = {}
 ): Promise<string> {
   const storagePath = buildSafeResumeStoragePath(candidateId, file.name);
   const { error: uploadError } = await supabase.storage
@@ -203,10 +205,40 @@ export async function uploadCandidateResume(
     });
   if (uploadError) throw uploadError;
 
+  // A new/updated resume must refresh the candidate's skills so match scores and
+  // missing-skill lists always reflect the latest document.
+  let refreshed: Partial<Candidate> = {};
+  if (options.reparse !== false) {
+    try {
+      const parsed = await parseResumeFile(file);
+      if (parsed.skills.length > 0) refreshed.skills = parsed.skills;
+      if (parsed.summary) refreshed.summary = parsed.summary;
+      if (parsed.current_title) refreshed.current_title = parsed.current_title;
+      if (parsed.total_experience_years > 0) {
+        refreshed.total_experience_years = parsed.total_experience_years;
+      }
+      refreshed.parsed_data = {
+        ...parsed,
+        email: undefined,
+        phone: undefined,
+        linkedin_url: undefined,
+        parsed_at: new Date().toISOString(),
+      } as unknown as Candidate['parsed_data'];
+    } catch {
+      refreshed = {};
+    }
+  }
+
   await updateCandidateProfile(candidateId, {
     resume_path: storagePath,
     resume_hash: resumeHash,
+    ...refreshed,
   });
+
+  // Tell open screens to recompute matches against the new resume.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('hirenest:resume-updated', { detail: { candidateId } }));
+  }
 
   return storagePath;
 }
@@ -260,12 +292,9 @@ export async function fetchMatchesForRequirement(params: {
   const existingMatches = (matchesRes.data || []) as CandidateMatch[];
   const allCandidates = (candidatesRes.data || []) as Candidate[];
 
-  if (!requirement || isRequirementSoftDeleted(requirement)) {
-    const sortedFallback = [...existingMatches].sort((a, b) => b.final_score - a.final_score);
-    return {
-      data: sortedFallback.slice(from, to),
-      count: sortedFallback.length,
-    };
+  // Match intelligence is only meaningful for ACTIVE (open) requirements.
+  if (!requirement || isRequirementSoftDeleted(requirement) || requirement.status !== 'open') {
+    return { data: [], count: 0 };
   }
 
   // If the requirement has compound unsplit skill strings (e.g. separated by ';', '/', or 'and'),
@@ -462,8 +491,7 @@ export async function fetchMatchesForCandidate(params: {
       (m) =>
         m.requirements &&
         !isRequirementSoftDeleted(m.requirements) &&
-        m.requirements.status !== 'closed' &&
-        m.requirements.status !== 'filled'
+        m.requirements.status === 'open'
     );
     const sortedFallback = [...activeFallback].sort((a, b) => b.final_score - a.final_score);
     return {
@@ -483,7 +511,7 @@ export async function fetchMatchesForCandidate(params: {
   for (const r of [...dbRequirements, ...catalogRequirements]) {
     if (!r || !r.id || seenIds.has(r.id)) continue;
     if (isRequirementSoftDeleted(r)) continue;
-    if (r.status === 'closed' || r.status === 'filled' || r.status === 'on_hold') continue;
+    if (r.status !== 'open') continue;
     const notesStr = String((r as unknown as Record<string, unknown>).notes || '');
     if (notesStr.includes('__HIRENEST_DELETED_META__:')) continue;
     seenIds.add(r.id);
