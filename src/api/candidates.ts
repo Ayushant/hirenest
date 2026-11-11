@@ -399,9 +399,17 @@ export async function fetchMatchesForRequirement(params: {
     return b.experience_score - a.experience_score;
   });
 
+  // Show only genuine matches (>= 70% and at least one resume skill found in the JD);
+  // manually overridden scores are always kept.
+  const qualified = enrichedMatches.filter(
+    (m) =>
+      m.override_score != null ||
+      (m.final_score >= 70 && (m.matched_skills?.length ?? 0) > 0)
+  );
+
   return {
-    data: enrichedMatches.slice(from, to),
-    count: enrichedMatches.length,
+    data: qualified.slice(from, to),
+    count: qualified.length,
   };
 }
 
