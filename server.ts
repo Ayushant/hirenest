@@ -23,6 +23,7 @@ import {
   parseRequirementMeta,
 } from './src/lib/enterpriseLifecycle';
 import { extractStructuredFieldsFromText } from './src/lib/resumeParser';
+import { registerStaffRoutes } from './staffRoutes';
 import {
   type PrivacyNoticeRecord,
   type PrivacyAcknowledgementRecord,
@@ -5053,6 +5054,9 @@ Return JSON array of objects with fields: targetSkill, question.`;
   // ==========================================================================
   // DEAL ROOM API
   // ==========================================================================
+
+  // User & Team Management (RBAC) — server-enforced
+  registerStaffRoutes(app, { authenticate: authenticateStaffingCaller, getAdmin: getSupabaseAdmin });
 
   // List all Deal Rooms the caller can access
   app.get('/api/deal-rooms', async (req, res) => {

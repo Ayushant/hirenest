@@ -200,6 +200,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           { label: 'Deal Rooms', to: `${basePrefix}/deal-rooms`, icon: MessageSquare },
           { label: 'Duplicates & ownership', to: `${basePrefix}/duplicates`, icon: Flag },
           { label: 'Vendor performance', to: `${basePrefix}/vendor-performance`, icon: BarChart3 },
+          ...(role === 'admin' ? [] : [{ label: 'My Access', to: `${basePrefix}/my-access`, icon: ShieldCheck }]),
         ],
       };
 
@@ -210,6 +211,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Approvals', to: '/admin/approvals', icon: UserCheck },
             { label: 'Organizations', to: '/admin/organizations', icon: Building2 },
             { label: 'Users', to: '/admin/users', icon: Users },
+            { label: 'User & Team Management', to: '/admin/team', icon: Users },
+            { label: 'My Access', to: '/admin/my-access', icon: ShieldCheck },
             { label: 'Feedback moderation', to: '/admin/feedback-moderation', icon: ClipboardCheck },
             { label: 'Disputes', to: '/admin/disputes', icon: Scale },
             { label: 'Settings & weights', to: '/admin/settings', icon: Settings },

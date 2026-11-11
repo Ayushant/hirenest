@@ -30,6 +30,8 @@ import {
 } from './pages/admin/HqDashboardAndGov';
 import { EarlyAccessDashboardPage } from './pages/admin/EarlyAccessDashboardPage';
 import { AdminSubscriptionPage } from './pages/admin/AdminSubscriptionPage';
+import { UserTeamManagementPage } from './pages/admin/UserTeamManagementPage';
+import { MyAccessPage } from './pages/shared/MyAccessPage';
 import { CeoDashboardPage, CfoDashboardPage } from './pages/admin/ExecutiveDashboards';
 
 import {
@@ -219,6 +221,8 @@ function AppRoutes() {
         <Route path="organizations" element={<AdminOrganizationsPage />} />
         <Route path="organizations/:id" element={<AdminOrganizationDetailPage />} />
         <Route path="users" element={<AdminUsersPage />} />
+        <Route path="team" element={<UserTeamManagementPage />} />
+        <Route path="my-access" element={<MyAccessPage />} />
         <Route path="requirements" element={<HqRequirementsListPage />} />
         <Route path="requirements/:id" element={<HqRequirementDetailPage />} />
         <Route path="candidates" element={<HqCandidatesListPage />} />
@@ -254,6 +258,7 @@ function AppRoutes() {
           </RequireRole>
         }
       >
+        <Route path="my-access" element={<MyAccessPage />} />
         <Route index element={<HqDashboardPage />} />
         <Route path="requirements" element={<HqRequirementsListPage />} />
         <Route path="requirements/:id" element={<HqRequirementDetailPage />} />
