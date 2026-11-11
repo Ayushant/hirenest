@@ -23,7 +23,7 @@ import {
   parseRequirementMeta,
 } from './src/lib/enterpriseLifecycle';
 import { extractStructuredFieldsFromText } from './src/lib/resumeParser';
-import { registerStaffRoutes } from './staffRoutes';
+import { registerStaffRoutes, registerStaffEnforcement } from './staffRoutes';
 import {
   type PrivacyNoticeRecord,
   type PrivacyAcknowledgementRecord,
@@ -1672,6 +1672,8 @@ async function startServer() {
   // ==========================================================================
   // SHORT LINK RESOLVER (e.g. /r/HN-49A0DD → requirement UUID)
   // ==========================================================================
+  registerStaffEnforcement(app, { authenticate: authenticateStaffingCaller, getAdmin: getSupabaseAdmin });
+
   app.get('/api/public-job/:slug', async (req, res) => {
     try {
       const job = await fetchShareableJobBySlug(String(req.params.slug || ''));

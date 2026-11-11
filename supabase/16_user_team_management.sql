@@ -68,3 +68,14 @@ select p.id, case when p.role = 'admin' then 'platform_admin' else 'recruiter' e
 from public.profiles p
 where p.role in ('admin', 'recruiter')
 on conflict (user_id) do nothing;
+
+-- Record assignments: lets 'own' / 'assigned' scoped users reach only records assigned to them.
+create table if not exists public.staff_record_assignments (
+  module      text not null,
+  record_id   text not null,
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  assigned_by uuid,
+  created_at  timestamptz not null default now(),
+  primary key (module, record_id, user_id)
+);
+alter table public.staff_record_assignments enable row level security;

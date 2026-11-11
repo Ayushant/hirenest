@@ -585,3 +585,104 @@ export function registerStaffRoutes(app: express.Express, deps: Deps): void {
     res.json({ ok: true, events: data || [] });
   });
 }
+
+type Rule = {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: RegExp;
+  module: PermissionModule;
+  action: PermissionAction;
+  /** 'allow' = client/vendor/candidate callers pass through unchanged (shared endpoint). */
+  external: 'allow' | 'deny';
+  recordId?: (req: express.Request) => string | null;
+};
+
+const bodyId = (key: string) => (req: express.Request): string | null => {
+  const v = (req.body as Record<string, unknown> | undefined)?.[key];
+  return typeof v === 'string' && v ? v : null;
+};
+
+/** Central map of existing internal endpoints → required permission. Enforced server-side. */
+const ENFORCEMENT_RULES: Rule[] = [
+  { method: 'POST', path: /^\/api\/requirements\/delete$/, module: 'requirements', action: 'delete', external: 'allow', recordId: bodyId('requirementId') },
+  { method: 'POST', path: /^\/api\/requirements\/duplicates\/consolidate$/, module: 'requirements', action: 'edit', external: 'allow' },
+  { method: 'POST', path: /^\/api\/requirements\/mapping$/, module: 'requirements', action: 'edit', external: 'allow', recordId: bodyId('requirementId') },
+  { method: 'POST', path: /^\/api\/subscriptions\/assign-plan$/, module: 'subscription_billing', action: 'edit', external: 'deny' },
+  { method: 'GET', path: /^\/api\/subscriptions\/all-plans$/, module: 'subscription_billing', action: 'view', external: 'deny' },
+  { method: 'POST', path: /^\/api\/subscriptions\/reminders\/run$/, module: 'subscription_billing', action: 'edit', external: 'deny' },
+  { method: 'POST', path: /^\/api\/privacy\/retention\/policies$/, module: 'platform_security', action: 'edit', external: 'deny' },
+  { method: 'POST', path: /^\/api\/privacy\/deletion-jobs\/run$/, module: 'platform_security', action: 'edit', external: 'deny' },
+  { method: 'POST', path: /^\/api\/privacy\/incidents$/, module: 'platform_security', action: 'edit', external: 'deny' },
+  { method: 'POST', path: /^\/api\/privacy\/requests\/update$/, module: 'platform_security', action: 'edit', external: 'deny' },
+  { method: 'GET', path: /^\/api\/admin\/onboarding\/pending-documents$/, module: 'clients_vendors', action: 'view', external: 'deny' },
+  { method: 'POST', path: /^\/api\/admin\/documents\/[^/]+\/review$/, module: 'clients_vendors', action: 'approve', external: 'deny' },
+  { method: 'POST', path: /^\/api\/admin\/organizations\/[^/]+\/nda$/, module: 'clients_vendors', action: 'edit', external: 'deny' },
+  { method: 'GET', path: /^\/api\/early-access\/applications$/, module: 'business_development', action: 'view', external: 'deny' },
+  { method: 'PATCH', path: /^\/api\/early-access\/applications\/[^/]+$/, module: 'business_development', action: 'edit', external: 'deny' },
+  { method: 'POST', path: /^\/api\/early-access\/applications\/[^/]+\/invite$/, module: 'business_development', action: 'edit', external: 'deny' },
+];
+
+/**
+ * Registers a gate (before the route handlers) that enforces ENFORCEMENT_RULES.
+ * Requires a verified Supabase JWT. Internal staff are checked against their effective
+ * permissions and record scope; external roles (client/vendor/candidate) are unaffected
+ * on shared endpoints and denied on staff-only ones.
+ */
+export function registerStaffEnforcement(app: express.Express, deps: Deps): void {
+  app.use('/api', async (req, res, next) => {
+    const rule = ENFORCEMENT_RULES.find((r) => r.method === req.method && r.path.test(`/api${req.path}`));
+    if (!rule) return next();
+
+    const auth = await deps.authenticate(req, { strict: true });
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.message });
+      return;
+    }
+    const admin = deps.getAdmin();
+    const isStaffProfile = auth.role === 'admin' || auth.role === 'recruiter';
+
+    if (!isStaffProfile) {
+      if (rule.external === 'allow') return next();
+      res.status(403).json({ error: 'Internal staff access required.' });
+      return;
+    }
+    // Without a service client we cannot resolve fine-grained access; keep legacy admin behaviour only.
+    if (!admin) {
+      if (auth.role === 'admin') return next();
+      res.status(403).json({ error: 'Permission service unavailable.' });
+      return;
+    }
+
+    const caller = await resolveStaffAccess(admin, auth.userId, auth.role);
+    const deny = async (message: string) => {
+      await admin.from('access_audit_log').insert({
+        actor_id: auth.userId,
+        actor_role: caller?.staffRole ?? auth.role,
+        action: 'denied',
+        after: { endpoint: `${req.method} ${req.path}`, need: `${rule.module}.${rule.action}` },
+      });
+      res.status(403).json({ error: message });
+    };
+    if (!caller || !hasPermission(caller.access, rule.module, rule.action)) {
+      await deny(`Missing permission: ${rule.module}.${rule.action}`);
+      return;
+    }
+
+    // Record scope: own/assigned grants only reach records explicitly assigned to the caller.
+    const scope = caller.access.permissions[rule.module]?.scope;
+    const recordId = rule.recordId?.(req) ?? null;
+    if (recordId && (scope === 'own' || scope === 'assigned')) {
+      const { data: row } = await admin
+        .from('staff_record_assignments')
+        .select('user_id')
+        .eq('module', rule.module)
+        .eq('record_id', recordId)
+        .eq('user_id', auth.userId)
+        .maybeSingle();
+      if (!row) {
+        await deny('This record is not assigned to you.');
+        return;
+      }
+    }
+    next();
+  });
+}
