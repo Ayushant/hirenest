@@ -113,23 +113,20 @@ export function buildTrackedRequirementShareUrl(params: {
   audienceType: SharingAudienceType;
   shareToken: string;
 }): string {
+  // Always share the public short link (/r/HN-XXXXXX): it works for logged-out
+  // recipients and resolves to the correct job page; tracking rides along as query params.
   const origin =
     typeof window !== 'undefined' && window.location?.origin
       ? window.location.origin
-      : 'https://hirenestos.app';
+      : 'https://os.hirenestworkforce.com';
 
-  const basePath =
-    params.audienceType === 'vendor'
-      ? `/vendor/requirements/${params.requirementId}`
-      : `/candidate/browse`;
-
+  const code = `HN-${params.requirementId.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
   const qs = new URLSearchParams({
-    req: params.requirementId,
     audience: params.audienceType,
     share_ref: params.shareToken,
   });
 
-  return `${origin}${basePath}?${qs.toString()}`;
+  return `${origin}/r/${code}?${qs.toString()}`;
 }
 
 export function buildShortShareUrl(requirementId: string): string {

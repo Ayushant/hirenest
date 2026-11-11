@@ -124,6 +124,15 @@ function ShortLinkRedirect() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const [error, setError] = useState(false);
+  const trackingQs = (() => {
+    const src = new URLSearchParams(window.location.search);
+    const out = new URLSearchParams({ apply: '1' });
+    const ref = src.get('share_ref');
+    const aud = src.get('audience');
+    if (ref) out.set('share_ref', ref);
+    if (aud) out.set('audience', aud);
+    return out.toString();
+  })();
 
   useEffect(() => {
     if (!code) { setError(true); return; }
@@ -134,9 +143,9 @@ function ShortLinkRedirect() {
         if (!res.ok) { setError(true); return; }
         const data = await res.json();
         if (data.slug) {
-          navigate(`/jobs/${data.slug}?apply=1`, { replace: true, state: { jobData: data } });
+          navigate(`/jobs/${data.slug}?${trackingQs}`, { replace: true, state: { jobData: data } });
         } else if (data.id) {
-          navigate(`/jobs/${data.id}?apply=1`, { replace: true, state: { jobData: data } });
+          navigate(`/jobs/${data.id}?${trackingQs}`, { replace: true, state: { jobData: data } });
         } else {
           setError(true);
         }
@@ -144,7 +153,7 @@ function ShortLinkRedirect() {
         setError(true);
       }
     })();
-  }, [code, navigate]);
+  }, [code, navigate, trackingQs]);
 
   if (error) {
     return (

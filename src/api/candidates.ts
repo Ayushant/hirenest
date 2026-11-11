@@ -549,15 +549,22 @@ export async function fetchMatchesForCandidate(params: {
     });
   }
 
-  enrichedMatches.sort((a, b) => {
+  // Only surface genuine matches: >= 70% overall AND at least one skill proven by the
+  // resume/profile against the JD. Anything lower is noise and is hidden.
+  const MIN_MATCH_SCORE = 70;
+  const qualified = enrichedMatches.filter(
+    (m) => m.final_score >= MIN_MATCH_SCORE && (m.matched_skills?.length ?? 0) > 0
+  );
+
+  qualified.sort((a, b) => {
     if (b.final_score !== a.final_score) return b.final_score - a.final_score;
     if (b.skill_score !== a.skill_score) return b.skill_score - a.skill_score;
     return b.experience_score - a.experience_score;
   });
 
   return {
-    data: enrichedMatches.slice(from, to),
-    count: enrichedMatches.length,
+    data: qualified.slice(from, to),
+    count: qualified.length,
   };
 }
 
