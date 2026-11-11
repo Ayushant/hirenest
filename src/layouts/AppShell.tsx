@@ -469,8 +469,13 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <button
             type="button"
             onClick={async () => {
-              navigate('/', { replace: true });
-              await signOut();
+              try {
+                await signOut();
+              } finally {
+                // Full page load: guarantees a clean state and lands on the public home page,
+                // not the route guard's sign-in redirect.
+                window.location.replace('/');
+              }
             }}
             className="w-full h-[34px] px-2.5 rounded-[6px] flex items-center gap-2 text-[13px] leading-[20px] text-[var(--sidebar-muted)] hover:text-white hover:bg-[var(--sidebar-hover)] transition-colors cursor-pointer"
           >
