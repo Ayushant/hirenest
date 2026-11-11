@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  ArrowLeft,
+  Repeat,
   Bell,
   Briefcase,
   Building2,
@@ -69,6 +71,24 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!profileOpen) return;
+    const close = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [profileOpen]);
+  const handleSignOut = async (next: string) => {
+    try {
+      await signOut();
+    } finally {
+      // Full page load: clean state, lands on the intended public page.
+      window.location.replace(next);
+    }
+  };
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -466,23 +486,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await signOut();
-              } finally {
-                // Full page load: guarantees a clean state and lands on the public home page,
-                // not the route guard's sign-in redirect.
-                window.location.replace('/');
-              }
-            }}
-            className="w-full h-[34px] px-2.5 rounded-[6px] flex items-center gap-2 text-[13px] leading-[20px] text-[var(--sidebar-muted)] hover:text-white hover:bg-[var(--sidebar-hover)] transition-colors cursor-pointer"
-          >
-            <LogOut strokeWidth={1.75} className="h-3.5 w-3.5" />
-            <span>Sign out</span>
-          </button>
-
           <div className="pt-1.5 px-2.5 border-t border-white/10 text-[12px] leading-[16px] text-[var(--sidebar-muted)]">
             Built by{' '}
             <a
@@ -502,6 +505,17 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         {/* Top Bar: 52px tall, white surface, 1px bottom border */}
         <header className="h-[52px] border-b border-[var(--border)] bg-[var(--surface)] px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-30">
           <div className="flex items-center gap-2.5 min-w-0">
+            {location.pathname !== firstLink && (
+              <button
+                type="button"
+                onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(firstLink))}
+                aria-label="Go back"
+                title="Back"
+                className="h-8 w-8 inline-flex items-center justify-center rounded-[6px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer"
+              >
+                <ArrowLeft strokeWidth={1.75} className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
@@ -666,7 +680,41 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               )}
             </button>
 
-            <Avatar id={profile?.id} name={profile?.full_name} size="sm" />
+            <div className="relative" ref={profileRef}>
+              <button
+                type="button"
+                onClick={() => setProfileOpen((o) => !o)}
+                aria-label="Account menu"
+                aria-expanded={profileOpen}
+                className="rounded-full cursor-pointer"
+              >
+                <Avatar id={profile?.id} name={profile?.full_name} size="sm" />
+              </button>
+              {profileOpen && (
+                <div className="absolute right-0 mt-2 w-60 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] shadow-lg z-50 py-1">
+                  <div className="px-3 py-2 border-b border-[var(--border)]">
+                    <div className="text-[13px] font-medium text-[var(--text-primary)] truncate">{profile?.full_name}</div>
+                    <div className="text-[12px] text-[var(--text-tertiary)] truncate">{ROLE_LABELS[role]}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleSignOut('/signin')}
+                    className="w-full px-3 py-2 flex items-center gap-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer"
+                  >
+                    <Repeat strokeWidth={1.75} className="h-3.5 w-3.5" />
+                    Switch account
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSignOut('/')}
+                    className="w-full px-3 py-2 flex items-center gap-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer"
+                  >
+                    <LogOut strokeWidth={1.75} className="h-3.5 w-3.5" />
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
