@@ -186,6 +186,10 @@ export const CandidateJobsForMePage: React.FC = () => {
                             Potential match
                           </span>
                         )}
+                        <Badge tone="success">
+                          {Math.round(m.final_score)}% match
+                        </Badge>
+
                       </div>
                       <p className="text-[13px] text-[var(--text-secondary)]">
                         {job?.location || '-'} ({job?.work_mode || '-'}) ·{' '}
