@@ -18,7 +18,8 @@ import { applyToRequirementRpc } from '../../api/submissions';
 import { supabase } from '../../lib/supabase';
 import { parseJobDescription } from '../../lib/jobDescription';
 import { mapSupabaseError } from '../../lib/errors';
-import { Button, Card, Badge, Dialog, Input } from '../../components/ui/kit';
+import { Button, Card, Dialog, Input } from '../../components/ui/kit';
+import { PublicNav, PUBLIC_FONT } from './PublicNav';
 
 const EMPLOYMENT_LABEL: Record<string, string> = {
   full_time: 'Full-time',
@@ -177,146 +178,114 @@ export const PublicJobPage: React.FC = () => {
     );
   }
 
+  const empLabel = EMPLOYMENT_LABEL[job.employment_type || ''] || 'Full-time';
+  const heroChip = 'inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200';
+  const overview = [
+    { icon: <MapPin className="h-4 w-4" />, label: 'Location', value: job.location || '-' },
+    { icon: <Building2 className="h-4 w-4" />, label: 'Work mode', value: job.work_mode ? WORK_MODE_LABEL[job.work_mode] : '-' },
+    { icon: <Clock className="h-4 w-4" />, label: 'Experience', value: formatExperience(job.min_experience, job.max_experience) },
+    { icon: <Briefcase className="h-4 w-4" />, label: 'Job type', value: empLabel },
+    { icon: <Users className="h-4 w-4" />, label: 'Openings', value: `${job.openings}` },
+    { icon: <Calendar className="h-4 w-4" />, label: 'Posted', value: formatPostedDate(job.posted_at) },
+    { icon: <Briefcase className="h-4 w-4" />, label: 'Notice', value: 'Negotiable' },
+    { icon: <Building2 className="h-4 w-4" />, label: 'Compensation', value: 'On request' },
+  ];
+
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: 'var(--app-bg)', color: 'var(--text-primary)' }}
-    >
-      {/* Top nav */}
-      <nav
-        className="border-b"
-        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-      >
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-base font-semibold tracking-tight"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            HireNest
-          </Link>
-          <Link
-            to="/signin"
-            className="text-sm"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Sign in
-          </Link>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-slate-50 text-slate-900" style={{ fontFamily: PUBLIC_FONT }}>
+      <PublicNav />
 
-      <main className="max-w-5xl mx-auto px-5 sm:px-8 py-10 sm:py-14 space-y-10 sm:space-y-12">
-        {/* Header */}
-        <header className="space-y-4">
-          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-            <Badge tone="indigo">{job.openings} opening{job.openings > 1 ? 's' : ''}</Badge>
-            <span>·</span>
-            <span>Posted {formatPostedDate(job.posted_at)}</span>
+      {/* Hero */}
+      <header className="bg-gradient-to-b from-[#1B1A33] to-[#0F111E] text-white">
+        <div className="mx-auto max-w-5xl space-y-5 px-5 pb-10 pt-8 sm:px-8 sm:pb-12">
+          <Link to="/jobs" className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-300 hover:text-indigo-200">
+            ← All open roles
+          </Link>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full border border-indigo-400/30 bg-indigo-500/10 px-2.5 py-0.5 font-semibold text-indigo-200">
+              {job.openings} opening{job.openings > 1 ? 's' : ''}
+            </span>
+            <span className="font-mono text-slate-400">Posted {formatPostedDate(job.posted_at)}</span>
           </div>
-
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight leading-tight">
-            {job.title}
-          </h1>
-
+          <h1 className="!text-white text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-[44px]">{job.title}</h1>
           {job.client_org_name && (
-            <div className="flex items-center gap-2 text-base sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
-              <Building2 className="w-5 h-5" aria-hidden="true" />
+            <div className="flex items-center gap-2 text-base text-slate-300 sm:text-lg">
+              <Building2 className="h-5 w-5" aria-hidden="true" />
               {job.client_org_name}
             </div>
           )}
-
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm sm:text-base pt-1" style={{ color: 'var(--text-secondary)' }}>
+          <div className="flex flex-wrap gap-2">
             {job.location && (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="w-4 h-4" aria-hidden="true" />
+              <span className={heroChip}>
+                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                 {job.location}
                 {job.work_mode ? ` · ${WORK_MODE_LABEL[job.work_mode]}` : ''}
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="w-4 h-4" aria-hidden="true" />
+            <span className={heroChip}>
+              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
               {formatExperience(job.min_experience, job.max_experience)}
             </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Briefcase className="w-4 h-4" aria-hidden="true" />
-              {EMPLOYMENT_LABEL[job.employment_type || ''] || 'Full-time'}
+            <span className={heroChip}>
+              <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
+              {empLabel}
             </span>
           </div>
 
-          {/* CTAs */}
-          <div className="flex flex-wrap gap-3 pt-5">
-            <Button
-              size="lg"
-              className="h-11 w-full sm:w-auto"
+          <div className="flex flex-wrap gap-3 pt-2">
+            <button
+              type="button"
               disabled={isClosedJob}
               onClick={() => setApplyOpen(true)}
+              className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-500 px-6 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               Apply Now
-            </Button>
-            <Button size="lg" variant="secondary" onClick={handleShare} className="h-11 flex-1 sm:flex-none">
-              <Share2 className="w-4 h-4 mr-2" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 sm:flex-none"
+            >
+              <Share2 className="mr-2 h-4 w-4" aria-hidden="true" />
               Share
-            </Button>
-            <a href={whatsAppHref} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
-              <Button size="lg" variant="secondary" className="h-11 w-full">
-                <MessageCircle className="w-4 h-4 mr-2" aria-hidden="true" />
-                WhatsApp
-              </Button>
+            </button>
+            <a
+              href={whatsAppHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 sm:flex-none"
+            >
+              <MessageCircle className="mr-2 h-4 w-4" aria-hidden="true" />
+              WhatsApp
             </a>
           </div>
-
-          <p className="text-xs sm:text-sm pt-1" style={{ color: 'var(--text-tertiary)' }}>
+          <p className="text-xs text-slate-400">
             {session
               ? 'You are signed in - Apply Now will submit your application.'
               : 'Sign up or sign in to apply - it only takes a minute.'}
           </p>
-        </header>
+        </div>
+      </header>
 
-        {/* Overview grid */}
-        <section>
-          <h2
-            className="text-xs font-semibold uppercase tracking-wider mb-4"
-            style={{ color: 'var(--text-tertiary)' }}
-          >
-            Overview
-          </h2>
-          <Card className="divide-y sm:divide-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-4">
-            <OverviewCell icon={<MapPin className="w-4 h-4" />} label="Location" value={job.location || '-'} />
-            <OverviewCell icon={<Building2 className="w-4 h-4" />} label="Work mode" value={job.work_mode ? WORK_MODE_LABEL[job.work_mode] : '-'} />
-            <OverviewCell icon={<Clock className="w-4 h-4" />} label="Experience" value={formatExperience(job.min_experience, job.max_experience)} />
-            <OverviewCell icon={<Briefcase className="w-4 h-4" />} label="Job type" value={EMPLOYMENT_LABEL[job.employment_type || ''] || 'Full-time'} />
-            <OverviewCell icon={<Users className="w-4 h-4" />} label="Openings" value={`${job.openings}`} />
-            <OverviewCell icon={<Calendar className="w-4 h-4" />} label="Posted" value={formatPostedDate(job.posted_at)} />
-            <OverviewCell icon={<Briefcase className="w-4 h-4" />} label="Notice" value="Negotiable" />
-            <OverviewCell icon={<Building2 className="w-4 h-4" />} label="Compensation" value="On request" />
-          </Card>
-        </section>
+      <main className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-5 py-8 sm:px-8 sm:py-10 lg:grid-cols-3">
+        <div className="space-y-8 lg:col-span-2">
+          {isClosedJob && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+              <p className="text-sm font-semibold text-amber-900">This position is no longer accepting applications.</p>
+              <Link to="/jobs" className="text-sm font-semibold text-indigo-600 underline">
+                View roles we&apos;re hiring for now
+              </Link>
+            </div>
+          )}
 
-        {isClosedJob && (
-          <Card className="p-4 sm:p-5">
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              This position is no longer accepting applications.
-            </p>
-            <Link to="/jobs" className="text-sm underline" style={{ color: 'var(--accent)' }}>
-              View roles we&apos;re hiring for now
-            </Link>
-          </Card>
-        )}
-
-        {/* About */}
-        <section className="space-y-4">
-          <h2
-            className="text-xs font-semibold uppercase tracking-wider"
-            style={{ color: 'var(--text-tertiary)' }}
-          >
-            About the role
-          </h2>
+          <section className="space-y-4">
+            <h2 className="font-['Public_Sans'] text-[11px] font-bold uppercase tracking-wider text-slate-500">About the role</h2>
           {(() => {
             const parsed = parseJobDescription(job.description);
             return (
               <>
                 {parsed.body && (
-                  <Card className="p-6 sm:p-8">
+                  <Card className="rounded-xl !border-slate-200 p-6 shadow-sm sm:p-8">
                     <p
                       className="whitespace-pre-wrap text-base leading-relaxed"
                       style={{ color: 'var(--text-primary)' }}
@@ -366,7 +335,7 @@ export const PublicJobPage: React.FC = () => {
                   </Card>
                 )}
                 {parsed.notes && (
-                  <Card className="p-6 sm:p-8">
+                  <Card className="rounded-xl !border-slate-200 p-6 shadow-sm sm:p-8">
                     <h3
                       className="text-xs font-semibold uppercase tracking-wider mb-2"
                       style={{ color: 'var(--text-tertiary)' }}
@@ -382,7 +351,7 @@ export const PublicJobPage: React.FC = () => {
                   </Card>
                 )}
                 {!parsed.body && !parsed.docId && !parsed.notes && (
-                  <Card className="p-6 sm:p-8">
+                  <Card className="rounded-xl !border-slate-200 p-6 shadow-sm sm:p-8">
                     <p className="text-base" style={{ color: 'var(--text-tertiary)' }}>
                       Details for this role are available on request.
                     </p>
@@ -391,55 +360,53 @@ export const PublicJobPage: React.FC = () => {
               </>
             );
           })()}
-        </section>
-
-        {/* Skills */}
-        {job.skills.length > 0 && (
-          <section className="space-y-4">
-            <h2
-              className="text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              Required skills
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {job.skills.map((s) => (
-                <span
-                  key={s}
-                  className="rounded-md px-3 py-1.5 text-sm"
-                  style={{
-                    background: 'var(--bg-subtle)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
           </section>
-        )}
 
-        {/* Footer CTA */}
-        <section
-          className="rounded-lg border p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-        >
-          <div>
-            <div className="text-base font-medium">Interested in this role?</div>
-            <div className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              Create a free candidate account to apply in minutes.
-            </div>
+          {job.skills.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="font-['Public_Sans'] text-[11px] font-bold uppercase tracking-wider text-slate-500">Required skills</h2>
+              <div className="flex flex-wrap gap-2">
+                {job.skills.map((s) => (
+                  <span key={s} className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+
+        <aside className="space-y-5 lg:sticky lg:top-6 lg:self-start">
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <h2 className="border-b border-slate-100 px-5 py-4 font-['Public_Sans'] text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Overview
+            </h2>
+            <dl className="divide-y divide-slate-100">
+              {overview.map((o) => (
+                <div key={o.label} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <dt className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                    <span className="text-slate-400" aria-hidden="true">{o.icon}</span>
+                    {o.label}
+                  </dt>
+                  <dd className="text-right text-sm font-semibold text-slate-900">{o.value}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <Button
-              size="lg"
-              className="h-11 w-full sm:w-auto"
+
+          <div className="rounded-xl border border-indigo-200 bg-gradient-to-b from-indigo-50/60 to-white p-5 shadow-sm">
+            <div className="text-sm font-bold text-slate-900">Interested in this role?</div>
+            <p className="mt-1 text-xs text-slate-600">Create a free candidate account to apply in minutes.</p>
+            <button
+              type="button"
               disabled={isClosedJob}
               onClick={() => setApplyOpen(true)}
+              className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-            Apply Now
-          </Button>
-        </section>
+              Apply Now
+            </button>
+          </div>
+        </aside>
       </main>
 
       <ApplyModal
@@ -457,26 +424,6 @@ export const PublicJobPage: React.FC = () => {
     </div>
   );
 };
-
-const OverviewCell: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}> = ({ icon, label, value }) => (
-  <div
-    className="p-5 sm:border-r sm:last:border-r-0 lg:[&:nth-child(4n)]:border-r-0"
-    style={{ borderColor: 'var(--border)' }}
-  >
-    <div
-      className="flex items-center gap-2 text-xs uppercase tracking-wider"
-      style={{ color: 'var(--text-tertiary)' }}
-    >
-      <span aria-hidden="true">{icon}</span>
-      {label}
-    </div>
-    <div className="mt-1.5 text-base font-medium">{value}</div>
-  </div>
-);
 
 // ---------------------------------------------------------------------
 // Apply modal: lets an unauthenticated visitor sign in or create a
