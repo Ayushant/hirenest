@@ -6,12 +6,8 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/alerts/run?job=morning",
+      "path": "/api/alerts/run?job=all",
       "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/alerts/run?job=compliance",
-      "schedule": "30 4 * * *"
     }
   ],
   "functions": {
