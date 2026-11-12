@@ -25,6 +25,10 @@ export function mapSupabaseError(err: unknown): string {
   }
 
   if (code === '42501' || msg.toUpperCase().startsWith('FORBIDDEN')) {
+    const detail = msg.replace(/^FORBIDDEN:?\s*/i, '').trim();
+    if (detail && /^[a-z]/i.test(detail)) {
+      return `Not allowed: ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`;
+    }
     return "You don't have permission to do this.";
   }
 
