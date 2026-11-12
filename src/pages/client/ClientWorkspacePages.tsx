@@ -156,7 +156,7 @@ export const ClientDashboardPage: React.FC = () => {
   const hiringFunnel = useMemo(() => [
     { name: 'Shared', value: offerMetrics.candidatesShared, color: '#6A89A7' },
     { name: 'Interviewing', value: upcomingInterviews?.count ?? 0, color: '#4F95DB' },
-    { name: 'Offered', value: offerMetrics.offersIssued, color: '#1F4CC4' },
+    { name: 'Offered', value: offerMetrics.offersIssued, color: '#4F46D8' },
     { name: 'Accepted', value: offerMetrics.offersAccepted, color: '#2A9D8F' },
     { name: 'Onboarded', value: offerMetrics.onboardedCandidates, color: '#17734A' },
   ], [offerMetrics, upcomingInterviews]);
@@ -193,7 +193,7 @@ export const ClientDashboardPage: React.FC = () => {
           label="Open Requirements"
           value={openReqs?.count ?? 0}
           icon={<Briefcase className="w-5 h-5" />}
-          accentColor="#1F4CC4"
+          accentColor="#4F46D8"
           onClick={() => navigate('/client/requirements')}
         />
         <KpiCard
@@ -293,7 +293,7 @@ export const ClientDashboardPage: React.FC = () => {
         }
       >
         <KpiRow cols={6}>
-          <KpiCard label="Offers issued" value={offerMetrics.offersIssued} icon={<Send className="w-4 h-4" />} accentColor="#1F4CC4" onClick={() => navigate('/client/offers')} />
+          <KpiCard label="Offers issued" value={offerMetrics.offersIssued} icon={<Send className="w-4 h-4" />} accentColor="#4F46D8" onClick={() => navigate('/client/offers')} />
           <KpiCard label="Accepted" value={offerMetrics.offersAccepted} icon={<CheckCircle className="w-4 h-4" />} accentColor="#17734A" onClick={() => navigate('/client/offers')} />
           <KpiCard label="Declined" value={offerMetrics.offersDeclined} icon={<AlertTriangle className="w-4 h-4" />} accentColor="#B8322B" onClick={() => navigate('/client/offers')} />
           <KpiCard label="Pending" value={offerMetrics.pendingOffers} icon={<Clock className="w-4 h-4" />} accentColor="#D99A2B" onClick={() => navigate('/client/offers')} />
@@ -718,7 +718,7 @@ export const ClientRequirementsPage: React.FC = () => {
                             <label
                               key={item.id}
                               className={`flex items-start justify-between gap-3 p-3 text-[12px] cursor-pointer ${
-                                isCanonical ? 'bg-[#1F4CC4]/5' : 'hover:bg-[var(--bg-hover)]'
+                                isCanonical ? 'bg-[#4F46D8]/5' : 'hover:bg-[var(--bg-hover)]'
                               }`}
                             >
                               <div className="flex items-start gap-2.5">
@@ -732,7 +732,7 @@ export const ClientRequirementsPage: React.FC = () => {
                                       [grp.groupKey]: item.id,
                                     }))
                                   }
-                                  className="mt-1 accent-[#1F4CC4]"
+                                  className="mt-1 accent-[#4F46D8]"
                                 />
                                 <div>
                                   <div className="flex items-center gap-2">

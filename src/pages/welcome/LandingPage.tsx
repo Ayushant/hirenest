@@ -33,7 +33,7 @@ const BRAND = 'var(--primary-bg)'; // rich-blue-600
 const BRAND_DEEP = 'var(--primary-hover)'; // rich-blue-700
 const BRAND_SOFT = 'var(--row-selected-bg)'; // rich-blue-50
 const BRAND_TINT = 'var(--focus-ring)'; // rich-blue-100
-const NAVY = '#111D40'; // rich-blue-950 — a fixed dark panel, not theme-coupled, by design
+const NAVY = '#1B1A33'; // rich-blue-950 — a fixed dark panel, not theme-coupled, by design
 const TEAL = 'var(--chip-teal-dot)';
 const SKY = 'var(--marker-new)';
 const STORM_BLUE = 'var(--chip-storm-blue-dot)';
@@ -500,10 +500,7 @@ function EarlyAccessForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full h-11 rounded-[6px] text-white disabled:opacity-60 text-[14px] font-medium transition-colors flex items-center justify-center gap-2"
-        style={{ background: BRAND }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = BRAND_DEEP)}
-        onMouseLeave={(e) => (e.currentTarget.style.background = BRAND)}
+        className="brand-gradient-bg w-full h-11 rounded-[6px] text-white disabled:opacity-60 text-[14px] font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
       >
         {submitting ? (
           <>
@@ -571,8 +568,7 @@ export const LandingPage: React.FC = () => {
             </Link>
             <a
               href="#early-access"
-              className="hidden sm:inline-flex h-9 px-3.5 rounded-[6px] text-white text-[13px] font-medium transition-colors items-center gap-1.5"
-              style={{ background: BRAND }}
+              className="brand-gradient-bg hidden sm:inline-flex h-9 px-3.5 rounded-[6px] text-white text-[13px] font-medium transition-opacity hover:opacity-90 items-center gap-1.5"
             >
               Request early access
             </a>
@@ -600,8 +596,7 @@ export const LandingPage: React.FC = () => {
               <a
                 href="#early-access"
                 onClick={() => setMobileMenuOpen(false)}
-                className="h-10 rounded-[6px] text-white text-[14px] font-medium transition-colors inline-flex items-center justify-center gap-1.5"
-                style={{ background: BRAND }}
+                className="brand-gradient-bg h-10 rounded-[6px] text-white text-[14px] font-medium transition-opacity hover:opacity-90 inline-flex items-center justify-center gap-1.5"
               >
                 Request early access
               </a>
@@ -629,8 +624,7 @@ export const LandingPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-4 pt-1">
               <a
                 href="#early-access"
-                className="h-11 px-5 rounded-[6px] text-white text-[14px] font-medium transition-colors inline-flex items-center gap-2"
-                style={{ background: BRAND }}
+                className="brand-gradient-bg h-11 px-5 rounded-[6px] text-white text-[14px] font-medium transition-opacity hover:opacity-90 inline-flex items-center gap-2"
               >
                 Request early access
                 <ArrowRight className="h-4 w-4" />

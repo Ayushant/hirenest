@@ -44,7 +44,7 @@ export const MatchEvidencePanel: React.FC<{
       score: skillScore,
       contribution: skillsContribution,
       subtitle: 'Required technical skills and evidence of their use',
-      barColor: '#2F63DE',
+      barColor: '#6E4ADE',
     },
     {
       key: 'experience',

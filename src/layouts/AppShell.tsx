@@ -760,7 +760,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       ? 'bg-[var(--status-danger-dot)]'
                       : subscriptionData.daysRemaining <= 5
                         ? 'bg-[var(--status-warning-dot)]'
-                        : 'bg-[#1F4CC4]'
+                        : 'bg-[#4F46D8]'
                   }`}
                 />
                 {subscriptionData.subscription.subscriptionStatus === 'expired' ? (
@@ -792,7 +792,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                         ? '/client/subscription'
                         : '/vendor/subscription'
                 }
-                className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#1F4CC4] px-2.5 py-1 text-[12px] leading-[16px] font-medium text-white hover:bg-[#193EA3] transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#4F46D8] px-2.5 py-1 text-[12px] leading-[16px] font-medium text-white hover:bg-[#193EA3] transition-colors shrink-0"
               >
                 <CreditCard className="h-3 w-3" />
                 <span>Purchase Plan / Upgrade Now</span>

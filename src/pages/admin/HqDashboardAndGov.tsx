@@ -132,7 +132,7 @@ export const HqDashboardPage: React.FC = () => {
   const funnelStages = useMemo(() => [
     { name: 'Applied', value: subByStage.applied ?? 0, color: '#6A89A7' },
     { name: 'Recruiter review', value: subByStage.recruiter_review ?? 0, color: '#4F95DB' },
-    { name: 'Client review', value: subByStage.client_review ?? 0, color: '#1F4CC4' },
+    { name: 'Client review', value: subByStage.client_review ?? 0, color: '#4F46D8' },
     { name: 'Interviewing', value: subByStage.interviewing ?? 0, color: '#2A9D8F' },
     { name: 'Offered', value: subByStage.offered ?? 0, color: '#D99A2B' },
     { name: 'Onboarded', value: subByStage.onboarded ?? 0, color: '#17734A' },
@@ -215,7 +215,7 @@ export const HqDashboardPage: React.FC = () => {
   const totalReqs = Object.values(reqByStatus).reduce((a, b) => a + (b || 0), 0);
   const totalSubs = Object.values(subByStage).reduce((a, b) => a + (b || 0), 0);
 
-  const REQ_COLORS = ['#2A9D8F', '#D99A2B', '#6A89A7', '#384959', '#1F4CC4', '#B8322B'];
+  const REQ_COLORS = ['#2A9D8F', '#D99A2B', '#6A89A7', '#384959', '#4F46D8', '#B8322B'];
 
   return (
     <div className="space-y-7">
@@ -250,7 +250,7 @@ export const HqDashboardPage: React.FC = () => {
           label="Client Organizations"
           value={summary.clients ?? 0}
           icon={<Building2 className="w-5 h-5" />}
-          accentColor="#1F4CC4"
+          accentColor="#4F46D8"
           onClick={() => navigate(isAdmin ? '/admin/organizations' : `${prefix}/requirements`)}
         />
         <KpiCard
@@ -354,7 +354,7 @@ export const HqDashboardPage: React.FC = () => {
             label="Offers issued"
             value={offerMetrics.offersIssued}
             icon={<Briefcase className="w-4 h-4" />}
-            accentColor="#1F4CC4"
+            accentColor="#4F46D8"
             onClick={() => navigate(`${prefix}/offers`)}
           />
           <KpiCard
@@ -392,7 +392,7 @@ export const HqDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <ChartCard title="Candidates by source" subtitle={`${totalCandidates} total`}>
           <div className="px-3 space-y-4 py-2">
-            <ProgressBar label="Vendor" value={candBySource.vendor ?? 0} total={totalCandidates} color="#1F4CC4" />
+            <ProgressBar label="Vendor" value={candBySource.vendor ?? 0} total={totalCandidates} color="#4F46D8" />
             <ProgressBar label="Direct" value={candBySource.direct ?? 0} total={totalCandidates} color="#4F95DB" />
             <ProgressBar label="HireNest" value={candBySource.internal ?? 0} total={totalCandidates} color="#2A9D8F" />
           </div>

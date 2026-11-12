@@ -171,7 +171,7 @@ export const VendorDashboardPage: React.FC = () => {
   const submissionFunnel = useMemo(() => [
     { name: 'Shared', value: offerMetrics.candidatesShared, color: '#6A89A7' },
     { name: 'Interviewing', value: interviewsData?.count ?? 0, color: '#4F95DB' },
-    { name: 'Offered', value: offerMetrics.offersIssued, color: '#1F4CC4' },
+    { name: 'Offered', value: offerMetrics.offersIssued, color: '#4F46D8' },
     { name: 'Accepted', value: offerMetrics.offersAccepted, color: '#2A9D8F' },
     { name: 'Onboarded', value: offerMetrics.onboardedCandidates, color: '#17734A' },
   ], [offerMetrics, interviewsData]);
@@ -225,7 +225,7 @@ export const VendorDashboardPage: React.FC = () => {
           label="Active Requirements"
           value={Math.max(activeShares.length, allRequirements.length)}
           icon={<Briefcase className="w-5 h-5" />}
-          accentColor="#1F4CC4"
+          accentColor="#4F46D8"
           onClick={() => navigate('/vendor/requirements')}
         />
         <KpiCard
@@ -302,7 +302,7 @@ export const VendorDashboardPage: React.FC = () => {
       >
         <KpiRow cols={6}>
           <KpiCard label="Shared" value={offerMetrics.candidatesShared} icon={<Send className="w-4 h-4" />} accentColor="#4F95DB" onClick={() => navigate('/vendor/submissions')} />
-          <KpiCard label="Offers issued" value={offerMetrics.offersIssued} icon={<Briefcase className="w-4 h-4" />} accentColor="#1F4CC4" onClick={() => navigate('/vendor/offers')} />
+          <KpiCard label="Offers issued" value={offerMetrics.offersIssued} icon={<Briefcase className="w-4 h-4" />} accentColor="#4F46D8" onClick={() => navigate('/vendor/offers')} />
           <KpiCard label="Accepted" value={offerMetrics.offersAccepted} icon={<CheckCircle className="w-4 h-4" />} accentColor="#17734A" onClick={() => navigate('/vendor/offers')} />
           <KpiCard label="Pending" value={offerMetrics.pendingOffers} icon={<Clock className="w-4 h-4" />} accentColor="#D99A2B" onClick={() => navigate('/vendor/offers')} />
           <KpiCard label="Onboarded" value={offerMetrics.onboardedCandidates} icon={<CheckCircle className="w-4 h-4" />} accentColor="#2A9D8F" onClick={() => navigate('/vendor/onboarded')} />

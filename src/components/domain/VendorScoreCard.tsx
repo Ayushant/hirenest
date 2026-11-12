@@ -48,13 +48,13 @@ export const VendorPerformancePanel: React.FC<{
 
   return (
     <div className="space-y-6">
-      {/* Three equal columns (Timing #1F4CC4, Quality #4F95DB, Compliance #2A9D8F) + Overall composite */}
+      {/* Three equal columns (Timing #4F46D8, Quality #4F95DB, Compliance #2A9D8F) + Overall composite */}
       <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-[var(--border)]">
         {/* 1. Timing */}
         <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
-              <span className="h-2 w-2 rounded-full bg-[#1F4CC4] shrink-0" />
+              <span className="h-2 w-2 rounded-full bg-[#4F46D8] shrink-0" />
               <span>Timing</span>
             </span>
             <span className="text-[12px] leading-[16px] font-mono tabular-nums text-[var(--text-tertiary)]">
@@ -271,7 +271,7 @@ export const VendorPerformancePanel: React.FC<{
                       </span>
                       <div className="w-14 h-1 rounded-[2px] bg-[var(--track)] overflow-hidden">
                         <div
-                          className="h-full bg-[#2F63DE]"
+                          className="h-full bg-[#6E4ADE]"
                           style={{ width: `${pct}%` }}
                         />
                       </div>

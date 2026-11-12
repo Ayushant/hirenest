@@ -459,7 +459,7 @@ export const HqRequirementsListPage: React.FC = () => {
       <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[var(--text-primary)]">
-            <span className="inline-flex items-center gap-1.5 text-[#1F4CC4]">
+            <span className="inline-flex items-center gap-1.5 text-[#4F46D8]">
               <Share2 className="h-3.5 w-3.5" />
               Simple Sharing Flow:
             </span>
@@ -780,7 +780,7 @@ export const HqRequirementsListPage: React.FC = () => {
                               setShareModalTarget(req);
                             }}
                           >
-                            <Share2 className="h-3.5 w-3.5 text-[#1F4CC4]" />
+                            <Share2 className="h-3.5 w-3.5 text-[#4F46D8]" />
                             Share
                           </Button>
                           <Button
@@ -936,7 +936,7 @@ export const HqRequirementsListPage: React.FC = () => {
                               key={item.id}
                               className={`flex items-start justify-between gap-3 p-3 text-[12px] cursor-pointer transition-colors ${
                                 isCanonical
-                                  ? 'bg-[#1F4CC4]/5'
+                                  ? 'bg-[#4F46D8]/5'
                                   : 'hover:bg-[var(--bg-hover)]'
                               }`}
                             >
@@ -951,7 +951,7 @@ export const HqRequirementsListPage: React.FC = () => {
                                       [grp.groupKey]: item.id,
                                     }))
                                   }
-                                  className="mt-1 accent-[#1F4CC4]"
+                                  className="mt-1 accent-[#4F46D8]"
                                 />
                                 <div>
                                   <div className="flex flex-wrap items-center gap-2">

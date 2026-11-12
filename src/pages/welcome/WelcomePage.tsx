@@ -22,9 +22,9 @@ const WORKSPACES = [
     label: 'HQ Admin',
     initials: 'HQ',
     description: 'Manage operations, approvals & SLAs',
-    bgTint: 'bg-[#EEF4FF]',
-    borderTint: 'border-[#B6CCFD]',
-    textTint: 'text-[#1F4CC4]',
+    bgTint: 'bg-[#F2EEFE]',
+    borderTint: 'border-[#CBC0FA]',
+    textTint: 'text-[#4F46D8]',
   },
   {
     id: 'client',

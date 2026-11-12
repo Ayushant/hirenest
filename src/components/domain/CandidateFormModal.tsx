@@ -596,7 +596,7 @@ export const CandidateFormModal: React.FC<{
                   Resume upload &amp; auto-parse (PDF, DOC, DOCX · Max 10 MB)
                 </label>
                 {parsingSingle && (
-                  <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#1F4CC4]">
+                  <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#4F46D8]">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Parsing resume fields...
                   </span>
@@ -605,7 +605,7 @@ export const CandidateFormModal: React.FC<{
 
               <div className="flex flex-wrap items-center gap-3">
                 <label className="inline-flex items-center gap-1.5 h-8 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] leading-[20px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)] shadow-2xs">
-                  <Upload strokeWidth={1.75} className="h-3.5 w-3.5 text-[#1F4CC4]" />
+                  <Upload strokeWidth={1.75} className="h-3.5 w-3.5 text-[#4F46D8]" />
                   <span className="truncate max-w-[260px]">
                     {resumeFile ? resumeFile.name : 'Upload resume to auto-fill fields'}
                   </span>
@@ -680,7 +680,7 @@ export const CandidateFormModal: React.FC<{
                         }}
                         className={`px-2.5 py-1 rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer ${
                           engagementType === opt.id
-                            ? 'bg-[#1F4CC4] text-white'
+                            ? 'bg-[#4F46D8] text-white'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
@@ -798,7 +798,7 @@ export const CandidateFormModal: React.FC<{
           /* Bulk Resume Upload & Auto-Parsing Queue */
           <div className="space-y-4">
             <div className="rounded-[8px] border border-dashed border-[var(--border-strong)] bg-[var(--bg-subtle)] p-5 text-center space-y-2">
-              <div className="mx-auto h-9 w-9 rounded-[8px] bg-[#1F4CC4]/10 text-[#1F4CC4] flex items-center justify-center">
+              <div className="mx-auto h-9 w-9 rounded-[8px] bg-[#4F46D8]/10 text-[#4F46D8] flex items-center justify-center">
                 <Upload className="h-4 w-4" />
               </div>
               <div className="text-[13px] leading-[18px] font-semibold text-[var(--text-primary)]">
@@ -808,7 +808,7 @@ export const CandidateFormModal: React.FC<{
                 Upload multiple PDF, DOC, or DOCX files at once. Each file is hashed with SHA-256 and parsed into structured candidate fields automatically.
               </p>
               <div className="pt-1">
-                <label className="inline-flex items-center gap-1.5 h-8 rounded-[6px] bg-[#1F4CC4] px-3.5 text-[12px] leading-[16px] font-medium text-white cursor-pointer hover:bg-[#193EA3] transition-colors">
+                <label className="inline-flex items-center gap-1.5 h-8 rounded-[6px] bg-[#4F46D8] px-3.5 text-[12px] leading-[16px] font-medium text-white cursor-pointer hover:bg-[#193EA3] transition-colors">
                   <Upload className="h-3.5 w-3.5" />
                   <span>Select resume files (Multi-select)</span>
                   <input

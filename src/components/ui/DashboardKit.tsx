@@ -132,8 +132,8 @@ export const SinceLastVisit: React.FC<{ items: DeltaItem[] }> = ({ items }) => {
 };
 
 const CHART_COLORS = [
-  '#1F4CC4', '#4F95DB', '#2A9D8F', '#D99A2B', '#6A89A7', '#384959',
-  '#5383EE', '#86A9F7', '#17734A', '#B8322B',
+  '#4F46D8', '#4F95DB', '#2A9D8F', '#D99A2B', '#6A89A7', '#384959',
+  '#8C68EA', '#AB92F5', '#17734A', '#B8322B',
 ];
 
 // ─── KPI Card ─────────────────────────────────────────────
@@ -262,7 +262,7 @@ export const MiniBarChart: React.FC<{
   data: Array<{ name: string; value: number }>;
   height?: number;
   color?: string;
-}> = ({ data, height = 220, color = '#1F4CC4' }) => (
+}> = ({ data, height = 220, color = '#4F46D8' }) => (
   <ResponsiveContainer width="100%" height={height}>
     <BarChart data={data} barCategoryGap="20%">
       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -339,7 +339,7 @@ export const TrendChart: React.FC<{
   height?: number;
   color?: string;
   showGrid?: boolean;
-}> = ({ data, height = 200, color = '#1F4CC4', showGrid = true }) => (
+}> = ({ data, height = 200, color = '#4F46D8', showGrid = true }) => (
   <ResponsiveContainer width="100%" height={height}>
     <AreaChart data={data}>
       {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />}
@@ -464,7 +464,7 @@ export const ProgressBar: React.FC<{
   value: number;
   total: number;
   color?: string;
-}> = ({ label, value, total, color = '#1F4CC4' }) => {
+}> = ({ label, value, total, color = '#4F46D8' }) => {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
   return (
     <div className="space-y-1.5">

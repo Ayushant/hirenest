@@ -701,7 +701,7 @@ export const CandidateProfilePage: React.FC = () => {
         </div>
         <Link
           to="/candidate/privacy"
-          className="font-medium text-[#1F4CC4] hover:underline shrink-0"
+          className="font-medium text-[#4F46D8] hover:underline shrink-0"
         >
           Open My Privacy &amp; Rights Center →
         </Link>

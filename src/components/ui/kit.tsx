@@ -9,9 +9,9 @@ import {
 import { decomposeCompoundSkills } from '../../lib/matchingEngine';
 
 // Category palette (in order):
-// #1F4CC4 rich blue · #4F95DB sky · #6A89A7 storm blue · #384959 storm slate · #2A9D8F teal · #D99A2B amber
+// #4F46D8 rich blue · #4F95DB sky · #6A89A7 storm blue · #384959 storm slate · #2A9D8F teal · #D99A2B amber
 export const CATEGORY_PALETTE = [
-  '#1F4CC4',
+  '#4F46D8',
   '#4F95DB',
   '#6A89A7',
   '#384959',
@@ -21,7 +21,7 @@ export const CATEGORY_PALETTE = [
 
 // Avatar deterministic 100-tint bg + 700-shade text from the category palette
 const AVATAR_STYLES = [
-  { bg: '#DAE6FF', text: '#1B3EA0' }, // Rich Blue 100 / 700
+  { bg: '#E6DFFC', text: '#4338B5' }, // Rich Blue 100 / 700
   { bg: '#E3F0FD', text: '#1F5F99' }, // Sky 100 / 700
   { bg: '#E6ECF2', text: '#384959' }, // Storm Blue 100 / 700
   { bg: '#E6ECF2', text: '#27333F' }, // Storm Slate 100 / 800
@@ -429,7 +429,7 @@ export const StatCard: React.FC<{
   onClick?: () => void;
 }> = ({ label, value, sublabel, tone = 'default', onClick }) => {
   const dotMap: Record<string, string> = {
-    default: '#1F4CC4',
+    default: '#4F46D8',
     emerald: '#2A9D8F',
     amber: '#D99A2B',
     red: '#B8322B',
@@ -824,8 +824,8 @@ export const RatingInput: React.FC<{
             className={`h-6 w-6 rounded-[6px] text-[12px] leading-[16px] font-mono tabular-nums flex items-center justify-center transition-colors cursor-pointer ${
               filled
                 ? isFive
-                  ? 'bg-[#1B3EA0] text-white font-medium'
-                  : 'bg-[#2F63DE] text-white font-medium'
+                  ? 'bg-[#4338B5] text-white font-medium'
+                  : 'bg-[#6E4ADE] text-white font-medium'
                 : 'bg-[var(--track)] text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]'
             }`}
           >

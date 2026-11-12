@@ -5,17 +5,17 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Brand "Rich Blue" */
-  --color-rich-blue-50: #EEF4FF;
-  --color-rich-blue-100: #DAE6FF;
-  --color-rich-blue-200: #B6CCFD;
-  --color-rich-blue-300: #86A9F7;
-  --color-rich-blue-400: #5383EE;
-  --color-rich-blue-500: #2F63DE;
-  --color-rich-blue-600: #1F4CC4;
-  --color-rich-blue-700: #1B3EA0;
-  --color-rich-blue-800: #1B3680;
-  --color-rich-blue-900: #1A2F66;
-  --color-rich-blue-950: #111D40;
+  --color-rich-blue-50: #F2EEFE;
+  --color-rich-blue-100: #E6DFFC;
+  --color-rich-blue-200: #CBC0FA;
+  --color-rich-blue-300: #AB92F5;
+  --color-rich-blue-400: #8C68EA;
+  --color-rich-blue-500: #6E4ADE;
+  --color-rich-blue-600: #4F46D8;
+  --color-rich-blue-700: #4338B5;
+  --color-rich-blue-800: #372C8F;
+  --color-rich-blue-900: #2A2270;
+  --color-rich-blue-950: #1B1A33;
 
   /* Stormy Morning (secondary family) */
   --color-storm-slate: #384959;
@@ -51,17 +51,17 @@
     --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
     /* Brand Rich Blue scale */
-    --rich-blue-50: #EEF4FF;
-    --rich-blue-100: #DAE6FF;
-    --rich-blue-200: #B6CCFD;
-    --rich-blue-300: #86A9F7;
-    --rich-blue-400: #5383EE;
-    --rich-blue-500: #2F63DE;
-    --rich-blue-600: #1F4CC4;
-    --rich-blue-700: #1B3EA0;
-    --rich-blue-800: #1B3680;
-    --rich-blue-900: #1A2F66;
-    --rich-blue-950: #111D40;
+    --rich-blue-50: #F2EEFE;
+    --rich-blue-100: #E6DFFC;
+    --rich-blue-200: #CBC0FA;
+    --rich-blue-300: #AB92F5;
+    --rich-blue-400: #8C68EA;
+    --rich-blue-500: #6E4ADE;
+    --rich-blue-600: #4F46D8;
+    --rich-blue-700: #4338B5;
+    --rich-blue-800: #372C8F;
+    --rich-blue-900: #2A2270;
+    --rich-blue-950: #1B1A33;
 
     /* Stormy Morning secondary scale */
     --storm-slate: #384959;
@@ -107,14 +107,14 @@
     --text-button-sec: #27333F;/* Storm 800 */
 
     /* Primary & Accent mapping */
-    --primary-bg: #1F4CC4;         /* Rich Blue 600 */
-    --primary-hover: #1B3EA0;      /* Rich Blue 700 */
+    --primary-bg: #4F46D8;         /* Rich Blue 600 */
+    --primary-hover: #4338B5;      /* Rich Blue 700 */
     --primary-text: #FFFFFF;
-    --accent: #1F4CC4;             /* Rich Blue 600 */
-    --focus-ring: #DAE6FF;         /* Rich Blue 100 */
-    --focus-border: #1F4CC4;       /* Rich Blue 600 */
-    --row-selected-bg: #EEF4FF;    /* Rich Blue 50 */
-    --row-selected-bar: #1F4CC4;   /* Rich Blue 600 */
+    --accent: #4F46D8;             /* Rich Blue 600 */
+    --focus-ring: #E6DFFC;         /* Rich Blue 100 */
+    --focus-border: #4F46D8;       /* Rich Blue 600 */
+    --row-selected-bg: #F2EEFE;    /* Rich Blue 50 */
+    --row-selected-bar: #4F46D8;   /* Rich Blue 600 */
     --highlight-soft: #E3F0FD;     /* Sky 100 */
     --marker-new: #4F95DB;         /* Sky 500 */
     --header-band-bg: #F2F8FE;     /* Sky 50 */
@@ -122,14 +122,14 @@
     --ai-block-bg: #F2F8FE;        /* Sky 50 */
     --ai-block-border: #BDDDFC;    /* Sky 200 */
 
-    /* Sidebar (Storm-Slate Deep) */
-    --sidebar-bg: #1E2A36;
+    /* Sidebar (Indigo-Navy Deep) */
+    --sidebar-bg: #1E1B3A;
     --sidebar-border: rgba(255, 255, 255, 0.08);
-    --sidebar-text: #D6E1EC;
-    --sidebar-muted: #8FA6BC;
+    --sidebar-text: #DCD8F5;
+    --sidebar-muted: #9089BC;
     --sidebar-hover: rgba(255, 255, 255, 0.06);
-    --sidebar-active-bg: rgba(136, 189, 242, 0.14);
-    --sidebar-active-bar: #88BDF2;
+    --sidebar-active-bg: rgba(140, 104, 234, 0.16);
+    --sidebar-active-bar: #8C68EA;
     --sidebar-active-text: #FFFFFF;
 
     /* Semantic soft-tint tokens (700 text on soft tint background) */
@@ -148,9 +148,9 @@
     --chip-storm-blue-text: #384959;
     --chip-storm-blue-bg: #E6ECF2;
     --chip-storm-blue-dot: #6A89A7;
-    --chip-rich-blue-text: #1B3EA0;
-    --chip-rich-blue-bg: #EEF4FF;
-    --chip-rich-blue-dot: #1F4CC4;
+    --chip-rich-blue-text: #4338B5;
+    --chip-rich-blue-bg: #F2EEFE;
+    --chip-rich-blue-dot: #4F46D8;
     --chip-sky-text: #1F5F99;
     --chip-sky-bg: #E3F0FD;
     --chip-sky-dot: #4F95DB;
@@ -159,7 +159,7 @@
     --chip-teal-dot: #2A9D8F;
 
     /* Chart & category palette (in order) */
-    --cat-1: #1F4CC4; /* rich blue */
+    --cat-1: #4F46D8; /* rich blue */
     --cat-2: #4F95DB; /* sky */
     --cat-3: #6A89A7; /* storm blue */
     --cat-4: #384959; /* storm slate */
@@ -185,14 +185,14 @@
     --text-tertiary: #73879B;
     --text-button-sec: #E4ECF4;
 
-    --primary-bg: #5383EE;         /* Rich Blue 400 */
-    --primary-hover: #86A9F7;      /* Rich Blue 300 */
-    --primary-text: #111D40;       /* Rich Blue 950 */
+    --primary-bg: #8C68EA;         /* Rich Blue 400 */
+    --primary-hover: #AB92F5;      /* Rich Blue 300 */
+    --primary-text: #1B1A33;       /* Rich Blue 950 */
     --accent: #88BDF2;             /* Sky */
-    --focus-ring: rgba(83, 131, 238, 0.25);
-    --focus-border: #5383EE;
-    --row-selected-bg: rgba(83, 131, 238, 0.12);
-    --row-selected-bar: #5383EE;
+    --focus-ring: rgba(140, 104, 234, 0.25);
+    --focus-border: #8C68EA;
+    --row-selected-bg: rgba(140, 104, 234, 0.12);
+    --row-selected-bar: #8C68EA;
     --highlight-soft: rgba(79, 149, 219, 0.18);
     --marker-new: #88BDF2;
     --header-band-bg: #121C27;
@@ -200,13 +200,13 @@
     --ai-block-bg: #121C27;
     --ai-block-border: #253240;
 
-    --sidebar-bg: #0A1016;
-    --sidebar-border: #18222C;
-    --sidebar-text: #D6E1EC;
-    --sidebar-muted: #8FA6BC;
+    --sidebar-bg: #120F26;
+    --sidebar-border: #211D40;
+    --sidebar-text: #DCD8F5;
+    --sidebar-muted: #9089BC;
     --sidebar-hover: rgba(255, 255, 255, 0.06);
-    --sidebar-active-bg: rgba(136, 189, 242, 0.14);
-    --sidebar-active-bar: #88BDF2;
+    --sidebar-active-bg: rgba(140, 104, 234, 0.16);
+    --sidebar-active-bar: #8C68EA;
     --sidebar-active-text: #FFFFFF;
 
     /* Semantic tints at 15% opacity with 300-shade text */
@@ -224,9 +224,9 @@
     --chip-storm-blue-text: #BDDDFC;
     --chip-storm-blue-bg: rgba(106, 137, 167, 0.18);
     --chip-storm-blue-dot: #88BDF2;
-    --chip-rich-blue-text: #86A9F7;
-    --chip-rich-blue-bg: rgba(47, 99, 222, 0.18);
-    --chip-rich-blue-dot: #5383EE;
+    --chip-rich-blue-text: #AB92F5;
+    --chip-rich-blue-bg: rgba(79, 70, 216, 0.18);
+    --chip-rich-blue-dot: #8C68EA;
     --chip-sky-text: #88BDF2;
     --chip-sky-bg: rgba(79, 149, 219, 0.18);
     --chip-sky-dot: #88BDF2;
@@ -390,6 +390,18 @@
   border-radius: 1.5px;
   background-color: #88BDF2;
   flex-shrink: 0;
+}
+
+/* Brand gradient: violet -> indigo -> blue. Marketing surfaces only (hero CTA, logo mark); app chrome stays flat --primary-bg for consistency. */
+.brand-gradient-bg {
+  background-image: linear-gradient(90deg, #7C4EE0 0%, #4F46D8 55%, #3A8EF0 100%);
+}
+
+.brand-gradient-text {
+  background-image: linear-gradient(90deg, #7C4EE0 0%, #4F46D8 55%, #3A8EF0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* Motion accessibility */
