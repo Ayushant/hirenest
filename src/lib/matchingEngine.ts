@@ -976,7 +976,27 @@ export function computeFineTunedCandidateMatch(
   const baseSkillScore =
     atomicReqSkills.length > 0 ? (totalSkillCredit / atomicReqSkills.length) * 100 : 50;
   const skillBonus = Math.min(12, extraResumeSkillMatches * 4);
-  const skillScore = Math.round(Math.max(0, Math.min(100, baseSkillScore + skillBonus)));
+  const listedSkillScore = Math.max(0, Math.min(100, baseSkillScore + skillBonus));
+
+  // Full-text JD vs resume overlap: how many distinctive JD terms (title + description)
+  // actually appear in the resume content, not only in the skills list.
+  const jdTerms = Array.from(
+    new Set(
+      jdCorpus
+        .split(/[^a-z0-9+#.]+/)
+        .map((t) => t.replace(/^\.+|\.+$/g, ''))
+        .filter((t) => t.length >= 3 && !STOP_WORDS.has(t) && !/^\d+$/.test(t))
+    )
+  );
+  let textOverlap = -1;
+  if (jdTerms.length >= 8 && candidateSignals.corpusText.length > 40) {
+    const hits = jdTerms.filter((t) => candidateSignals.corpusText.includes(t)).length;
+    // Overlap of 60% is already an excellent textual match.
+    textOverlap = Math.min(100, (hits / jdTerms.length / 0.6) * 100);
+  }
+  const skillScore = Math.round(
+    textOverlap >= 0 ? listedSkillScore * 0.65 + textOverlap * 0.35 : listedSkillScore
+  );
 
   // 2. E = Experience Match Score (0–100, Weight 25%)
   const minExp = requirement.min_experience ?? requirement.min_experience_years ?? 0;
