@@ -285,7 +285,17 @@ export const VendorDashboardPage: React.FC = () => {
           </div>
         </DashboardSection>
 
-        <ChartCard title="Submission pipeline" subtitle="Candidate progression">
+        <ChartCard
+          title="Submission pipeline"
+          subtitle="Candidate progression"
+          action={
+            offerMetrics.candidatesShared > 0 ? (
+              <Badge tone="emerald">
+                {Math.round((offerMetrics.onboardedCandidates / offerMetrics.candidatesShared) * 100)}% shared → onboarded
+              </Badge>
+            ) : undefined
+          }
+        >
           <FunnelChart stages={submissionFunnel} />
         </ChartCard>
       </div>

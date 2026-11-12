@@ -13,6 +13,7 @@ import {
   Dialog,
   Textarea,
   SkillsChipInput,
+  MatchScoreRing,
 } from '../../components/ui/kit';
 import { StageBadge } from '../../components/domain/DomainBadges';
 import { MatchEvidencePanel } from '../../components/domain/MatchEvidence';
@@ -171,32 +172,31 @@ export const CandidateJobsForMePage: React.FC = () => {
               return (
                 <div key={m.id} className="py-4 space-y-3">
                   <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
-                          #{idx + 1}
-                        </span>
-                        <h3 className="text-[14px] font-medium text-[var(--text-primary)]">
-                          {job?.title || 'Open job'}
-                        </h3>
-                        {isApplied ? (
-                          <Badge tone="success">Applied</Badge>
-                        ) : (
-                          <span className="text-[12px] text-[var(--text-tertiary)]">
-                            Potential match
+                    <div className="flex items-start gap-4 min-w-0">
+                      <MatchScoreRing score={m.final_score} />
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
+                            #{idx + 1}
                           </span>
-                        )}
-                        <Badge tone="success">
-                          {Math.round(m.final_score)}% match
-                        </Badge>
-
+                          <h3 className="text-[14px] font-medium text-[var(--text-primary)]">
+                            {job?.title || 'Open job'}
+                          </h3>
+                          {isApplied ? (
+                            <Badge tone="success">Applied</Badge>
+                          ) : (
+                            <span className="text-[12px] text-[var(--text-tertiary)]">
+                              Potential match
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[13px] text-[var(--text-secondary)]">
+                          {job?.location || '-'} ({job?.work_mode || '-'}) ·{' '}
+                          <span className="font-mono tabular-nums">
+                            {job?.min_experience ?? 0}–{job?.max_experience ?? 0} yrs
+                          </span>
+                        </p>
                       </div>
-                      <p className="text-[13px] text-[var(--text-secondary)]">
-                        {job?.location || '-'} ({job?.work_mode || '-'}) ·{' '}
-                        <span className="font-mono tabular-nums">
-                          {job?.min_experience ?? 0}–{job?.max_experience ?? 0} yrs
-                        </span>
-                      </p>
                     </div>
 
                     <div>
