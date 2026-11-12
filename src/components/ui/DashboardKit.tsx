@@ -145,7 +145,8 @@ export const KpiCard: React.FC<{
   icon?: React.ReactNode;
   onClick?: () => void;
   accentColor?: string;
-}> = ({ label, value, change, changePeriod = 'vs last month', icon, onClick, accentColor }) => {
+  hint?: string;
+}> = ({ label, value, change, changePeriod = 'vs last month', icon, onClick, accentColor, hint }) => {
   const isPositive = change != null && change > 0;
   const isNegative = change != null && change < 0;
   const isNeutral = change != null && change === 0;
@@ -174,6 +175,9 @@ export const KpiCard: React.FC<{
           <p className="text-[32px] leading-[40px] font-semibold tracking-[-0.02em] font-mono tabular-nums text-[var(--text-primary)]">
             {value}
           </p>
+          {hint && (
+            <p className="text-[12px] leading-[16px] text-[var(--text-tertiary)] truncate">{hint}</p>
+          )}
           {change != null && (
             <div className="flex items-center gap-1.5">
               {isPositive && <TrendingUp className="w-3.5 h-3.5 text-[#17734A]" />}

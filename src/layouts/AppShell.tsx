@@ -456,23 +456,20 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                     }
                     onClick={() => setSidebarOpen(false)}
                     className={({ isActive }) =>
-                      `relative h-[34px] px-2.5 rounded-[6px] flex items-center justify-between gap-2 text-[13px] leading-[20px] transition-colors duration-120 ${
+                      `relative h-[34px] px-2.5 rounded-[8px] flex items-center justify-between gap-2 text-[13px] leading-[20px] transition-colors duration-120 ${
                         isActive
-                          ? 'bg-[var(--sidebar-active)] text-white font-medium'
+                          ? 'bg-gradient-to-r from-[#7C4EE0] via-[#4F46D8] to-[#3A8EF0] text-white font-semibold shadow-sm'
                           : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover)] hover:text-white font-normal'
                       }`
                     }
                   >
                     {({ isActive }) => (
                       <>
-                        {isActive && (
-                          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-[#88BDF2]" />
-                        )}
                         <span className="flex items-center gap-2.5 truncate">
                           <Icon
                             strokeWidth={1.75}
                             className={`h-4 w-4 shrink-0 ${
-                              isActive ? 'text-[#88BDF2]' : 'text-[var(--sidebar-muted)]'
+                              isActive ? 'text-white' : 'text-[var(--sidebar-muted)]'
                             }`}
                           />
                           <span className="truncate">{item.label}</span>

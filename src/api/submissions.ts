@@ -86,6 +86,19 @@ export async function fetchSubmissionStageHistory(
   return (data || []) as SubmissionStageHistory[];
 }
 
+export async function fetchStageTransitions(
+  submissionIds: string[]
+): Promise<Pick<SubmissionStageHistory, 'submission_id' | 'to_stage' | 'created_at'>[]> {
+  if (submissionIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('submission_stage_history')
+    .select('submission_id, to_stage, created_at')
+    .in('submission_id', submissionIds)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []) as Pick<SubmissionStageHistory, 'submission_id' | 'to_stage' | 'created_at'>[];
+}
+
 // Section 5.4 Pipeline RPCs
 export async function submitCandidateRpc(params: {
   p_requirement_id: string;

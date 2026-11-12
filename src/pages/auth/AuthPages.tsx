@@ -3,12 +3,15 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { LogOut, RefreshCw } from 'lucide-react';
+import { LogOut, RefreshCw, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth, getHomeRouteForRole } from '../../auth/AuthProvider';
 import { Button, Input, Select } from '../../components/ui/kit';
 import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../../components/ui/Toast';
+
+const NAVY = '#1B1A33';
+const BRAND = 'var(--primary-bg)';
 
 // Shared Two-Column Split Layout for Auth Pages:
 // Left 42% in deep storm-slate #1E2A36 with a subtle sky radial wash at the top, wordmark, and a concise 3-line product statement in #D6E1EC;
@@ -161,6 +164,7 @@ export const SignInPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -209,68 +213,200 @@ export const SignInPage: React.FC = () => {
     }
   };
 
+  const flowSteps = [
+    { title: 'Requirement', detail: 'Client or HQ opens it; scored and routed automatically.' },
+    { title: 'Shortlist', detail: 'Vendors submit matches; HQ forwards the ranked list.' },
+    { title: 'Interview', detail: 'Structured feedback on a shared rubric, on the clock.' },
+    { title: 'Offer', detail: 'Logged to the same requirement thread, start to close.' },
+  ];
+
   return (
-    <AuthSplitLayout>
-      <div className="space-y-1">
-        <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-          Sign in
-        </h1>
-        <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-          Enter your email and password to access your workspace.
-        </p>
-      </div>
+    <div className="min-h-screen flex flex-col lg:flex-row bg-[var(--app-bg)] text-[var(--text-primary)]">
+      {/* Left panel — brand, value prop, and the real requirement flow */}
+      <div
+        className="hidden lg:flex lg:w-[42%] flex-col justify-between px-10 py-10 xl:px-14 xl:py-14 text-white shrink-0"
+        style={{ background: NAVY }}
+      >
+        <Link to="/" className="flex items-center gap-2.5">
+          <img
+            src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
+            alt="HireNest"
+            className="h-8 w-8 rounded-[6px] bg-white object-contain p-0.5"
+          />
+          <span className="text-[14px] font-semibold tracking-[-0.01em]">HireNestOS</span>
+        </Link>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <Input
-          label="Email"
-          type="email"
-          autoComplete="email"
-          placeholder="name@company.com"
-          {...register('email')}
-          error={errors.email?.message}
-        />
-        <Input
-          label="Password"
-          type="password"
-          autoComplete="current-password"
-          placeholder="••••••••"
-          {...register('password')}
-          error={errors.password?.message}
-        />
-
-        {authError && (
-          <div className="rounded-[6px] border border-[var(--border)] bg-[var(--status-danger-bg)] p-3 text-[12px] leading-[16px] text-[var(--status-danger)]">
-            <div className="flex items-start gap-1.5 font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)] shrink-0 mt-1.5" />
-              <span>{authError}</span>
-            </div>
+        <div className="space-y-10">
+          <div className="space-y-3 max-w-sm">
+            <div className="h-[3px] w-5 rounded-full" style={{ background: BRAND }} />
+            <p className="text-[18px] leading-[1.4] font-semibold tracking-[-0.01em]">
+              One requirement, routed between HQ, clients, vendors and candidates — with a clock on every handoff.
+            </p>
           </div>
-        )}
 
-        <div className="flex items-center justify-end text-[12px] leading-[16px]">
-          <Link
-            to="/forgot-password"
-            className="text-[var(--accent)] hover:underline"
-          >
-            Forgot password?
-          </Link>
+          <div>
+            {flowSteps.map((step, i) => (
+              <div key={step.title} className="flex gap-3.5">
+                <div className="flex flex-col items-center">
+                  <span
+                    className="w-6 h-6 rounded-full font-mono text-[11px] font-semibold flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(255,255,255,0.1)', color: '#C4B5FD' }}
+                  >
+                    {i + 1}
+                  </span>
+                  {i < flowSteps.length - 1 && <span className="w-px flex-1 my-1" style={{ background: 'rgba(255,255,255,0.12)' }} />}
+                </div>
+                <div className="pb-6">
+                  <div className="text-[13.5px] font-semibold text-white">{step.title}</div>
+                  <p className="text-[12.5px] mt-0.5 leading-relaxed" style={{ color: '#9099C2' }}>{step.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <Button type="submit" className="w-full" loading={loading}>
-          Sign in
-        </Button>
-      </form>
-
-      <div className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-        No account?{' '}
-        <Link
-          to="/signup"
-          className="font-medium text-[var(--accent)] hover:underline"
-        >
-          Create an account
-        </Link>
+        <div className="text-[11px]" style={{ color: '#6B74A0' }}>
+          Built by{' '}
+          <a href="https://atkind.com" target="_blank" rel="noopener noreferrer" className="text-[#9099C2] hover:text-white hover:underline transition-colors">
+            Atkind Pvt Ltd
+          </a>
+        </div>
       </div>
-    </AuthSplitLayout>
+
+      {/* Right panel — the sign-in form */}
+      <div className="flex-1 flex flex-col">
+        <header className="lg:hidden border-b border-[var(--border)] bg-[var(--surface)]">
+          <div className="px-4 sm:px-6 h-14 flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2.5">
+              <img
+                src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
+                alt="HireNest"
+                className="h-8 w-8 rounded-[6px] bg-white object-contain p-0.5 border border-[var(--border)]"
+              />
+              <span className="text-[14px] font-semibold tracking-[-0.01em]">HireNestOS</span>
+            </Link>
+            <span className="text-[13px] text-[var(--text-secondary)]">
+              Need a workspace?{' '}
+              <Link to="/signup" className="font-medium text-[var(--accent)] hover:underline">
+                Create an account
+              </Link>
+            </span>
+          </div>
+        </header>
+
+        <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-[380px]">
+          <div className="bg-[var(--surface)] rounded-[10px] border border-[var(--border)] p-7">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-[19px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">Sign in</h1>
+                <p className="text-[13px] text-[var(--text-secondary)] mt-1">
+                  Enter your email and password to access your workspace.
+                </p>
+              </div>
+              <Link to="/signup" className="hidden lg:inline text-[12px] font-medium text-[var(--accent)] hover:underline shrink-0 ml-4">
+                Create account
+              </Link>
+            </div>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <label htmlFor="signin-email" className="block text-[12px] font-medium text-[var(--text-secondary)] mb-1.5">
+                  Work email
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)] pointer-events-none" />
+                  <Input
+                    id="signin-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="name@company.com"
+                    className="pl-9 h-10"
+                    {...register('email')}
+                    error={errors.email?.message}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="signin-password" className="block text-[12px] font-medium text-[var(--text-secondary)]">
+                    Password
+                  </label>
+                  <Link to="/forgot-password" className="text-[12px] font-medium text-[var(--accent)] hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)] pointer-events-none" />
+                  <Input
+                    id="signin-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    className="pl-9 pr-9 h-10"
+                    {...register('password')}
+                    error={errors.password?.message}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {authError && (
+                <div className="rounded-[6px] border border-[var(--border)] bg-[var(--status-danger-bg)] p-3 text-[12px] leading-[16px] text-[var(--status-danger)]">
+                  <div className="flex items-start gap-1.5 font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)] shrink-0 mt-1.5" />
+                    <span>{authError}</span>
+                  </div>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-10"
+                loading={loading}
+              >
+                Sign in
+              </Button>
+            </form>
+
+            <div className="mt-6 pt-5 border-t border-[var(--border)] flex items-center justify-between text-[13px] text-[var(--text-secondary)]">
+              <span>Don't have an account?</span>
+              <Link to="/signup" className="font-semibold text-[var(--accent)] hover:underline">
+                Create account
+              </Link>
+            </div>
+          </div>
+        </div>
+        </main>
+
+        <footer className="border-t border-[var(--border)] py-5 px-4 sm:px-6">
+          <div className="max-w-[1180px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-[var(--text-tertiary)]">
+            <span>© 2026 HireNest Workforce Pvt Ltd.</span>
+            <div className="flex items-center gap-5">
+              <Link to="/privacy-policy" className="hover:text-[var(--text-secondary)] transition-colors">
+                Privacy policy
+              </Link>
+              <a
+                href="https://atkind.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[var(--text-secondary)] transition-colors"
+              >
+                Built by Atkind Pvt Ltd
+              </a>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
   );
 };
 
