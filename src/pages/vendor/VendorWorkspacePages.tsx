@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Briefcase, Users, CalendarCheck, Send, CheckCircle, Clock, Star, ShieldCheck } from 'lucide-react';
@@ -713,6 +714,7 @@ export const VendorRequirementsPage: React.FC = () => {
                       className="cursor-pointer"
                     >
                       <td>
+                        <RequirementRibbon requirement={req} />
                         <div className="font-medium text-[var(--text-primary)]">
                           {req.title}
                         </div>
@@ -1340,6 +1342,13 @@ export const VendorCandidateDetailPage: React.FC = () => {
     refetchOnWindowFocus: true,
   });
 
+  const { data: myShares = [] } = useQuery({
+    queryKey: ['vendor_shares', profile?.org_id],
+    queryFn: () => fetchRequirementVendorShares(undefined, profile?.org_id || undefined),
+    enabled: Boolean(profile?.org_id),
+  });
+  const sharedReqIds = new Set(myShares.filter((s) => !s.revoked_at).map((s) => s.requirement_id));
+
   const { data: submissionsData } = useQuery({
     queryKey: ['vendor_candidate_submissions', id, profile?.org_id],
     queryFn: () =>
@@ -1598,12 +1607,18 @@ export const VendorCandidateDetailPage: React.FC = () => {
                               ) : (
                                 <Button
                                   size="sm"
+                                  disabled={!sharedReqIds.has(m.requirement_id)}
+                                  title={
+                                    sharedReqIds.has(m.requirement_id)
+                                      ? undefined
+                                      : "This requirement hasn't been shared with your agency yet"
+                                  }
                                   onClick={() => {
                                     setSubmitTarget(m);
                                     setSubmitNotes('');
                                   }}
                                 >
-                                  Submit
+                                  {sharedReqIds.has(m.requirement_id) ? 'Submit' : 'Not shared'}
                                 </Button>
                               )}
                             </div>

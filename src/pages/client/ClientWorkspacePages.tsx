@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Layers, Trash2, Briefcase, Users, CalendarCheck, MessageCircle, Send, CheckCircle, Clock } from 'lucide-react';
@@ -565,6 +566,7 @@ export const ClientRequirementsPage: React.FC = () => {
                       className="cursor-pointer"
                     >
                       <td>
+                        <RequirementRibbon requirement={req} />
                         <div className="font-medium text-[var(--text-primary)]">
                           {req.title}
                         </div>

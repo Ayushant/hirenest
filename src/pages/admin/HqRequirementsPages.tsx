@@ -1,4 +1,5 @@
 import { parseJobDescription } from '../../lib/jobDescription';
+import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -723,6 +724,7 @@ export const HqRequirementsListPage: React.FC = () => {
                         />
                       </td>
                       <td>
+                        <RequirementRibbon requirement={req} />
                         <div className="font-medium text-[var(--text-primary)]">
                           {req.title}
                         </div>

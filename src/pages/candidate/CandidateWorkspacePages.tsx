@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Briefcase, Wallet, CheckCircle2, ChevronDown } from 'lucide-react';
@@ -290,6 +291,7 @@ export const CandidateJobsForMePage: React.FC = () => {
                           {job?.organizations?.name || 'HireNest partner company'}
                         </span>
                       </div>
+                      {job && <RequirementRibbon requirement={job} />}
                       <h3 className="text-[16px] font-semibold text-[var(--text-primary)] leading-tight">
                         {job?.title || 'Open job'}
                       </h3>
