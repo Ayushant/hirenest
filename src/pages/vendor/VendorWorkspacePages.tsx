@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { displayClientName } from '../../lib/clientIdentity';
 import {
   RequirementRibbon,
   RequirementCategoryFilter,
@@ -250,7 +251,7 @@ export const VendorDashboardPage: React.FC = () => {
   const clientNameByReqId = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of allRequirements) {
-      if (r.organizations?.name) m.set(r.id, r.organizations.name);
+      m.set(r.id, displayClientName(r.organizations, 'vendor_admin', r.client_org_id));
     }
     return m;
   }, [allRequirements]);

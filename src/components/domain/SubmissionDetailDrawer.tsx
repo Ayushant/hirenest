@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { displayClientName } from '../../lib/clientIdentity';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -936,7 +937,7 @@ export const SubmissionDetailDrawer: React.FC<{
       title={submission?.candidates?.full_name || 'Submission detail'}
       subtitle={
         submission?.requirements?.title
-          ? `${submission.requirements.title} · ${submission.requirements.organizations?.name || 'Client'}`
+          ? `${submission.requirements.title} · ${displayClientName(submission.requirements.organizations, role, submission.requirements.client_org_id)}`
           : ''
       }
       widthClass="max-w-[780px]"

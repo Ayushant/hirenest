@@ -5650,15 +5650,10 @@ async function fetchShareableJobBySlug(slug: string): Promise<Record<string, unk
     .eq('slug', slug)
     .maybeSingle();
   if (!data) return null;
-  let clientOrgName: string | null = null;
-  if (data.client_org_id) {
-    const { data: org } = await admin
-      .from('organizations')
-      .select('name')
-      .eq('id', data.client_org_id)
-      .maybeSingle();
-    clientOrgName = org?.name ?? null;
-  }
+  // Public pages never reveal the client's company name; show a Client ID instead.
+  const clientOrgName: string | null = data.client_org_id
+    ? `CL-${String(data.client_org_id).replace(/-/g, '').slice(0, 6).toUpperCase()}`
+    : null;
   return {
     id: data.id,
     slug: data.slug,

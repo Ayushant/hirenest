@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { displayClientName } from '../../lib/clientIdentity';
 import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -286,9 +287,9 @@ export const CandidateJobsForMePage: React.FC = () => {
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1.5">
-                        <Avatar name={job?.organizations?.name || 'Client'} />
+                        <Avatar name={displayClientName(job?.organizations, 'candidate', job?.client_org_id)} />
                         <span className="text-[12px] font-medium text-[var(--text-secondary)] truncate">
-                          {job?.organizations?.name || 'HireNest partner company'}
+                          {displayClientName(job?.organizations, 'candidate', job?.client_org_id)}
                         </span>
                       </div>
                       {job && <RequirementRibbon requirement={job} />}
