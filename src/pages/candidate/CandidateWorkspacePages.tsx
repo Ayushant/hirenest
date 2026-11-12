@@ -169,12 +169,20 @@ export const CandidateJobsForMePage: React.FC = () => {
             {matchesData.data.map((m, idx) => {
               const job = m.requirements;
               const isApplied = appliedReqIds.has(m.requirement_id);
+              const score = m.final_score;
+              const fitLabel =
+                score >= 90 ? 'Exceptional fit' : score >= 80 ? 'Strong match' : score >= 70 ? 'Good fit' : 'Potential match';
               return (
                 <div key={m.id} className="py-4 space-y-3">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex items-start gap-4 min-w-0">
-                      <MatchScoreRing score={m.final_score} />
-                      <div className="space-y-1 min-w-0">
+                      <div className="flex flex-col items-center gap-1 shrink-0">
+                        <MatchScoreRing score={score} />
+                        <span className="text-[11px] font-medium text-[var(--text-secondary)] text-center whitespace-nowrap">
+                          {fitLabel}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 min-w-0">
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                             #{idx + 1}
@@ -182,13 +190,7 @@ export const CandidateJobsForMePage: React.FC = () => {
                           <h3 className="text-[14px] font-medium text-[var(--text-primary)]">
                             {job?.title || 'Open job'}
                           </h3>
-                          {isApplied ? (
-                            <Badge tone="success">Applied</Badge>
-                          ) : (
-                            <span className="text-[12px] text-[var(--text-tertiary)]">
-                              Potential match
-                            </span>
-                          )}
+                          {isApplied && <Badge tone="success">Applied</Badge>}
                         </div>
                         <p className="text-[13px] text-[var(--text-secondary)]">
                           {job?.location || '-'} ({job?.work_mode || '-'}) ·{' '}
@@ -196,6 +198,18 @@ export const CandidateJobsForMePage: React.FC = () => {
                             {job?.min_experience ?? 0}–{job?.max_experience ?? 0} yrs
                           </span>
                         </p>
+                        {job?.skills && job.skills.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {job.skills.slice(0, 5).map((skill) => (
+                              <span
+                                key={skill}
+                                className="px-2 py-0.5 text-[11px] font-mono rounded bg-[var(--bg-subtle)] text-[var(--text-secondary)] border border-[var(--border)]"
+                              >
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -207,6 +221,7 @@ export const CandidateJobsForMePage: React.FC = () => {
                       ) : (
                         <Button
                           size="sm"
+                          className="brand-gradient-bg border-0 hover:opacity-90"
                           onClick={() =>
                             setApplyTarget({
                               requirementId: m.requirement_id,

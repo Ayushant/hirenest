@@ -35,6 +35,10 @@ const BdmDashboardPage: React.FC = () => {
   const subs = subQ.data?.data || [];
   const inClientReview = subs.filter((s) => s.stage === 'client_review').length;
   const totalOpenings = useMemo(() => open.reduce((sum, r) => sum + (r.openings || 0), 0), [open]);
+  const avgSlaHours = useMemo(() => {
+    if (open.length === 0) return 0;
+    return Math.round(open.reduce((sum, r) => sum + (r.submission_sla_hours || 0), 0) / open.length);
+  }, [open]);
 
   return (
     <div className="space-y-6">
@@ -54,7 +58,7 @@ const BdmDashboardPage: React.FC = () => {
               label="With client for review"
               value={inClientReview}
               tone="amber"
-              sublabel="Submissions awaiting client decision"
+              sublabel={avgSlaHours > 0 ? `Avg ${avgSlaHours}h submission SLA` : 'Submissions awaiting client decision'}
             />
           </div>
           {byClient.length === 0 ? (
