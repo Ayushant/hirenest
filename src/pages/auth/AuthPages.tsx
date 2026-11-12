@@ -328,6 +328,7 @@ export const SignUpPage: React.FC = () => {
         email: cleanEmail,
         password: values.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/email-confirmed`,
           data: {
             full_name: values.full_name.trim(),
             signup_intent: values.signup_intent,
@@ -798,6 +799,44 @@ export const SuspendedAccessPage: React.FC = () => {
         >
           <LogOut className="h-3.5 w-3.5" />
           Sign out
+        </Button>
+      </div>
+    </AuthSplitLayout>
+  );
+};
+
+
+// Landing page for the "Confirm email" link in the signup email.
+export const EmailConfirmedPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { session, loading, homeRoute } = useAuth();
+  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  const failed = /error=|error_code=/.test(hash);
+
+  return (
+    <AuthSplitLayout>
+      <div className="space-y-4 text-center">
+        <div
+          className={`mx-auto h-12 w-12 rounded-full flex items-center justify-center text-[22px] ${
+            failed ? 'bg-[var(--status-danger-bg)] text-[var(--status-danger)]' : 'bg-[var(--status-success-bg)] text-[var(--status-success)]'
+          }`}
+        >
+          {failed ? '!' : '✓'}
+        </div>
+        <h1 className="text-[20px] leading-[28px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          {failed ? 'This link has expired' : 'Email confirmed'}
+        </h1>
+        <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
+          {failed
+            ? 'The confirmation link is invalid or has already been used. Sign in, or sign up again to receive a new link.'
+            : 'Your email address is verified and your HireNest account is ready.'}
+        </p>
+        <Button
+          className="w-full"
+          loading={loading && !failed}
+          onClick={() => navigate(!failed && session ? homeRoute : '/signin', { replace: true })}
+        >
+          {!failed && session ? 'Continue to HireNest' : 'Go to sign in'}
         </Button>
       </div>
     </AuthSplitLayout>

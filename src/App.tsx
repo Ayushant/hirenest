@@ -19,6 +19,7 @@ import {
   UpdatePasswordPage,
   PendingApprovalPage,
   SuspendedAccessPage,
+  EmailConfirmedPage,
 } from './pages/auth/AuthPages';
 
 import {
@@ -196,6 +197,7 @@ function AppRoutes() {
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<UpdatePasswordPage />} />
+      <Route path="/email-confirmed" element={<EmailConfirmedPage />} />
       <Route path="/pending" element={<PendingApprovalPage />} />
       <Route path="/suspended" element={<SuspendedAccessPage />} />
 

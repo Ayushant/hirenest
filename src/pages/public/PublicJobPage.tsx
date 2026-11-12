@@ -560,6 +560,7 @@ const ApplyModal: React.FC<{
         email: cleanEmail,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/email-confirmed`,
           data: {
             full_name: fullName.trim(),
             signup_intent: selectedRole === 'vendor' ? 'vendor' : 'candidate',

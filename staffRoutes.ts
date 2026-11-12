@@ -305,7 +305,7 @@ export function registerStaffRoutes(app: express.Express, deps: Deps): void {
       return;
     }
 
-    const redirectTo = `${process.env.APP_BASE_URL || 'https://os.hirenestworkforce.com'}/signin`;
+    const redirectTo = `${process.env.APP_BASE_URL || 'https://os.hirenestworkforce.com'}/reset-password`;
     const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
       data: { full_name: name, signup_intent: 'staff' },
       redirectTo,
