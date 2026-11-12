@@ -1,5 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
+import {
+  RequirementRibbon,
+  RequirementCategoryFilter,
+  matchesRequirementCategory,
+  type RequirementCategoryFilterValue,
+} from '../../components/domain/RequirementRibbon';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Briefcase, Users, CalendarCheck, Send, CheckCircle, Clock, Star, ShieldCheck } from 'lucide-react';
@@ -579,6 +584,7 @@ export const VendorRequirementsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [quickFilter, setQuickFilter] = useState<PipelineQuickFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<RequirementCategoryFilterValue>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -594,7 +600,10 @@ export const VendorRequirementsPage: React.FC = () => {
   });
 
   const allRequirements = data?.data || [];
-  const filteredRows = allRequirements.filter((req) =>
+  const categoryRequirements = allRequirements.filter((req) =>
+    matchesRequirementCategory(req, categoryFilter)
+  );
+  const filteredRows = categoryRequirements.filter((req) =>
     matchesPipelineQuickFilter(req, quickFilter)
   );
 
@@ -652,6 +661,18 @@ export const VendorRequirementsPage: React.FC = () => {
         </div>
       </div>
 
+      {!isLoading && allRequirements.length > 0 && (
+        <div className="flex items-center gap-2">
+          <RequirementCategoryFilter
+            value={categoryFilter}
+            onChange={(v) => {
+              setCategoryFilter(v);
+              setPage(1);
+            }}
+            requirements={allRequirements}
+          />
+        </div>
+      )}
       {isLoading ? (
         <TableSkeleton rows={5} cols={5} />
       ) : error ? (
@@ -674,7 +695,7 @@ export const VendorRequirementsPage: React.FC = () => {
         </div>
       ) : viewMode === 'cards' ? (
         <RequirementsPipelineGrid
-          requirements={allRequirements}
+          requirements={categoryRequirements}
           shares={shares}
           activeFilter={quickFilter}
           onFilterChange={setQuickFilter}

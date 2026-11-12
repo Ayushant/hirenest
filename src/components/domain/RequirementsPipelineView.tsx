@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Badge, EmptyState } from '../ui/kit';
 import { SlaBadge } from './DomainBadges';
+import { RequirementRibbon } from './RequirementRibbon';
 import { formatRequirementBudgetWithSubtitle } from '../../lib/format';
 import type { Requirement, RequirementVendorShare } from '../../types/db';
 
@@ -261,6 +262,7 @@ export const RequirementsPipelineGrid: React.FC<{
                       <Briefcase className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0">
+                      <RequirementRibbon requirement={req} />
                       <h3 className="text-[14px] leading-[20px] font-bold uppercase tracking-[-0.01em] text-[var(--text-primary)] truncate">
                         {req.title}
                       </h3>

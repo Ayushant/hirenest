@@ -1,5 +1,10 @@
 import { parseJobDescription } from '../../lib/jobDescription';
-import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
+import {
+  RequirementRibbon,
+  RequirementCategoryFilter,
+  matchesRequirementCategory,
+  type RequirementCategoryFilterValue,
+} from '../../components/domain/RequirementRibbon';
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -117,6 +122,7 @@ export const HqRequirementsListPage: React.FC = () => {
   const [mappingFilter, setMappingFilter] = useState<'all' | 'mapped' | 'unmapped'>('all');
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [quickFilter, setQuickFilter] = useState<PipelineQuickFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<RequirementCategoryFilterValue>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [createOpen, setCreateOpen] = useState(false);
   const [syncingVendors, setSyncingVendors] = useState(false);
@@ -287,7 +293,10 @@ export const HqRequirementsListPage: React.FC = () => {
   };
 
   const allRequirements = data?.data || [];
-  const filteredRows = allRequirements.filter((req) =>
+  const categoryRequirements = allRequirements.filter((req) =>
+    matchesRequirementCategory(req, categoryFilter)
+  );
+  const filteredRows = categoryRequirements.filter((req) =>
     matchesPipelineQuickFilter(req, quickFilter)
   );
 
@@ -592,6 +601,7 @@ export const HqRequirementsListPage: React.FC = () => {
           status ||
           publicFilter ||
           mappingFilter !== 'all' ||
+          categoryFilter !== 'all' ||
           quickFilter !== 'all') && (
           <Button
             size="sm"
@@ -603,6 +613,7 @@ export const HqRequirementsListPage: React.FC = () => {
               setPublicFilter('');
               setMappingFilter('all');
               setQuickFilter('all');
+              setCategoryFilter('all');
               setPage(1);
             }}
           >
@@ -644,7 +655,7 @@ export const HqRequirementsListPage: React.FC = () => {
         />
       ) : viewMode === 'cards' ? (
         <RequirementsPipelineGrid
-          requirements={allRequirements}
+          requirements={categoryRequirements}
           activeFilter={quickFilter}
           onFilterChange={setQuickFilter}
           onSelectRequirement={(req) => navigate(`${prefix}/requirements/${req.id}`)}
