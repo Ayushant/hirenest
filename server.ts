@@ -5123,8 +5123,9 @@ Return JSON array of objects with fields: targetSkill, question.`;
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.get('authorization') || '';
     const headerSecret = req.get('x-alert-secret') || '';
-    if (!cronSecret || (authHeader !== `Bearer ${cronSecret}` && headerSecret !== cronSecret)) {
-      res.status(401).json({ error: 'Unauthorized' });
+    if (!cronSecret || (authHeader !== `Bearer ${cronSecret}` && headerSecret.trim() !== cronSecret.trim())) {
+      // Diagnostic only: says whether the server has a secret configured, never its value.
+      res.status(401).json({ error: 'Unauthorized', serverHasCronSecret: Boolean(cronSecret) });
       return;
     }
     const admin = getSupabaseAdmin();
