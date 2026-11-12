@@ -585,6 +585,10 @@ export const VendorRequirementsPage: React.FC = () => {
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [quickFilter, setQuickFilter] = useState<PipelineQuickFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<RequirementCategoryFilterValue>('all');
+  // Default to open requirements, like the HQ list.
+  const [statusFilter, setStatusFilter] = useState<string>('open');
+  const [workModeFilter, setWorkModeFilter] = useState<string>('');
+  const [employmentFilter, setEmploymentFilter] = useState<string>('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -600,9 +604,19 @@ export const VendorRequirementsPage: React.FC = () => {
   });
 
   const allRequirements = data?.data || [];
-  const categoryRequirements = allRequirements.filter((req) =>
-    matchesRequirementCategory(req, categoryFilter)
+  const categoryRequirements = allRequirements.filter(
+    (req) =>
+      matchesRequirementCategory(req, categoryFilter) &&
+      (!statusFilter || req.status === statusFilter) &&
+      (!workModeFilter || req.work_mode === workModeFilter) &&
+      (!employmentFilter || req.employment_type === employmentFilter)
   );
+  const hasActiveFilters =
+    categoryFilter !== 'all' ||
+    statusFilter !== 'open' ||
+    Boolean(workModeFilter) ||
+    Boolean(employmentFilter) ||
+    quickFilter !== 'all';
   const filteredRows = categoryRequirements.filter((req) =>
     matchesPipelineQuickFilter(req, quickFilter)
   );
@@ -662,7 +676,7 @@ export const VendorRequirementsPage: React.FC = () => {
       </div>
 
       {!isLoading && allRequirements.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <RequirementCategoryFilter
             value={categoryFilter}
             onChange={(v) => {
@@ -671,6 +685,68 @@ export const VendorRequirementsPage: React.FC = () => {
             }}
             requirements={allRequirements}
           />
+          <div className="w-40">
+            <Select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              options={[
+                { value: '', label: 'All statuses' },
+                { value: 'open', label: 'Open' },
+                { value: 'on_hold', label: 'On hold' },
+                { value: 'closed', label: 'Closed' },
+                { value: 'filled', label: 'Filled' },
+              ]}
+            />
+          </div>
+          <div className="w-40">
+            <Select
+              value={workModeFilter}
+              onChange={(e) => {
+                setWorkModeFilter(e.target.value);
+                setPage(1);
+              }}
+              options={[
+                { value: '', label: 'All work modes' },
+                { value: 'remote', label: 'Remote' },
+                { value: 'hybrid', label: 'Hybrid' },
+                { value: 'onsite', label: 'Onsite' },
+              ]}
+            />
+          </div>
+          <div className="w-44">
+            <Select
+              value={employmentFilter}
+              onChange={(e) => {
+                setEmploymentFilter(e.target.value);
+                setPage(1);
+              }}
+              options={[
+                { value: '', label: 'All engagement types' },
+                { value: 'full_time', label: 'Full-time' },
+                { value: 'contract', label: 'Contract' },
+                { value: 'contract_to_hire', label: 'Contract to hire' },
+              ]}
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setCategoryFilter('all');
+                setStatusFilter('open');
+                setWorkModeFilter('');
+                setEmploymentFilter('');
+                setQuickFilter('all');
+                setPage(1);
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
         </div>
       )}
       {isLoading ? (
