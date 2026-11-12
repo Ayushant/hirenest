@@ -1,4 +1,5 @@
 import type { Candidate, CandidateMatch, Requirement } from '../types/db';
+import { classifyRequirement } from './requirementCategory';
 
 /**
  * Normalizes a skill or phrase for comparison.
@@ -621,6 +622,9 @@ export function extractRequirementAtomicSkills(
   requirement: Pick<Requirement, 'title' | 'description' | 'skills'>
 ): string[] {
   const decomposed = decomposeCompoundSkills(requirement.skills || []);
+  // Skills defined on the requirement are the single source of truth. Only when none were
+  // defined do we fall back to inferring skills from the title/description.
+  if (decomposed.length > 0) return decomposed;
   const seen = new Set(decomposed.map((s) => s.toLowerCase()));
 
   const titleAndDesc = `${requirement.title || ''} ${requirement.description || ''}`;
@@ -955,47 +959,14 @@ export function computeFineTunedCandidateMatch(
     }
   }
 
-  // Surface any explicit resume skills that appear in the JD title/description
-  const jdCorpus = `${requirement.title || ''} ${requirement.description || ''}`.toLowerCase();
-  let extraResumeSkillMatches = 0;
-  for (const cSkill of candidateSignals.explicitSkills) {
-    const lowerC = cSkill.toLowerCase();
-    if (
-      lowerC.length >= 2 &&
-      jdCorpus.includes(lowerC) &&
-      !matchedSkills.some((m) => m.toLowerCase() === lowerC)
-    ) {
-      extraResumeSkillMatches += 1;
-      if (matchedSkills.length < 8) {
-        matchedSkills.push(cSkill);
-      }
-    }
-  }
-
-  // 1. S = Skills Match Score (0–100, Weight 40%)
-  const baseSkillScore =
-    atomicReqSkills.length > 0 ? (totalSkillCredit / atomicReqSkills.length) * 100 : 50;
-  const skillBonus = Math.min(12, extraResumeSkillMatches * 4);
-  const listedSkillScore = Math.max(0, Math.min(100, baseSkillScore + skillBonus));
-
-  // Full-text JD vs resume overlap: how many distinctive JD terms (title + description)
-  // actually appear in the resume content, not only in the skills list.
-  const jdTerms = Array.from(
-    new Set(
-      jdCorpus
-        .split(/[^a-z0-9+#.]+/)
-        .map((t) => t.replace(/^\.+|\.+$/g, ''))
-        .filter((t) => t.length >= 3 && !STOP_WORDS.has(t) && !/^\d+$/.test(t))
-    )
-  );
-  let textOverlap = -1;
-  if (jdTerms.length >= 8 && candidateSignals.corpusText.length > 40) {
-    const hits = jdTerms.filter((t) => candidateSignals.corpusText.includes(t)).length;
-    // Overlap of 60% is already an excellent textual match.
-    textOverlap = Math.min(100, (hits / jdTerms.length / 0.6) * 100);
-  }
+  // 1. S = Skills Match Score (0–100, Weight 40%): coverage of the skills defined on the
+  // requirement, evidenced in the resume. Unproven skills are listed for the senior
+  // recruiter to verify; they are not hidden or double-penalised.
   const skillScore = Math.round(
-    textOverlap >= 0 ? listedSkillScore * 0.65 + textOverlap * 0.35 : listedSkillScore
+    Math.max(
+      0,
+      Math.min(100, atomicReqSkills.length > 0 ? (totalSkillCredit / atomicReqSkills.length) * 100 : 50)
+    )
   );
 
   // 2. E = Experience Match Score (0–100, Weight 25%)
@@ -1027,18 +998,31 @@ export function computeFineTunedCandidateMatch(
   const domainContribution = Number((domainScore * 0.2).toFixed(2));
   const seniorityContribution = Number((seniorityScore * 0.15).toFixed(2));
 
-  const computedScore = Math.round(
-    Math.max(
-      0,
-      Math.min(
-        100,
-        skillsContribution +
-          experienceContribution +
-          domainContribution +
-          seniorityContribution
-      )
+  const weightedScore = Math.max(
+    0,
+    Math.min(
+      100,
+      skillsContribution + experienceContribution + domainContribution + seniorityContribution
     )
   );
+  // Skill coverage gates the overall score: weak coverage of the defined skills cannot be
+  // rescued by experience/seniority alone.
+  let cappedScore = Math.min(weightedScore, 35 + skillScore * 0.65);
+  // An IT candidate must not surface for a non-IT requirement (or vice versa) unless the
+  // defined skills are mostly covered.
+  const reqCategory = classifyRequirement({
+    title: requirement.title,
+    skills: requirement.skills,
+    description: requirement.description,
+  });
+  const candCategory = classifyRequirement({
+    title: candidate.current_title,
+    skills: Array.isArray(candidate.skills) ? candidate.skills : [],
+  });
+  if (reqCategory !== candCategory && skillScore < 60) {
+    cappedScore = Math.min(cappedScore, 45);
+  }
+  const computedScore = Math.round(cappedScore);
 
   const overrideScore =
     existingMatch?.override_score !== undefined ? existingMatch.override_score : null;
