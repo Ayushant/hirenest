@@ -1607,6 +1607,8 @@ const CreateInterviewFlow: React.FC<{
   onScheduled: () => void;
 }> = ({ open, onClose, onScheduled }) => {
   const [submissionId, setSubmissionId] = useState('');
+  const [sourceType, setSourceType] = useState<'' | 'vendor' | 'direct' | 'internal'>('');
+  const [groupId, setGroupId] = useState('');
   const subsQ = useQuery({
     queryKey: ['interview_create_submissions'],
     queryFn: () => fetchSubmissions({ page: 1, pageSize: 200 }),
@@ -1617,6 +1619,42 @@ const CreateInterviewFlow: React.FC<{
   );
   const chosen = subs.find((x) => x.id === submissionId);
 
+  const bySource = {
+    vendor: subs.filter((x) => x.source === 'vendor'),
+    direct: subs.filter((x) => x.source === 'direct'),
+    internal: subs.filter((x) => x.source !== 'vendor' && x.source !== 'direct'),
+  };
+  // Second dropdown: which vendor (by name) or which internal team member.
+  const groupOptions: { value: string; label: string }[] = [];
+  if (sourceType === 'vendor') {
+    const seen = new Set<string>();
+    for (const x of bySource.vendor) {
+      const id = x.vendor_org_id || '';
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      groupOptions.push({ value: id, label: x.organizations?.name || 'Vendor' });
+    }
+  } else if (sourceType === 'internal') {
+    const seen = new Set<string>();
+    for (const x of bySource.internal) {
+      const id = x.submitted_by || '';
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const roleLabel = x.submitter?.role === 'admin' ? 'Admin' : 'Recruiter / internal team';
+      groupOptions.push({ value: id, label: `${x.submitter?.full_name || 'Team member'} — ${roleLabel}` });
+    }
+  }
+  groupOptions.sort((a, b) => a.label.localeCompare(b.label));
+  const candidateSubs =
+    sourceType === 'vendor'
+      ? bySource.vendor.filter((x) => x.vendor_org_id === groupId)
+      : sourceType === 'internal'
+        ? bySource.internal.filter((x) => x.submitted_by === groupId)
+        : sourceType === 'direct'
+          ? bySource.direct
+          : [];
+  const needsGroup = sourceType === 'vendor' || sourceType === 'internal';
+
   if (!open) return null;
   if (chosen) {
     return (
@@ -1624,6 +1662,8 @@ const CreateInterviewFlow: React.FC<{
         open
         onClose={() => {
           setSubmissionId('');
+          setSourceType('');
+          setGroupId('');
           onClose();
         }}
         submissionId={chosen.id}
@@ -1635,6 +1675,8 @@ const CreateInterviewFlow: React.FC<{
         candidateCurrentTitle={chosen.candidates?.current_title ?? null}
         onScheduled={() => {
           setSubmissionId('');
+          setSourceType('');
+          setGroupId('');
           onScheduled();
         }}
       />
@@ -1644,19 +1686,61 @@ const CreateInterviewFlow: React.FC<{
     <Dialog open onClose={onClose} title="Schedule interview">
       <div className="space-y-3">
         <Select
-          label="Candidate submission"
-          value={submissionId}
-          onChange={(e) => setSubmissionId(e.target.value)}
+          label="Candidate source"
+          value={sourceType}
+          onChange={(e) => {
+            setSourceType(e.target.value as typeof sourceType);
+            setGroupId('');
+            setSubmissionId('');
+          }}
           options={[
-            { value: '', label: subsQ.isLoading ? 'Loading…' : 'Select a candidate / requirement…' },
-            ...subs.map((x) => ({
-              value: x.id,
-              label: `${x.candidates?.full_name || 'Candidate'} — ${x.requirements?.title || 'Requirement'}`,
-            })),
+            { value: '', label: subsQ.isLoading ? 'Loading…' : 'Select source…' },
+            { value: 'vendor', label: `Vendor (${bySource.vendor.length})` },
+            { value: 'direct', label: `Direct candidates (${bySource.direct.length})` },
+            { value: 'internal', label: `Admin / Admin recruiter / Internal team (${bySource.internal.length})` },
           ]}
         />
+        {needsGroup && (
+          <Select
+            label={sourceType === 'vendor' ? 'Vendor' : 'Team member'}
+            value={groupId}
+            onChange={(e) => {
+              setGroupId(e.target.value);
+              setSubmissionId('');
+            }}
+            options={[
+              {
+                value: '',
+                label: groupOptions.length
+                  ? sourceType === 'vendor'
+                    ? 'Select vendor…'
+                    : 'Select team member…'
+                  : 'None available',
+              },
+              ...groupOptions,
+            ]}
+          />
+        )}
+        {sourceType && (!needsGroup || groupId) && (
+          <Select
+            label={sourceType === 'vendor' ? 'Vendor candidate' : 'Candidate'}
+            value={submissionId}
+            onChange={(e) => setSubmissionId(e.target.value)}
+            options={[
+              {
+                value: '',
+                label: candidateSubs.length ? 'Select a candidate / requirement…' : 'No candidates available',
+              },
+              ...candidateSubs.map((x) => ({
+                value: x.id,
+                label: `${x.candidates?.full_name || 'Candidate'} — ${x.requirements?.title || 'Requirement'}`,
+              })),
+            ]}
+          />
+        )}
         <p className="text-[12px] text-[var(--text-tertiary)]">
-          Interviews are created against a candidate submission. Submit the candidate to a requirement first if they are not listed.
+          Pick the source first. Vendor candidates are grouped by vendor name; direct candidates are listed together.
+          Interviews are created against a candidate submission, so submit the candidate to a requirement first if they are not listed.
         </p>
       </div>
     </Dialog>
