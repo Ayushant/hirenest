@@ -339,6 +339,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             { label: 'Subscription & billing', to: '/vendor/subscription', icon: CreditCard },
             { label: 'Privacy & DPDP', to: '/vendor/privacy', icon: Lock },
             { label: 'Compliance & NDA', to: '/vendor/compliance', icon: ShieldCheck },
+            ...(role === 'vendor_admin'
+              ? [{ label: 'Agency team', to: '/vendor/team', icon: Users }]
+              : []),
           ],
         },
       ];

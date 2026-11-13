@@ -33,6 +33,7 @@ import { EarlyAccessDashboardPage } from './pages/admin/EarlyAccessDashboardPage
 import { AdminSubscriptionPage } from './pages/admin/AdminSubscriptionPage';
 import { RecruiterHome } from './pages/admin/BdmDashboardPage';
 import { UserTeamManagementPage } from './pages/admin/UserTeamManagementPage';
+import { VendorTeamPage } from './pages/vendor/VendorTeamPage';
 import { MyAccessPage } from './pages/shared/MyAccessPage';
 import { CeoDashboardPage, CfoDashboardPage } from './pages/admin/ExecutiveDashboards';
 
@@ -331,6 +332,14 @@ function AppRoutes() {
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="privacy" element={<PrivacyGovernancePage />} />
         <Route path="compliance" element={<CompliancePage />} />
+        <Route
+          path="team"
+          element={
+            <RequireRole allowedRoles={['vendor_admin']}>
+              <VendorTeamPage />
+            </RequireRole>
+          }
+        />
       </Route>
 
       {/* Candidate Workspace (/candidate/*) */}

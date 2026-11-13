@@ -24,6 +24,7 @@ import {
 } from './src/lib/enterpriseLifecycle';
 import { extractStructuredFieldsFromText } from './src/lib/resumeParser';
 import { registerStaffRoutes, registerStaffEnforcement } from './staffRoutes';
+import { registerVendorTeamRoutes } from './vendorTeamRoutes';
 import { runSlaAlerts, runMorningDigest, runComplianceAlerts } from './alertsEngine';
 import {
   type PrivacyNoticeRecord,
@@ -5147,6 +5148,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
 
   // User & Team Management (RBAC) — server-enforced
   registerStaffRoutes(app, { authenticate: authenticateStaffingCaller, getAdmin: getSupabaseAdmin });
+  registerVendorTeamRoutes(app, { authenticate: authenticateStaffingCaller, getAdmin: getSupabaseAdmin });
 
   // List all Deal Rooms the caller can access
   app.get('/api/deal-rooms', async (req, res) => {
