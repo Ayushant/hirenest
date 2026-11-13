@@ -780,7 +780,8 @@ function computeDomainMatchScore(
   requirement: Pick<Requirement, 'title' | 'description' | 'skills'>,
   candidateSignals: ReturnType<typeof extractCandidateProfileSignals>
 ): { score: number; matchedDomains: string[] } {
-  const jdCorpus = `${requirement.title || ''} ${requirement.description || ''} ${(requirement.skills || []).join(' ')}`.toLowerCase();
+  // Domain comes from the criteria entered on the requirement (title + defined skills), not free-text noise.
+  const jdCorpus = `${requirement.title || ''} ${(requirement.skills || []).join(' ')}`.toLowerCase();
 
   const reqDomains = DOMAIN_CLUSTERS.filter((cluster) =>
     cluster.patterns.some((rx) => rx.test(jdCorpus))
@@ -920,7 +921,59 @@ export interface FineTunedMatchResult {
   matched_skills: string[];
   unproven_skills: string[];
   experience_note: string;
+  eligibility_note?: string;
+  role_alignment?: number;
   dimensions: DimensionBreakdown;
+}
+
+
+const ROLE_NOISE = new Set([
+  'senior','sr','lead','junior','jr','principal','staff','associate','manager','head','specialist',
+  'consultant','executive','officer','engineer','developer','analyst','architect','and','the','of','for',
+]);
+
+/** Role alignment (0-100): requirement title vs the candidate's role evidence (title, summary, parsed resume). */
+function computeRoleAlignment(
+  requirement: { title?: string | null },
+  candidate: Candidate,
+  corpus: string
+): number {
+  const reqTokens = normalizeText(requirement.title || '')
+    .split(' ')
+    .filter((t) => t.length >= 3 && !STOP_WORDS.has(t) && !ROLE_NOISE.has(t));
+  const titleText = normalizeText(candidate.current_title || '');
+  // Same role family (e.g. developer vs developer) is itself evidence.
+  const familyOf = (t: string) =>
+    /(developer|programmer|engineer|architect|devops|sre|tester|qa)/.test(t) ? 'tech' :
+    /(sales|business development|account executive)/.test(t) ? 'sales' :
+    /(account|finance|audit|tax)/.test(t) ? 'finance' :
+    /(hr|recruit|talent|payroll)/.test(t) ? 'hr' :
+    /(market|seo|content|brand)/.test(t) ? 'marketing' :
+    /(support|service|bpo|voice)/.test(t) ? 'support' : '';
+  const sameFamily =
+    familyOf(normalizeText(requirement.title || '')) !== '' &&
+    familyOf(normalizeText(requirement.title || '')) === familyOf(titleText);
+  if (reqTokens.length === 0) return sameFamily ? 80 : 60;
+  const inTitle = reqTokens.filter((t) => titleText.includes(t)).length;
+  const inCorpus = reqTokens.filter((t) => corpus.includes(t)).length;
+  const raw = (inTitle / reqTokens.length) * 70 + (inCorpus / reqTokens.length) * 30 + (sameFamily ? 25 : 0);
+  return Math.round(Math.max(0, Math.min(100, raw)));
+}
+
+function computeEligibilityDeduction(
+  requirement: { location?: string | null; work_mode?: string | null },
+  candidate: Candidate
+): { deduction: number; note: string } {
+  const mode = String(requirement.work_mode || '').toLowerCase();
+  if (mode !== 'onsite' && mode !== 'hybrid') return { deduction: 0, note: '' };
+  const reqLoc = normalizeText(requirement.location || '');
+  const candLoc = normalizeText(candidate.location || '');
+  if (!reqLoc || !candLoc || reqLoc === 'remote') return { deduction: 0, note: '' };
+  const reqTokens = reqLoc.split(' ').filter((t) => t.length >= 3);
+  const overlaps = reqTokens.some((t) => candLoc.includes(t));
+  return overlaps
+    ? { deduction: 0, note: '' }
+    : { deduction: 6, note: `Location differs (${candidate.location} vs ${requirement.location}, ${mode}).` };
 }
 
 /**
@@ -938,6 +991,8 @@ export function computeFineTunedCandidateMatch(
     max_experience?: number | null;
     min_experience_years?: number | null;
     max_experience_years?: number | null;
+    location?: string | null;
+    work_mode?: string | null;
   },
   candidate: Candidate,
   existingMatch?: Partial<CandidateMatch> | null
@@ -979,7 +1034,9 @@ export function computeFineTunedCandidateMatch(
   );
 
   // 3. D = Domain Match Score (0–100, Weight 20%)
-  const { score: domainScore } = computeDomainMatchScore(requirement, candidateSignals);
+  const { score: clusterDomainScore } = computeDomainMatchScore(requirement, candidateSignals);
+  const roleAlignment = computeRoleAlignment(requirement, candidate, candidateSignals.corpusText);
+  const domainScore = Math.round(clusterDomainScore * 0.6 + roleAlignment * 0.4);
 
   // 4. N = Seniority Match Score (0–100, Weight 15%)
   const { score: seniorityScore } = computeSeniorityMatchScore(
@@ -1022,7 +1079,8 @@ export function computeFineTunedCandidateMatch(
   if (reqCategory !== candCategory && skillScore < 60) {
     cappedScore = Math.min(cappedScore, 45);
   }
-  const computedScore = Math.round(cappedScore);
+  const eligibility = computeEligibilityDeduction(requirement, candidate);
+  const computedScore = Math.round(Math.max(0, cappedScore - eligibility.deduction));
 
   const overrideScore =
     existingMatch?.override_score !== undefined ? existingMatch.override_score : null;
@@ -1039,6 +1097,8 @@ export function computeFineTunedCandidateMatch(
     matched_skills: matchedSkills,
     unproven_skills: unprovenSkills,
     experience_note: experienceNote,
+    eligibility_note: eligibility.note || undefined,
+    role_alignment: roleAlignment,
     dimensions: {
       skills: { score: skillScore, weight: 0.4, contribution: skillsContribution },
       experience: { score: experienceScore, weight: 0.25, contribution: experienceContribution },
