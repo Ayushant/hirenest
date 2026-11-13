@@ -36,6 +36,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
+import { supabase } from '../lib/supabase';
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -74,10 +75,17 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const [profileOpen, setProfileOpen] = useState(false);
   // Time-on-platform heartbeat: one ping per minute while the tab is visible.
   useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void fetch('/api/presence/ping', { method: 'POST' }).catch(() => undefined);
-      }
+    const id = window.setInterval(async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        await fetch('/api/presence/ping', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {}
     }, 60_000);
     return () => window.clearInterval(id);
   }, []);
