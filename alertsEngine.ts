@@ -173,6 +173,47 @@ export async function runMorningDigest(admin: SupabaseClient): Promise<{ vendors
   return { vendors: vendorsNotified, admins: adminsNotified };
 }
 
+/** Run every ~10 min: auto-close open requirements whose SLA has expired. */
+export async function runSlaAutoClose(admin: SupabaseClient): Promise<{ closed: number }> {
+  const now = new Date().toISOString();
+  // Find open requirements where opened_at + submission_sla_hours has passed
+  const { data: expired } = await admin
+    .from('requirements')
+    .select('id, title, submission_sla_hours, opened_at, client_org_id')
+    .eq('status', 'open')
+    .not('opened_at', 'is', null);
+
+  let closed = 0;
+  for (const r of (expired || []) as Array<{
+    id: string; title: string; submission_sla_hours: number;
+    opened_at: string; client_org_id: string | null;
+  }>) {
+    const expiresAt = new Date(r.opened_at).getTime() + r.submission_sla_hours * 3600_000;
+    if (Date.now() < expiresAt) continue;
+
+    const dedupeKey = `sla-close:${r.id}:${r.opened_at}`;
+    if (!(await claim(admin, dedupeKey))) continue;
+
+    const { error } = await admin
+      .from('requirements')
+      .update({ status: 'closed', closed_at: now })
+      .eq('id', r.id)
+      .eq('status', 'open');
+    if (error) continue;
+
+    closed++;
+
+    // Notify admins/recruiters
+    await notifyUsers(admin, await staffUsers(admin, ['admin', 'recruiter']), {
+      kind: 'sla_auto_close',
+      title: `Requirement auto-closed: ${r.title}`,
+      body: `"${r.title}" was automatically closed after its ${r.submission_sla_hours}-hour SLA expired. Re-open it from the requirement detail page to set a new SLA.`,
+      link: `/admin/requirements/${r.id}`,
+    });
+  }
+  return { closed };
+}
+
 /** Daily: vendors missing a verified NDA are reminded; admins told about documents awaiting review. */
 export async function runComplianceAlerts(admin: SupabaseClient): Promise<{ vendors: number; admins: number }> {
   const day = new Date().toISOString().slice(0, 10);
