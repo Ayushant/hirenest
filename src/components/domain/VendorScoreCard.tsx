@@ -49,9 +49,9 @@ export const VendorPerformancePanel: React.FC<{
   return (
     <div className="space-y-6">
       {/* Three equal columns (Timing #4F46D8, Quality #4F95DB, Compliance #2A9D8F) + Overall composite */}
-      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-[var(--border)]">
+      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] grid grid-cols-1 sm:grid-cols-2 gap-px" style={{ backgroundColor: 'var(--border)' }}>
         {/* 1. Timing */}
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 bg-[var(--surface)]">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               <span className="h-2 w-2 rounded-full bg-[#4F46D8] shrink-0" />
@@ -107,7 +107,7 @@ export const VendorPerformancePanel: React.FC<{
         </div>
 
         {/* 2. Quality */}
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 bg-[var(--surface)]">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               <span className="h-2 w-2 rounded-full bg-[#4F95DB] shrink-0" />
@@ -155,7 +155,7 @@ export const VendorPerformancePanel: React.FC<{
         </div>
 
         {/* 3. Compliance */}
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 bg-[var(--surface)]">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               <span className="h-2 w-2 rounded-full bg-[#2A9D8F] shrink-0" />
@@ -193,7 +193,7 @@ export const VendorPerformancePanel: React.FC<{
         </div>
 
         {/* 4. Composite */}
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 bg-[var(--surface)]">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-2 text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               <span className="h-2 w-2 rounded-full bg-[#384959] shrink-0" />
@@ -247,7 +247,7 @@ export const VendorPerformancePanel: React.FC<{
         <h4 className="section-title-bar text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)] mb-4">
           Quality dimensions (1–5 scale)
         </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
           {(
             Object.keys(QUALITY_DIMENSION_LABELS) as Array<
               keyof VendorPerformanceResult['quality']['dimensions']

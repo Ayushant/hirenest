@@ -234,6 +234,7 @@ export const HqVendorPerformancePage: React.FC = () => {
         onClose={() => setSelectedRow(null)}
         title={selectedRow ? `${selectedRow.vendor_name}` : ''}
         subtitle="Three-pillar metrics and 6-dimension candidate quality breakdown"
+        widthClass="max-w-[720px]"
       >
         {selectedRow && <VendorPerformancePanel performance={selectedRow.metrics} />}
       </Drawer>
