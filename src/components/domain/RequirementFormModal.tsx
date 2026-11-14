@@ -444,10 +444,7 @@ export const RequirementFormModal: React.FC<{
 
     const values = validation.data;
 
-    if (skills.length === 0) {
-      setSkillsError('Add at least one required skill.');
-      return;
-    }
+    // Must-have skills are optional: a requirement can be created without them.
     setSkillsError(null);
 
     // Validate Client Mapping
@@ -783,7 +780,7 @@ export const RequirementFormModal: React.FC<{
         {/* Skills Chip Input + Inline Skill Suggestions */}
         <div className="space-y-2">
           <SkillsChipInput
-            label="Must-have skills"
+            label="Must-have skills (optional)"
             skills={skills}
             onChange={(next) => {
               setSkills(next);
@@ -958,15 +955,6 @@ export const RequirementFormModal: React.FC<{
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
-            label="Hourly rate (per hour, optional)"
-            type="number"
-            min="0"
-            step="any"
-            placeholder="e.g. 1200"
-            value={hourlyRateInput}
-            onChange={(e) => setHourlyRateInput(e.target.value)}
-          />
-          <Input
             label="Working days per month (optional)"
             type="number"
             min="1"
@@ -1021,7 +1009,7 @@ export const RequirementFormModal: React.FC<{
             <label className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               Budget unit
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {(['LPA', 'LPM'] as const).map((unitCode) => {
                 const info = BUDGET_UNIT_METADATA[unitCode];
                 const active = budgetUnit === unitCode;
@@ -1048,6 +1036,17 @@ export const RequirementFormModal: React.FC<{
                   </button>
                 );
               })}
+              <div className="col-span-2 sm:col-span-1">
+                <Input
+                  label="Hourly rate (per hour)"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="e.g. 1200"
+                  value={hourlyRateInput}
+                  onChange={(e) => setHourlyRateInput(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
