@@ -6,9 +6,7 @@ import {
   decomposeCompoundSkills,
 } from '../lib/matchingEngine';
 import {
-  computeRequirementDuplicateGroupKey,
   isRequirementSoftDeleted,
-  parseRequirementMeta,
 } from '../lib/enterpriseLifecycle';
 import { hydrateDeletedRequirementsFromBackend } from './requirements';
 import type {
@@ -518,11 +516,10 @@ export async function fetchMatchesForCandidate(params: {
     rawActiveReqs.push(r);
   }
 
-  // Deduplicate by canonical requirement group key (title + client + location + work mode)
-  // so merged/duplicate requirement rows never inflate the candidate's matching requirements count
+  // Deduplicate by title + location + work mode (ignoring client org) so the same
+  // position mapped to different orgs doesn't repeat in the candidate's match list
   const canonicalByGroupKey = new Map<string, Requirement>();
   const sortedForDedupe = [...rawActiveReqs].sort((a, b) => {
-    // Prefer 'open' status, then richest skill set, then earliest canonical creation
     if (a.status === 'open' && b.status !== 'open') return -1;
     if (b.status === 'open' && a.status !== 'open') return 1;
     const aSkills = Array.isArray(a.skills) ? a.skills.length : 0;
@@ -532,15 +529,10 @@ export async function fetchMatchesForCandidate(params: {
   });
 
   for (const req of sortedForDedupe) {
-    const meta = parseRequirementMeta(req);
-    const groupKey = computeRequirementDuplicateGroupKey({
-      title: req.title,
-      client_org_id: req.client_org_id,
-      mappedClientOrgId: meta.mappedClientOrgId,
-      isClientMapped: meta.isClientMapped,
-      location: req.location,
-      work_mode: req.work_mode,
-    });
+    const normTitle = (req.title || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    const normLocation = (req.location || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    const normWorkMode = (req.work_mode || 'hybrid').toLowerCase().trim();
+    const groupKey = `${normTitle}||${normLocation}||${normWorkMode}`;
     if (!canonicalByGroupKey.has(groupKey)) {
       canonicalByGroupKey.set(groupKey, req);
     }
