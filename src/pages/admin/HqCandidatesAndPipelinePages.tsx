@@ -32,6 +32,7 @@ import {
   type RecruiterDecisionGate,
 } from '../../lib/recruiterValidation';
 import { MatchEvidencePanel } from '../../components/domain/MatchEvidence';
+import { FitmentScoreCard } from '../../components/domain/FitmentScoreCard';
 import { CandidateFormModal } from '../../components/domain/CandidateFormModal';
 import { SubmissionDetailDrawer } from '../../components/domain/SubmissionDetailDrawer';
 import { createDealRoom } from '../../api/dealRoom';
@@ -391,6 +392,7 @@ export const HqCandidateDetailPage: React.FC = () => {
   const [overrideScoreInput, setOverrideScoreInput] = useState('');
   const [overrideReasonInput, setOverrideReasonInput] = useState('');
   const [overrideLoading, setOverrideLoading] = useState(false);
+  const [scorecardTarget, setScorecardTarget] = useState<CandidateMatch | null>(null);
 
   const [submitMatchTarget, setSubmitMatchTarget] = useState<CandidateMatch | null>(null);
   const [submitNotes, setSubmitNotes] = useState('');
@@ -800,6 +802,13 @@ export const HqCandidateDetailPage: React.FC = () => {
                                 <Button
                                   size="sm"
                                   variant="ghost"
+                                  onClick={() => setScorecardTarget(m)}
+                                >
+                                  Scorecard
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
                                   onClick={() => {
                                     setOverrideTarget(m);
                                     setOverrideScoreInput(
@@ -1160,6 +1169,19 @@ export const HqCandidateDetailPage: React.FC = () => {
           </div>
         )}
       </Dialog>
+
+      {/* Fitment Scorecard */}
+      {scorecardTarget && cand && scorecardTarget.requirements && (
+        <FitmentScoreCard
+          open={Boolean(scorecardTarget)}
+          onClose={() => setScorecardTarget(null)}
+          match={scorecardTarget}
+          candidate={cand}
+          requirement={scorecardTarget.requirements}
+          clientName={scorecardTarget.requirements.organizations?.name}
+          canDownload={isAdmin || role === 'recruiter'}
+        />
+      )}
 
       {/* HQ Edit Candidate 360 Modal */}
       <Dialog
