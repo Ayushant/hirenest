@@ -36,6 +36,7 @@ import {
   ScoreBar,
 } from '../../components/domain/DomainBadges';
 import { MatchEvidencePanel } from '../../components/domain/MatchEvidence';
+import { FitmentScoreCard } from '../../components/domain/FitmentScoreCard';
 import { VendorPerformancePanel } from '../../components/domain/VendorScoreCard';
 import { CandidateFormModal } from '../../components/domain/CandidateFormModal';
 import { SubmissionDetailDrawer } from '../../components/domain/SubmissionDetailDrawer';
@@ -1462,6 +1463,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'matches' | 'submissions' | 'overview'>('matches');
   const [matchesPage, setMatchesPage] = useState(1);
   const [evidenceTarget, setEvidenceTarget] = useState<CandidateMatch | null>(null);
+  const [scorecardTarget, setScorecardTarget] = useState<CandidateMatch | null>(null);
   const [submitTarget, setSubmitTarget] = useState<CandidateMatch | null>(null);
   const [submitNotes, setSubmitNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -1753,6 +1755,13 @@ export const VendorCandidateDetailPage: React.FC = () => {
                               >
                                 Evidence
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setScorecardTarget(m)}
+                              >
+                                Scorecard
+                              </Button>
                               {existingSub ? (
                                 <Button
                                   size="sm"
@@ -1949,6 +1958,19 @@ export const VendorCandidateDetailPage: React.FC = () => {
           </div>
         )}
       </Dialog>
+
+      {/* Fitment Scorecard — Vendor View Only (canDownload=false) */}
+      {scorecardTarget && cand && scorecardTarget.requirements && (
+        <FitmentScoreCard
+          open={Boolean(scorecardTarget)}
+          onClose={() => setScorecardTarget(null)}
+          match={scorecardTarget}
+          candidate={cand}
+          requirement={scorecardTarget.requirements}
+          clientName={scorecardTarget.requirements.organizations?.name}
+          canDownload={false}
+        />
+      )}
 
       {/* Submit Candidate to Requirement Modal */}
       <Dialog

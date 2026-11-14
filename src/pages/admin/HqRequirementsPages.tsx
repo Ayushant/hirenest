@@ -42,6 +42,7 @@ import {
   ScoreBar,
 } from '../../components/domain/DomainBadges';
 import { MatchEvidencePanel } from '../../components/domain/MatchEvidence';
+import { FitmentScoreCard } from '../../components/domain/FitmentScoreCard';
 import { RequirementFormModal } from '../../components/domain/RequirementFormModal';
 import { SubmissionDetailDrawer } from '../../components/domain/SubmissionDetailDrawer';
 import { DuplicateDialog } from '../../components/domain/DuplicateDialog';
@@ -1081,6 +1082,7 @@ export const HqRequirementDetailPage: React.FC = () => {
   const [sharingLoading, setSharingLoading] = useState(false);
 
   const [evidenceTarget, setEvidenceTarget] = useState<CandidateMatch | null>(null);
+  const [scorecardTarget, setScorecardTarget] = useState<CandidateMatch | null>(null);
   const [overrideTarget, setOverrideTarget] = useState<CandidateMatch | null>(null);
   const [overrideScoreInput, setOverrideScoreInput] = useState<string>('');
   const [overrideReasonInput, setOverrideReasonInput] = useState('');
@@ -2018,6 +2020,13 @@ export const HqRequirementDetailPage: React.FC = () => {
                                 <Button
                                   size="sm"
                                   variant="ghost"
+                                  onClick={() => setScorecardTarget(m)}
+                                >
+                                  Scorecard
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
                                   onClick={() => {
                                     setOverrideTarget(m);
                                     setOverrideScoreInput(
@@ -2544,6 +2553,19 @@ export const HqRequirementDetailPage: React.FC = () => {
           </div>
         )}
       </Dialog>
+
+      {/* Fitment Scorecard */}
+      {scorecardTarget && req && scorecardTarget.candidates && (
+        <FitmentScoreCard
+          open={Boolean(scorecardTarget)}
+          onClose={() => setScorecardTarget(null)}
+          match={scorecardTarget}
+          candidate={scorecardTarget.candidates}
+          requirement={req}
+          clientName={req.organizations?.name}
+          canDownload={isAdmin || role === 'recruiter'}
+        />
+      )}
 
       {/* Soft-Delete Confirmation Dialog on Requirement Detail Page */}
       <Dialog
