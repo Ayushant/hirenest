@@ -12,7 +12,7 @@ const SLA_WINDOW_MIN = 120; // vendor SLA after acknowledging a requirement
 const SLA_WARN_MIN = 30; // warn when this many minutes remain
 const MIN_MATCH = 70;
 
-async function sendEmail(to: string[], subject: string, html: string): Promise<boolean> {
+export async function sendEmail(to: string[], subject: string, html: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key || to.length === 0) return false;
   try {

@@ -64,6 +64,11 @@ export const UserTeamManagementPage: React.FC = () => {
     },
     onError: onErr,
   });
+  const resendM = useMutation({
+    mutationFn: (id: string) => staffApi.resendInvite(id),
+    onSuccess: () => toast({ title: 'Invitation re-sent', description: 'They will get a fresh activation link by email.', tone: 'success' }),
+    onError: onErr,
+  });
   const reactivateM = useMutation({
     mutationFn: (id: string) => staffApi.reactivate(id),
     onSuccess: () => {
@@ -131,6 +136,8 @@ export const UserTeamManagementPage: React.FC = () => {
           deptName={deptName}
           userName={userName}
           emptyText="No pending invitations."
+          actionLabel="Resend invite"
+          onAction={(u) => resendM.mutate(u.id)}
         />
       )}
 

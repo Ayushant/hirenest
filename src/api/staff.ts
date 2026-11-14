@@ -79,6 +79,7 @@ export const staffApi = {
     api<{ changed: string[] }>(`/api/staff/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   suspend: (id: string, reason?: string) =>
     api(`/api/staff/users/${id}/suspend`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  resendInvite: (id: string) => api(`/api/staff/users/${id}/resend-invite`, { method: 'POST', body: '{}' }),
   reactivate: (id: string) => api(`/api/staff/users/${id}/reactivate`, { method: 'POST', body: '{}' }),
   departments: () => api<{ departments: Department[] }>('/api/staff/departments').then((r) => r.departments),
   addDepartment: (name: string) =>

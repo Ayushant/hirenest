@@ -1,4 +1,5 @@
 import type express from 'express';
+import { sendEmail } from './alertsEngine';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   DEFAULT_TEMPLATES,
@@ -507,6 +508,50 @@ export function registerStaffRoutes(app: express.Express, deps: Deps): void {
     });
     res.json({ ok: true });
   }
+  // Re-send an activation link (fixes invites that were sent while Supabase pointed at localhost).
+  app.post('/api/staff/users/:id/resend-invite', async (req, res) => {
+    const ctx = await guard(req, res, { module: 'user_management', action: 'edit' });
+    if (!ctx) return;
+    const { admin, caller } = ctx;
+    const targetId = req.params.id;
+    const { data: sm } = await admin.from('staff_members').select('user_id, activated_at').eq('user_id', targetId).maybeSingle();
+    const { data: prof } = await admin.from('profiles').select('email, full_name, status').eq('id', targetId).maybeSingle();
+    if (!sm || !prof?.email) {
+      res.status(404).json({ error: 'Employee not found.' });
+      return;
+    }
+    if (sm.activated_at) {
+      res.status(400).json({ error: 'This user has already activated their account. They can use "Forgot password" on the sign-in page.' });
+      return;
+    }
+    const redirectTo = `${process.env.APP_BASE_URL || 'https://os.hirenestworkforce.com'}/reset-password`;
+    let sent = false;
+    // 1) Normal invite (re-sends for users who never confirmed).
+    const inv = await admin.auth.admin.inviteUserByEmail(prof.email, {
+      data: { full_name: prof.full_name, signup_intent: 'staff' },
+      redirectTo,
+    });
+    if (!inv.error) sent = true;
+    // 2) Fallback: generate a one-time link and email it ourselves via Resend.
+    if (!sent) {
+      const link = await admin.auth.admin.generateLink({ type: 'recovery', email: prof.email, options: { redirectTo } });
+      const actionLink = link.data?.properties?.action_link;
+      if (actionLink) {
+        sent = await sendEmail(
+          [prof.email],
+          'Activate your HireNestOS account',
+          `<p>Hi ${prof.full_name || ''},</p><p>Use the button below to set your password and activate your HireNestOS account.</p><p><a href="${actionLink}" style="display:inline-block;padding:12px 22px;background:#1F4CC4;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">Set password</a></p><p style="font-size:12px;color:#667085">If you did not expect this, ignore this email.</p>`
+        );
+      }
+    }
+    if (!sent) {
+      res.status(400).json({ error: 'Could not re-send the invitation. Check Supabase SMTP / Resend settings, or ask the user to use "Forgot password" on the sign-in page.' });
+      return;
+    }
+    await audit(admin, { actorId: caller.userId, actorRole: caller.staffRole, targetUserId: targetId, action: 'invite_resent' });
+    res.json({ ok: true });
+  });
+
   app.post('/api/staff/users/:id/suspend', (req, res) => void setSuspended(req, res, true));
   app.post('/api/staff/users/:id/reactivate', (req, res) => void setSuspended(req, res, false));
 
