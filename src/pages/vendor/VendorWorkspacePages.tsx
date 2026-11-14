@@ -73,6 +73,8 @@ import {
   fetchSubmissions,
   fetchStageTransitions,
   submitCandidateRpc,
+  getVendorSubmissionCount,
+  vendorNdaIsVerified,
 } from '../../api/submissions';
 import {
   fetchInterviews,
@@ -870,6 +872,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [dupReason, setDupReason] = useState<string | null>(null);
   const [drawerSubId, setDrawerSubId] = useState<string | null>(null);
+  const [showNdaAlert, setShowNdaAlert] = useState(false);
 
   const { data: req, isLoading } = useQuery({
     queryKey: ['vendor_req_detail', id, profile?.role, profile?.org_id],
@@ -954,6 +957,16 @@ export const VendorRequirementDetailPage: React.FC = () => {
       setSubmitTarget(null);
       setSubmitNotes('');
       queryClient.invalidateQueries({ queryKey: ['vendor_req_submissions'] });
+      // NDA soft gate: show nudge after 3rd or 4th submission if NDA not verified
+      if (profile?.org_id) {
+        const [count, verified] = await Promise.all([
+          getVendorSubmissionCount(profile.org_id),
+          vendorNdaIsVerified(profile.org_id),
+        ]);
+        if (!verified && (count === 3 || count === 4)) {
+          setShowNdaAlert(true);
+        }
+      }
     } catch (err) {
       toast({
         title: 'Submission failed',
@@ -1246,6 +1259,41 @@ export const VendorRequirementDetailPage: React.FC = () => {
         onClose={() => setDupReason(null)}
         reason={dupReason}
       />
+
+      {/* NDA Soft-Gate Alert — shown after 3rd/4th submission if NDA unverified */}
+      <Dialog
+        open={showNdaAlert}
+        onClose={() => setShowNdaAlert(false)}
+        title="NDA Verification Required Soon"
+      >
+        <div className="space-y-4 text-[13px] text-[var(--text-primary)]">
+          <p>
+            Your agency has made <strong>3 or more candidate submissions</strong>. To continue
+            submitting beyond this point, HireNest requires a verified <strong>Non-Disclosure Agreement (NDA)</strong> on file.
+          </p>
+          <p className="text-[var(--text-secondary)]">
+            Please contact your HireNest account manager or reach out to{' '}
+            <a href="mailto:compliance@hirenest.in" className="underline text-blue-600">
+              compliance@hirenest.in
+            </a>{' '}
+            to get your NDA executed and verified. This is a one-time process.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setShowNdaAlert(false)}>
+              Dismiss
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                window.open('mailto:compliance@hirenest.in?subject=NDA Verification Request', '_blank');
+                setShowNdaAlert(false);
+              }}
+            >
+              Contact Compliance
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 };
@@ -1419,6 +1467,7 @@ export const VendorCandidateDetailPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [dupReason, setDupReason] = useState<string | null>(null);
   const [drawerSubId, setDrawerSubId] = useState<string | null>(null);
+  const [showNdaAlert, setShowNdaAlert] = useState(false);
 
   const { data: cand, isLoading } = useQuery({
     queryKey: ['vendor_candidate_detail', id],
@@ -1575,6 +1624,16 @@ export const VendorCandidateDetailPage: React.FC = () => {
       setSubmitTarget(null);
       setSubmitNotes('');
       queryClient.invalidateQueries({ queryKey: ['vendor_candidate_submissions', id] });
+      // NDA soft gate: show nudge after 3rd or 4th submission if NDA not verified
+      if (profile?.org_id) {
+        const [count, verified] = await Promise.all([
+          getVendorSubmissionCount(profile.org_id),
+          vendorNdaIsVerified(profile.org_id),
+        ]);
+        if (!verified && (count === 3 || count === 4)) {
+          setShowNdaAlert(true);
+        }
+      }
     } catch (err) {
       toast({
         title: 'Submission failed',
@@ -1931,6 +1990,41 @@ export const VendorCandidateDetailPage: React.FC = () => {
         onClose={() => setDupReason(null)}
         reason={dupReason}
       />
+
+      {/* NDA Soft-Gate Alert — shown after 3rd/4th submission if NDA unverified */}
+      <Dialog
+        open={showNdaAlert}
+        onClose={() => setShowNdaAlert(false)}
+        title="NDA Verification Required Soon"
+      >
+        <div className="space-y-4 text-[13px] text-[var(--text-primary)]">
+          <p>
+            Your agency has made <strong>3 or more candidate submissions</strong>. To continue
+            submitting beyond this point, HireNest requires a verified <strong>Non-Disclosure Agreement (NDA)</strong> on file.
+          </p>
+          <p className="text-[var(--text-secondary)]">
+            Please contact your HireNest account manager or reach out to{' '}
+            <a href="mailto:compliance@hirenest.in" className="underline text-blue-600">
+              compliance@hirenest.in
+            </a>{' '}
+            to get your NDA executed and verified. This is a one-time process.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setShowNdaAlert(false)}>
+              Dismiss
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                window.open('mailto:compliance@hirenest.in?subject=NDA Verification Request', '_blank');
+                setShowNdaAlert(false);
+              }}
+            >
+              Contact Compliance
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       <Dialog
         open={editing}

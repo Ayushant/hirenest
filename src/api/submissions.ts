@@ -302,6 +302,24 @@ export async function resolveClarificationRpc(params: {
   if (error) throw error;
 }
 
+/** Returns the total number of submissions made by this vendor org. */
+export async function getVendorSubmissionCount(vendorOrgId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('get_vendor_submission_count', {
+    p_vendor_org_id: vendorOrgId,
+  });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+/** Returns true if the vendor org has a verified NDA. */
+export async function vendorNdaIsVerified(vendorOrgId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('vendor_nda_is_verified', {
+    p_vendor_org_id: vendorOrgId,
+  });
+  if (error) throw error;
+  return Boolean(data);
+}
+
 export const VALIDATION_STATE_LABELS: Record<string, string> = {
   pending_assessment: 'Pending Assessment Review',
   pending_interview: 'Pending Validation Interview',
