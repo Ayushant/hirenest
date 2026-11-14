@@ -42,3 +42,19 @@ export const REQUIREMENT_CATEGORY_LABEL: Record<RequirementCategory, string> = {
   it: 'IT',
   non_it: 'Non-IT',
 };
+
+export function classifyCandidate(candidate?: {
+  current_title?: string | null;
+  skills?: string[] | null;
+  summary?: string | null;
+  parsed_data?: Record<string, unknown> | null;
+} | null): RequirementCategory {
+  if (!candidate) return 'it';
+  const explicit = candidate.parsed_data?.domain_category as RequirementCategory | undefined;
+  if (explicit === 'it' || explicit === 'non_it') return explicit;
+  return classifyRequirement({
+    title: candidate.current_title,
+    skills: candidate.skills,
+    description: candidate.summary,
+  });
+}

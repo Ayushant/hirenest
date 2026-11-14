@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { displayClientName } from '../../lib/clientIdentity';
-import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
+import {
+  classifyCandidate,
+  classifyRequirement,
+  REQUIREMENT_CATEGORY_LABEL,
+  type RequirementCategory,
+} from '../../lib/requirementCategory';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Briefcase, Wallet, CheckCircle2, ChevronDown } from 'lucide-react';
@@ -161,8 +166,29 @@ export const CandidateJobsForMePage: React.FC = () => {
   );
   const appliedReqIds = new Set(appliedByReqId.keys());
 
-  const sortedMatches = (() => {
+  const candCategory = classifyCandidate(myCandidate);
+  const candidatePd = (myCandidate?.parsed_data || {}) as Record<string, unknown>;
+  const openToContract = Boolean(candidatePd.open_to_contract);
+
+  const eligibleMatches = useMemo(() => {
     const list = matchesData?.data ? [...matchesData.data] : [];
+    return list.filter((m) => {
+      const job = m.requirements;
+      if (!job) return false;
+      // 1. Employment type: only FTE unless candidate explicitly opened to contract
+      if (!openToContract && job.employment_type !== 'full_time') {
+        return false;
+      }
+      // 2. IT vs Non-IT: candidate only sees jobs in their domain track
+      if (classifyRequirement(job) !== candCategory) {
+        return false;
+      }
+      return true;
+    });
+  }, [matchesData?.data, openToContract, candCategory]);
+
+  const sortedMatches = useMemo(() => {
+    const list = [...eligibleMatches];
     if (filterMode === 'recent') {
       list.sort(
         (a, b) =>
@@ -181,7 +207,7 @@ export const CandidateJobsForMePage: React.FC = () => {
       list.sort((a, b) => b.final_score - a.final_score);
     }
     return list;
-  })();
+  }, [eligibleMatches, filterMode]);
 
   // Profile completeness: real signal from fields actually captured on the candidate record.
   const completenessFields: Array<[string, boolean]> = [
@@ -203,6 +229,30 @@ export const CandidateJobsForMePage: React.FC = () => {
         title="Jobs for me"
         description="Open public jobs ranked by skill and experience alignment with your profile."
       />
+
+      {/* Feed Scope Banner: IT/Non-IT & Contract Scope */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-[12px]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-[var(--text-primary)]">Feed scope:</span>
+          <Badge tone={candCategory === 'it' ? 'blue' : 'neutral'}>
+            {REQUIREMENT_CATEGORY_LABEL[candCategory]} Track
+          </Badge>
+          <Badge tone={openToContract ? 'amber' : 'emerald'}>
+            {openToContract ? 'FTE + Contract (C2C/C2H)' : 'FTE Only'}
+          </Badge>
+          <span className="text-[var(--text-secondary)]">
+            {openToContract
+              ? 'Showing Full-Time and Contract active jobs'
+              : 'Showing Full-Time (FTE) jobs only'}
+          </span>
+        </div>
+        <Link
+          to="/candidate/profile"
+          className="text-[#1D5FD1] hover:underline font-medium text-[11px]"
+        >
+          Manage contract &amp; track preferences →
+        </Link>
+      </div>
 
       {loadingMatches ? (
         <TableSkeleton rows={5} cols={4} />
@@ -551,6 +601,7 @@ export const CandidateBrowseJobsPage: React.FC = () => {
     queryFn: () =>
       fetchRequirements({
         page,
+        pageSize: 100,
         status: 'open',
         isPublic: true,
         search,
@@ -560,6 +611,32 @@ export const CandidateBrowseJobsPage: React.FC = () => {
   const appliedReqIds = new Set(
     (myApplications?.data || []).map((s) => s.requirement_id)
   );
+
+  const candCategory = classifyCandidate(myCandidate);
+  const candidatePd = (myCandidate?.parsed_data || {}) as Record<string, unknown>;
+  const openToContract = Boolean(candidatePd.open_to_contract);
+
+  // Browse filters: defaults to candidate's own track and contract preference
+  const [categoryFilter, setCategoryFilter] = useState<'auto' | 'it' | 'non_it'>('auto');
+  const effectiveCategory = categoryFilter === 'auto' ? candCategory : categoryFilter;
+
+  const [contractFilter, setContractFilter] = useState<'auto' | 'fte_only' | 'all'>('auto');
+  const effectiveContract = contractFilter === 'auto' ? (openToContract ? 'all' : 'fte_only') : contractFilter;
+
+  const filteredJobs = useMemo(() => {
+    const list = data?.data || [];
+    return list.filter((job) => {
+      // 1. Employment type: only FTE unless candidate has contract jobs enabled
+      if (effectiveContract === 'fte_only' && job.employment_type !== 'full_time') {
+        return false;
+      }
+      // 2. IT vs Non-IT: only show jobs in candidate's domain track
+      if (classifyRequirement(job) !== effectiveCategory) {
+        return false;
+      }
+      return true;
+    });
+  }, [data?.data, effectiveContract, effectiveCategory]);
 
   const handleApply = async () => {
     if (!selectedJob) return;
@@ -616,29 +693,129 @@ export const CandidateBrowseJobsPage: React.FC = () => {
         )}
       </div>
 
+      {/* Scope and Track Filter Bar */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px]">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Track Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-[var(--text-secondary)]">Track:</span>
+            <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-0.5">
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('it')}
+                className={`px-2.5 py-1 rounded-[4px] font-medium transition-colors cursor-pointer ${
+                  effectiveCategory === 'it'
+                    ? 'bg-[#1D5FD1] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                💻 IT ({data?.data?.filter((j) => classifyRequirement(j) === 'it').length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('non_it')}
+                className={`px-2.5 py-1 rounded-[4px] font-medium transition-colors cursor-pointer ${
+                  effectiveCategory === 'non_it'
+                    ? 'bg-[#1D5FD1] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                🏢 Non-IT ({data?.data?.filter((j) => classifyRequirement(j) === 'non_it').length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('all')}
+                className={`px-2.5 py-1 rounded-[4px] font-medium transition-colors cursor-pointer ${
+                  categoryFilter === 'all'
+                    ? 'bg-[#1D5FD1] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                All
+              </button>
+            </div>
+          </div>
+
+          {/* Contract / Employment Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-[var(--text-secondary)]">Type:</span>
+            <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-0.5">
+              <button
+                type="button"
+                onClick={() => setContractFilter('fte_only')}
+                className={`px-2.5 py-1 rounded-[4px] font-medium transition-colors cursor-pointer ${
+                  effectiveContract === 'fte_only'
+                    ? 'bg-[#1D5FD1] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Full-Time (FTE) Only
+              </button>
+              <button
+                type="button"
+                onClick={() => setContractFilter('all')}
+                className={`px-2.5 py-1 rounded-[4px] font-medium transition-colors cursor-pointer ${
+                  effectiveContract === 'all'
+                    ? 'bg-[#1D5FD1] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                + Contract (C2C/C2H)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <Link
+          to="/candidate/profile"
+          className="text-[#1D5FD1] hover:underline font-medium text-[11px]"
+        >
+          Manage profile preferences →
+        </Link>
+      </div>
+
       {isLoading ? (
         <TableSkeleton rows={5} cols={4} />
       ) : error ? (
         <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
-      ) : !data?.data.length ? (
+      ) : !filteredJobs.length ? (
         <EmptyState
-          title="No open public jobs match your search"
-          description="Check back soon or clear your search filter."
+          title="No open jobs match your current filters"
+          description={
+            effectiveContract === 'fte_only'
+              ? `No active Full-Time (FTE) ${effectiveCategory === 'all' ? '' : REQUIREMENT_CATEGORY_LABEL[effectiveCategory] + ' '}jobs found. Check back soon or enable contract jobs in your profile.`
+              : 'No active jobs found for the selected track.'
+          }
         />
       ) : (
         <div>
           <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
-            {data.data.map((job) => {
+            {filteredJobs.map((job) => {
               const isApplied = appliedReqIds.has(job.id);
+              const jobCategory = classifyRequirement(job);
               return (
                 <div key={job.id} className="py-4 space-y-2.5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                            jobCategory === 'it'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-purple-50 text-purple-700 border-purple-200'
+                          }`}
+                        >
+                          {REQUIREMENT_CATEGORY_LABEL[jobCategory]}
+                        </span>
+                        <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-700">
+                          {job.employment_type === 'full_time' ? 'FTE (Full-Time)' : job.employment_type.replace(/_/g, ' ')}
+                        </span>
+                      </div>
                       <h3 className="text-[14px] font-medium text-[var(--text-primary)]">
                         {job.title}
                       </h3>
                       <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 capitalize">
-                        {job.location} · {job.work_mode} · {job.employment_type.replace(/_/g, ' ')} ·{' '}
+                        {job.location} · {job.work_mode} ·{' '}
                         <span className="font-mono tabular-nums">
                           {job.min_experience}–{job.max_experience} yrs
                         </span>
@@ -670,7 +847,7 @@ export const CandidateBrowseJobsPage: React.FC = () => {
             })}
           </div>
 
-          <Pagination page={page} totalCount={data.count} onPageChange={setPage} />
+          <Pagination page={page} totalCount={filteredJobs.length} onPageChange={setPage} />
         </div>
       )}
 
@@ -812,6 +989,8 @@ export const CandidateProfilePage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [linkedin, setLinkedin] = useState('');
+  const [openToContract, setOpenToContract] = useState<boolean>(false);
+  const [domainCategory, setDomainCategory] = useState<'it' | 'non_it'>('it');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -822,6 +1001,9 @@ export const CandidateProfilePage: React.FC = () => {
       setExpYears(String(myCandidate.total_experience_years ?? 0));
       setSkills(myCandidate.skills || []);
       setSummary(myCandidate.summary || '');
+      const pd = (myCandidate.parsed_data || {}) as Record<string, unknown>;
+      setOpenToContract(Boolean(pd.open_to_contract));
+      setDomainCategory((pd.domain_category as 'it' | 'non_it') || classifyCandidate(myCandidate));
     }
     if (contacts) {
       setEmail(contacts.email || '');
@@ -835,6 +1017,7 @@ export const CandidateProfilePage: React.FC = () => {
     if (!myCandidate) return;
     setSaving(true);
     try {
+      const existingPd = (myCandidate.parsed_data || {}) as Record<string, unknown>;
       await updateCandidateProfile(myCandidate.id, {
         full_name: fullName.trim(),
         current_title: currentTitle.trim() || null,
@@ -842,6 +1025,11 @@ export const CandidateProfilePage: React.FC = () => {
         total_experience_years: Number(expYears),
         skills,
         summary: summary.trim() || null,
+        parsed_data: {
+          ...existingPd,
+          open_to_contract: openToContract,
+          domain_category: domainCategory,
+        },
       });
       await updateCandidateContacts(myCandidate.id, {
         email: email.trim() || null,
@@ -1020,6 +1208,68 @@ export const CandidateProfilePage: React.FC = () => {
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
         />
+
+        {/* Job Scope & Matching Preferences */}
+        <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-4 space-y-3">
+          <span className="text-[13px] font-semibold text-[var(--text-primary)] block">
+            Job Scope &amp; Matching Preferences
+          </span>
+
+          <div className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="pref_open_to_contract"
+              checked={openToContract}
+              onChange={(e) => setOpenToContract(e.target.checked)}
+              className="mt-0.5 rounded border-[var(--border)] h-4 w-4 text-[#1D5FD1]"
+            />
+            <label htmlFor="pref_open_to_contract" className="text-[12px] cursor-pointer">
+              <span className="font-medium text-[var(--text-primary)] block">
+                Show Contract (C2C / C2H) jobs in addition to Permanent Full-Time (FTE)
+              </span>
+              <span className="text-[var(--text-secondary)] block mt-0.5">
+                {openToContract
+                  ? 'Active: Both FTE and C2C/C2H positions are visible in your browse and match feeds.'
+                  : 'FTE Only: Only permanent Full-Time roles are visible. Contract / C2C roles are filtered out.'}
+              </span>
+            </label>
+          </div>
+
+          <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
+            <label className="text-[12px] font-medium text-[var(--text-primary)] block">
+              Domain / Profile Track
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDomainCategory('it')}
+                className={`p-2.5 rounded-[6px] border text-left text-[12px] transition-colors cursor-pointer ${
+                  domainCategory === 'it'
+                    ? 'border-[#1D5FD1] bg-[#1D5FD1]/10 text-[#1D5FD1] font-semibold'
+                    : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                <span className="block font-medium">💻 IT / Tech Track</span>
+                <span className="text-[11px] opacity-80 block mt-0.5">Software, Cloud, Data, QA, DevOps, AI</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDomainCategory('non_it')}
+                className={`p-2.5 rounded-[6px] border text-left text-[12px] transition-colors cursor-pointer ${
+                  domainCategory === 'non_it'
+                    ? 'border-[#1D5FD1] bg-[#1D5FD1]/10 text-[#1D5FD1] font-semibold'
+                    : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                <span className="block font-medium">🏢 Non-IT Track</span>
+                <span className="text-[11px] opacity-80 block mt-0.5">Sales, Operations, HR, Finance, Support</span>
+              </button>
+            </div>
+            <span className="text-[11px] text-[var(--text-tertiary)] block mt-0.5">
+              Filters your feed to only show matching {domainCategory === 'it' ? 'IT' : 'Non-IT'} positions.
+            </span>
+          </div>
+        </div>
 
         <div className="flex justify-end pt-2">
           <Button type="submit" loading={saving}>

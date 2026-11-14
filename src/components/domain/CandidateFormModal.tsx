@@ -19,6 +19,7 @@ import {
   uploadCandidateResume,
   fetchCandidateNameById,
   reassignCandidateVendor,
+  updateCandidateProfile,
 } from '../../api/candidates';
 import { fetchOrganizations } from '../../api/admin';
 import { useQuery } from '@tanstack/react-query';
@@ -127,6 +128,10 @@ export const CandidateFormModal: React.FC<{
 
   const [dupOpen, setDupOpen] = useState(false);
   const [dupMatchType, setDupMatchType] = useState<string | null>(null);
+
+  // Candidate self-onboarding preferences
+  const [openToContract, setOpenToContract] = useState<boolean>(false);
+  const [domainCategory, setDomainCategory] = useState<'it' | 'non_it'>('it');
 
   const {
     register,
@@ -552,6 +557,16 @@ export const CandidateFormModal: React.FC<{
         await reassignCandidateVendor(result.candidate_id, selectedVendorOrgId);
       }
 
+      // Candidate self-onboarding: persist contract preference and domain track
+      if (isSelfOnboarding) {
+        await updateCandidateProfile(result.candidate_id, {
+          parsed_data: {
+            open_to_contract: openToContract,
+            domain_category: domainCategory,
+          },
+        }).catch(() => undefined);
+      }
+
       if (dpdpNoticeAccepted) {
         await recordPrivacyAcknowledgementApi({
           subjectRef: `cand_${result.candidate_id}`,
@@ -839,6 +854,72 @@ export const CandidateFormModal: React.FC<{
               placeholder="Domain expertise, systems built, availability..."
               {...register('summary')}
             />
+
+            {/* Candidate Preferences: Contract Roles & Domain Track */}
+            {isSelfOnboarding && (
+              <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3.5 space-y-3">
+                <span className="text-[12px] font-semibold text-[var(--text-primary)] block">
+                  Job Preferences &amp; Scope
+                </span>
+
+                {/* Contract Role Acceptance */}
+                <div className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="open_to_contract"
+                    checked={openToContract}
+                    onChange={(e) => setOpenToContract(e.target.checked)}
+                    className="mt-0.5 rounded border-[var(--border)] h-4 w-4 text-[#1D5FD1]"
+                  />
+                  <label htmlFor="open_to_contract" className="text-[12px] cursor-pointer">
+                    <span className="font-medium text-[var(--text-primary)] block">
+                      I am open to Contract (C2C / C2H) jobs in addition to Permanent Full-Time (FTE)
+                    </span>
+                    <span className="text-[var(--text-secondary)] block mt-0.5">
+                      {openToContract
+                        ? '✓ Both Permanent Full-Time (FTE) and Contract (C2C/C2H) jobs will be visible in your feed.'
+                        : '🔒 Only Permanent Full-Time (FTE) jobs will be visible. Contract / C2C roles will be hidden.'}
+                    </span>
+                  </label>
+                </div>
+
+                {/* IT vs Non-IT Domain Selection */}
+                <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
+                  <label className="text-[12px] font-medium text-[var(--text-primary)] block">
+                    Domain / Profile Track
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDomainCategory('it')}
+                      className={`p-2.5 rounded-[6px] border text-left text-[12px] transition-colors cursor-pointer ${
+                        domainCategory === 'it'
+                          ? 'border-[#1D5FD1] bg-[#1D5FD1]/10 text-[#1D5FD1] font-semibold'
+                          : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                    >
+                      <span className="block font-medium">💻 IT / Tech Track</span>
+                      <span className="text-[11px] opacity-80 block mt-0.5">Software, Cloud, Data, QA, DevOps, AI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDomainCategory('non_it')}
+                      className={`p-2.5 rounded-[6px] border text-left text-[12px] transition-colors cursor-pointer ${
+                        domainCategory === 'non_it'
+                          ? 'border-[#1D5FD1] bg-[#1D5FD1]/10 text-[#1D5FD1] font-semibold'
+                          : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                    >
+                      <span className="block font-medium">🏢 Non-IT Track</span>
+                      <span className="text-[11px] opacity-80 block mt-0.5">Sales, Operations, HR, Finance, Support</span>
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-[var(--text-tertiary)] block mt-0.5">
+                    Ensures you only see requirements matching your {domainCategory === 'it' ? 'IT' : 'Non-IT'} background.
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* DPDP Act, 2023 Notice & Consent / Representation Attestation */}
             <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] leading-[18px] text-[var(--text-secondary)]">
