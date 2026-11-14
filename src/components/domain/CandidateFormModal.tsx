@@ -56,6 +56,19 @@ interface BulkCandidateItem {
   statusMessage?: string;
   existingCandidateId?: string | null;
   existingCandidateName?: string | null;
+  fieldErrors?: Record<string, string>;
+}
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+function validateBulkItem(item: BulkCandidateItem): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!item.full_name.trim()) errors.full_name = 'Name is required';
+  if (item.email && !EMAIL_RE.test(item.email.trim()))
+    errors.email = item.email.includes(' ')
+      ? 'Email contains a space — remove it'
+      : 'Invalid email format';
+  return errors;
 }
 
 export const CandidateFormModal: React.FC<{
@@ -253,24 +266,30 @@ export const CandidateFormModal: React.FC<{
             parseResumeFile(item.file),
           ]);
           setBulkItems((prev) =>
-            prev.map((row) =>
-              row.id === item.id
-                ? {
-                    ...row,
-                    resumeHash: hash,
-                    full_name: parsed.full_name,
-                    current_title: parsed.current_title,
-                    email: parsed.email,
-                    phone: parsed.phone,
-                    linkedin_url: parsed.linkedin_url,
-                    location: parsed.location,
-                    total_experience_years: parsed.total_experience_years,
-                    skills: parsed.skills,
-                    summary: parsed.summary,
-                    status: 'ready',
-                  }
-                : row
-            )
+            prev.map((row) => {
+              if (row.id !== item.id) return row;
+              const updated = {
+                ...row,
+                resumeHash: hash,
+                full_name: parsed.full_name,
+                current_title: parsed.current_title,
+                email: parsed.email,
+                phone: parsed.phone,
+                linkedin_url: parsed.linkedin_url,
+                location: parsed.location,
+                total_experience_years: parsed.total_experience_years,
+                skills: parsed.skills,
+                summary: parsed.summary,
+                status: 'ready' as const,
+              };
+              const fieldErrors = validateBulkItem(updated);
+              return {
+                ...updated,
+                fieldErrors,
+                status: Object.keys(fieldErrors).length > 0 ? 'error' as const : 'ready' as const,
+                statusMessage: Object.keys(fieldErrors).length > 0 ? Object.values(fieldErrors).join('; ') : undefined,
+              };
+            })
           );
         } catch {
           setBulkItems((prev) =>
@@ -297,7 +316,19 @@ export const CandidateFormModal: React.FC<{
     value: BulkCandidateItem[K]
   ) => {
     setBulkItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const updated = { ...item, [field]: value };
+        if (updated.status === 'created' || updated.status === 'duplicate' || updated.status === 'creating') return updated;
+        const fieldErrors = validateBulkItem(updated);
+        const hasErrors = Object.keys(fieldErrors).length > 0;
+        return {
+          ...updated,
+          fieldErrors,
+          status: hasErrors ? 'error' as const : 'ready' as const,
+          statusMessage: hasErrors ? Object.values(fieldErrors).join('; ') : undefined,
+        };
+      })
     );
   };
 
@@ -897,13 +928,18 @@ export const CandidateFormModal: React.FC<{
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                        <Input
-                          label="Full name"
-                          value={item.full_name}
-                          onChange={(e) =>
-                            updateBulkItemField(item.id, 'full_name', e.target.value)
-                          }
-                        />
+                        <div>
+                          <Input
+                            label="Full name"
+                            value={item.full_name}
+                            onChange={(e) =>
+                              updateBulkItemField(item.id, 'full_name', e.target.value)
+                            }
+                          />
+                          {item.fieldErrors?.full_name && (
+                            <p className="text-[11px] text-[var(--status-danger)] mt-0.5">{item.fieldErrors.full_name}</p>
+                          )}
+                        </div>
                         <Input
                           label="Current title"
                           value={item.current_title}
@@ -952,14 +988,19 @@ export const CandidateFormModal: React.FC<{
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <Input
-                            label="Email"
-                            placeholder="Required for FTE"
-                            value={item.email}
-                            onChange={(e) =>
-                              updateBulkItemField(item.id, 'email', e.target.value)
-                            }
-                          />
+                          <div>
+                            <Input
+                              label="Email"
+                              placeholder="Required for FTE"
+                              value={item.email}
+                              onChange={(e) =>
+                                updateBulkItemField(item.id, 'email', e.target.value)
+                              }
+                            />
+                            {item.fieldErrors?.email && (
+                              <p className="text-[11px] text-[var(--status-danger)] mt-0.5">{item.fieldErrors.email}</p>
+                            )}
+                          </div>
                           <Input
                             label="Phone"
                             placeholder="Required for FTE"

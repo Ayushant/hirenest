@@ -59,6 +59,8 @@ function formatCheckConstraintMessage(msg: string): string {
   if (msg.includes('reason')) return 'Reason must be at least 20 characters.';
   if (msg.includes('weights')) return 'Timing, quality, and compliance weights must sum to 100.';
   if (msg.includes('rating')) return 'Ratings must be between 1 and 5.';
+  if (msg.includes('email')) return 'Email address is invalid — check for spaces or missing @ symbol.';
+  if (msg.includes('phone')) return 'Phone number format is invalid.';
   return 'One or more fields did not pass validation requirements.';
 }
 
