@@ -3,6 +3,7 @@ import {
   computeRequirementDuplicateGroupKey,
   computeRequirementFingerprint,
   encodeRequirementMetaToCurrency,
+  extrasFromMeta,
   evaluateRequirementAccess,
   getRequirementFinancialsCache,
   getRequirementMarginsCache,
@@ -619,7 +620,7 @@ export interface CreateRequirementInput {
   description: string;
   skills: string[];
   min_experience: number;
-  max_experience: number;
+  max_experience: number | null;
   location: string;
   work_mode: WorkMode;
   employment_type: EmploymentType;
@@ -882,6 +883,7 @@ export async function softDeleteRequirement(params: {
     deletedAt: nowIso,
     deletedBy: actor,
     canonicalId,
+    ...extrasFromMeta(meta),
   });
 
   // 1. Save soft-delete state in local cache immediately
@@ -1191,6 +1193,7 @@ export async function setRequirementClientMapping(params: {
     budgetMax: meta.budgetMax,
     isClientMapped: params.isClientMapped,
     mappedClientOrgId: nextMappedOrgId,
+    ...extrasFromMeta(meta),
   });
 
   const nextMeta = parseRequirementMeta(

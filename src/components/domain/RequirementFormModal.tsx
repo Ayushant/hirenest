@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { classifyRequirement } from '../../lib/requirementCategory';
+import { parseExperienceInput } from '../../lib/format';
 import { z } from 'zod';
 import {
   Dialog,
@@ -24,6 +26,7 @@ import {
   type BudgetUnit,
   BUDGET_UNIT_METADATA,
   encodeRequirementMetaToCurrency,
+  extrasFromMeta,
   formatBudgetDisplay,
   parseRequirementMeta,
   validateBudgetValues,
@@ -102,11 +105,32 @@ export const RequirementFormModal: React.FC<{
   );
   const [title, setTitle] = useState<string>(initialRequirement?.title || '');
   const [description, setDescription] = useState<string>(initialRequirement?.description || '');
-  const [minExpInput, setMinExpInput] = useState<string>(
-    String(initialRequirement?.min_experience ?? 2)
+  const experienceToInput = (min?: number | null, max?: number | null) => {
+    if (min === undefined || min === null) return '';
+    if (max === null || max === undefined) return `${min}+`;
+    return max === min ? String(min) : `${min}-${max}`;
+  };
+  const [expInput, setExpInput] = useState<string>(
+    initialRequirement
+      ? experienceToInput(initialRequirement.min_experience, initialRequirement.max_experience)
+      : ''
   );
-  const [maxExpInput, setMaxExpInput] = useState<string>(
-    String(initialRequirement?.max_experience ?? 6)
+  const [goodToHave, setGoodToHave] = useState<string[]>(initialMeta.goodToHaveSkills || []);
+  const [categoryChoice, setCategoryChoice] = useState<'it' | 'non_it' | null>(
+    initialMeta.category ?? null
+  );
+  const [profileType, setProfileType] = useState<'' | 'bench' | 'market'>(
+    initialMeta.profileType || ''
+  );
+  const [hourlyRateInput, setHourlyRateInput] = useState<string>(
+    initialMeta.hourlyRate !== null && initialMeta.hourlyRate !== undefined
+      ? String(initialMeta.hourlyRate)
+      : ''
+  );
+  const [workingDaysInput, setWorkingDaysInput] = useState<string>(
+    initialMeta.workingDaysPerMonth !== null && initialMeta.workingDaysPerMonth !== undefined
+      ? String(initialMeta.workingDaysPerMonth)
+      : ''
   );
   const [openingsInput, setOpeningsInput] = useState<string>(
     String(initialRequirement?.openings ?? 1)
@@ -215,8 +239,16 @@ export const RequirementFormModal: React.FC<{
     );
     setTitle(initialRequirement?.title || '');
     setDescription(initialRequirement?.description || '');
-    setMinExpInput(String(initialRequirement?.min_experience ?? 2));
-    setMaxExpInput(String(initialRequirement?.max_experience ?? 6));
+    setExpInput(
+      initialRequirement
+        ? experienceToInput(initialRequirement.min_experience, initialRequirement.max_experience)
+        : ''
+    );
+    setGoodToHave(parsed.goodToHaveSkills || []);
+    setCategoryChoice(parsed.category ?? null);
+    setProfileType(parsed.profileType || '');
+    setHourlyRateInput(parsed.hourlyRate != null ? String(parsed.hourlyRate) : '');
+    setWorkingDaysInput(parsed.workingDaysPerMonth != null ? String(parsed.workingDaysPerMonth) : '');
     setOpeningsInput(String(initialRequirement?.openings ?? 1));
     setSlaHoursInput(String(initialRequirement?.submission_sla_hours ?? defaultSlaHours));
     setLocation(initialRequirement?.location || '');
@@ -372,15 +404,23 @@ export const RequirementFormModal: React.FC<{
     }
   };
 
+  const effectiveCategory: 'it' | 'non_it' =
+    categoryChoice ?? classifyRequirement({ title, skills, description });
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const expParsed = parseExperienceInput(expInput);
+    if ('error' in expParsed) {
+      setFieldErrors({ experience: expParsed.error });
+      return;
+    }
     const validation = requirementSchema.safeParse({
       client_org_id: clientOrgId,
       title,
       description,
-      min_experience: minExpInput,
-      max_experience: maxExpInput,
+      min_experience: expParsed.min,
+      max_experience: expParsed.max ?? expParsed.min,
       location,
       work_mode: workMode,
       employment_type: employmentType,
@@ -460,6 +500,12 @@ export const RequirementFormModal: React.FC<{
         budgetMax: parsedMaxNum,
         isClientMapped,
         mappedClientOrgId: isClientMapped ? dbClientOrgId : null,
+        goodToHaveSkills: goodToHave,
+        category: effectiveCategory,
+        profileType: profileType || null,
+        hourlyRate: hourlyRateInput.trim() !== '' && Number.isFinite(Number(hourlyRateInput)) ? Number(hourlyRateInput) : null,
+        workingDaysPerMonth:
+          workingDaysInput.trim() !== '' && Number.isFinite(Number(workingDaysInput)) ? Number(workingDaysInput) : null,
       });
 
       let savedReq: Requirement & { wasDuplicatePrevented?: boolean };
@@ -469,8 +515,8 @@ export const RequirementFormModal: React.FC<{
           title: values.title,
           description: values.description,
           skills,
-          min_experience: values.min_experience,
-          max_experience: values.max_experience,
+          min_experience: expParsed.min,
+          max_experience: expParsed.max,
           location: values.location,
           work_mode: values.work_mode,
           employment_type: values.employment_type,
@@ -485,8 +531,8 @@ export const RequirementFormModal: React.FC<{
           title: values.title,
           description: values.description,
           skills,
-          min_experience: values.min_experience,
-          max_experience: values.max_experience,
+          min_experience: expParsed.min,
+          max_experience: expParsed.max,
           location: values.location,
           work_mode: values.work_mode,
           employment_type: values.employment_type,
@@ -737,7 +783,7 @@ export const RequirementFormModal: React.FC<{
         {/* Skills Chip Input + Inline Skill Suggestions */}
         <div className="space-y-2">
           <SkillsChipInput
-            label="Required skills"
+            label="Must-have skills"
             skills={skills}
             onChange={(next) => {
               setSkills(next);
@@ -745,6 +791,47 @@ export const RequirementFormModal: React.FC<{
             }}
             error={skillsError || undefined}
           />
+
+          <SkillsChipInput
+            label="Good-to-have skills (optional)"
+            skills={goodToHave}
+            onChange={setGoodToHave}
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <span className="block text-[12px] font-medium text-[var(--text-secondary)]">Requirement category</span>
+              <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] p-0.5">
+                {(['it', 'non_it'] as const).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCategoryChoice(c)}
+                    className={`px-3 py-1 rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer ${
+                      effectiveCategory === c
+                        ? 'bg-[var(--primary-bg)] text-white'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {c === 'it' ? 'IT' : 'Non-IT'}
+                  </button>
+                ))}
+              </div>
+              {categoryChoice === null && (
+                <span className="block text-[11px] text-[var(--text-tertiary)]">Auto-detected from title and skills. Tap to set.</span>
+              )}
+            </div>
+            <Select
+              label="Profile type"
+              value={profileType}
+              onChange={(e) => setProfileType(e.target.value as '' | 'bench' | 'market')}
+              options={[
+                { value: '', label: 'Not specified' },
+                { value: 'bench', label: 'Bench profile' },
+                { value: 'market', label: 'Market profile' },
+              ]}
+            />
+          </div>
 
           {aiSkillSuggestions.length > 0 && (
             <div className="rounded-[6px] border border-[var(--ai-block-border)] bg-[var(--ai-block-bg)] p-3 space-y-2">
@@ -792,32 +879,18 @@ export const RequirementFormModal: React.FC<{
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Input
-            label="Min exp (yrs)"
-            type="number"
-            step="0.5"
-            value={minExpInput}
+            label="Experience (yrs)"
+            placeholder="e.g. 8+  or  10  or  8-12"
+            value={expInput}
             onChange={(e) => {
-              setMinExpInput(e.target.value);
-              if (fieldErrors.min_experience) {
-                setFieldErrors((prev) => ({ ...prev, min_experience: undefined }));
+              setExpInput(e.target.value);
+              if (fieldErrors.experience) {
+                setFieldErrors((prev) => ({ ...prev, experience: undefined }));
               }
             }}
-            error={fieldErrors.min_experience}
-          />
-          <Input
-            label="Max exp (yrs)"
-            type="number"
-            step="0.5"
-            value={maxExpInput}
-            onChange={(e) => {
-              setMaxExpInput(e.target.value);
-              if (fieldErrors.max_experience) {
-                setFieldErrors((prev) => ({ ...prev, max_experience: undefined }));
-              }
-            }}
-            error={fieldErrors.max_experience}
+            error={fieldErrors.experience}
           />
           <Input
             label="Openings"
@@ -880,6 +953,27 @@ export const RequirementFormModal: React.FC<{
               { value: 'contract_to_hire', label: 'Contract to hire' },
               { value: 'part_time', label: 'Part time' },
             ]}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="Hourly rate (per hour, optional)"
+            type="number"
+            min="0"
+            step="any"
+            placeholder="e.g. 1200"
+            value={hourlyRateInput}
+            onChange={(e) => setHourlyRateInput(e.target.value)}
+          />
+          <Input
+            label="Working days per month (optional)"
+            type="number"
+            min="1"
+            max="31"
+            placeholder="e.g. 22"
+            value={workingDaysInput}
+            onChange={(e) => setWorkingDaysInput(e.target.value)}
           />
         </div>
 

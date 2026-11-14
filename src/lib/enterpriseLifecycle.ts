@@ -28,6 +28,30 @@ export interface RequirementExtendedMeta {
   deletedBy?: string | null;
   canonicalId?: string | null;
   fingerprint?: string | null;
+  // Extended requirement criteria (stored in the currency meta string; no schema change)
+  goodToHaveSkills?: string[];
+  category?: 'it' | 'non_it' | null;
+  hourlyRate?: number | null;
+  workingDaysPerMonth?: number | null;
+  profileType?: 'bench' | 'market' | null;
+}
+
+export interface RequirementExtras {
+  goodToHaveSkills?: string[];
+  category?: 'it' | 'non_it' | null;
+  hourlyRate?: number | null;
+  workingDaysPerMonth?: number | null;
+  profileType?: 'bench' | 'market' | null;
+}
+
+export function extrasFromMeta(meta: RequirementExtendedMeta): RequirementExtras {
+  return {
+    goodToHaveSkills: meta.goodToHaveSkills,
+    category: meta.category ?? null,
+    hourlyRate: meta.hourlyRate ?? null,
+    workingDaysPerMonth: meta.workingDaysPerMonth ?? null,
+    profileType: meta.profileType ?? null,
+  };
 }
 
 export interface DuplicateRequirementGroup {
@@ -404,7 +428,7 @@ export function encodeRequirementMetaToCurrency(params: {
   deletedAt?: string | null;
   deletedBy?: string | null;
   canonicalId?: string | null;
-}): string {
+} & RequirementExtras): string {
   const base = (params.baseCurrency || 'INR').split('|')[0].trim() || 'INR';
   const unit = params.budgetUnit || 'LPA';
   const mode = params.budgetMode || 'range';
@@ -420,6 +444,20 @@ export function encodeRequirementMetaToCurrency(params: {
   const mapOrg = params.isClientMapped && params.mappedClientOrgId ? params.mappedClientOrgId : '';
 
   let encoded = `${base}|unit=${unit}|mode=${mode}|min=${minStr}|max=${maxStr}|map=${mapFlag}:${mapOrg}`;
+  if (params.category === 'it' || params.category === 'non_it') encoded += `|cat=${params.category}`;
+  if (params.profileType === 'bench' || params.profileType === 'market') encoded += `|pt=${params.profileType}`;
+  if (params.hourlyRate !== null && params.hourlyRate !== undefined && Number.isFinite(params.hourlyRate)) {
+    encoded += `|rate=${params.hourlyRate}`;
+  }
+  if (
+    params.workingDaysPerMonth !== null &&
+    params.workingDaysPerMonth !== undefined &&
+    Number.isFinite(params.workingDaysPerMonth)
+  ) {
+    encoded += `|days=${params.workingDaysPerMonth}`;
+  }
+  const good = (params.goodToHaveSkills || []).map((x) => x.trim()).filter(Boolean);
+  if (good.length > 0) encoded += `|gth=${encodeURIComponent(good.join(','))}`;
   if (params.isDeleted) {
     const safeAt = encodeURIComponent(params.deletedAt || new Date().toISOString());
     const safeBy = encodeURIComponent(params.deletedBy || 'admin');
@@ -544,6 +582,17 @@ export function parseRequirementMeta(
     }
   }
 
+  const numOrNull = (v: string | undefined) =>
+    v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
+  let goodToHaveSkills: string[] = [];
+  if (kv.gth) {
+    try {
+      goodToHaveSkills = decodeURIComponent(kv.gth).split(',').map((x) => x.trim()).filter(Boolean);
+    } catch {
+      goodToHaveSkills = [];
+    }
+  }
+
   const result: RequirementExtendedMeta = {
     baseCurrency,
     budgetUnit,
@@ -556,6 +605,11 @@ export function parseRequirementMeta(
     deletedAt,
     deletedBy,
     canonicalId,
+    goodToHaveSkills,
+    category: kv.cat === 'it' || kv.cat === 'non_it' ? kv.cat : null,
+    profileType: kv.pt === 'bench' || kv.pt === 'market' ? kv.pt : null,
+    hourlyRate: numOrNull(kv.rate),
+    workingDaysPerMonth: numOrNull(kv.days),
   };
 
   if (reqId) {

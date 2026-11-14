@@ -14,10 +14,14 @@ const IT_SKILL =
   /\b(java|python|javascript|typescript|react|angular|node|sql|aws|azure|gcp|docker|kubernetes|terraform|spring|\.net|c\+\+|golang|kotlin|swift|salesforce|sap|api|microservices|devops|linux|git|selenium|hadoop|spark|etl|tableau|power\s*bi|agile|jira|confluent|flink|kafka|snowflake|databricks|lakehouse|identity|iam|okta|active directory|ldap)\b/i;
 
 export function classifyRequirement(req: {
+  currency?: string | null;
   title?: string | null;
   skills?: string[] | null;
   description?: string | null;
 }): RequirementCategory {
+  // Explicit category chosen on the requirement form wins over any inference.
+  const explicitCat = /\|cat=(it|non_it)(?:\||$)/.exec(String((req as { currency?: string }).currency || ''));
+  if (explicitCat) return explicitCat[1] as RequirementCategory;
   const title = req.title || '';
   const skills = Array.isArray(req.skills) ? req.skills.join(' ') : '';
 

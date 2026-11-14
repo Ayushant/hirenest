@@ -1,4 +1,5 @@
 import { parseJobDescription } from '../../lib/jobDescription';
+import { formatExperienceRange } from '../../lib/format';
 import { fetchCandidateHistory, PAST_OUTCOME_LABEL } from '../../lib/candidateHistory';
 import {
   RequirementRibbon,
@@ -742,7 +743,7 @@ export const HqRequirementsListPage: React.FC = () => {
                           {req.title}
                         </div>
                         <div className="text-[12px] leading-[16px] text-[var(--text-tertiary)] font-mono tabular-nums">
-                          ID: {shortId} · {req.min_experience}–{req.max_experience}y · {req.openings} open
+                          ID: {shortId} · {formatExperienceRange(req.min_experience, req.max_experience, 'y')} · {req.openings} open
                           {req.is_public ? ' · Public' : ''}
                         </div>
                       </td>
@@ -2386,7 +2387,7 @@ export const HqRequirementDetailPage: React.FC = () => {
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Experience</span>
               <span className="font-mono tabular-nums text-[var(--text-primary)]">
-                {req.min_experience}–{req.max_experience} yrs
+                {formatExperienceRange(req.min_experience, req.max_experience)}
               </span>
             </div>
             <div className="py-2 flex justify-between gap-2">

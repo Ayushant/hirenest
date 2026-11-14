@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
+import { formatExperienceRange } from '../../lib/format';
 import { displayClientName } from '../../lib/clientIdentity';
 import {
   classifyCandidate,
@@ -353,7 +355,7 @@ export const CandidateJobsForMePage: React.FC = () => {
                         </span>
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-[6px] bg-[var(--bg-subtle)] border border-[var(--border)] text-[11px] font-mono text-[var(--text-secondary)]">
                           <Briefcase className="h-3 w-3 text-[var(--text-tertiary)]" />
-                          {job?.min_experience ?? 0}–{job?.max_experience ?? 0} yrs
+                          {formatExperienceRange(job?.min_experience ?? 0, job?.max_experience)}
                         </span>
                         {budgetInfo?.formatted && budgetInfo.formatted !== '-' && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-[6px] bg-[var(--status-success-bg)] border border-[var(--status-success-dot)]/20 text-[11px] font-medium text-[var(--status-success)]">
@@ -817,7 +819,7 @@ export const CandidateBrowseJobsPage: React.FC = () => {
                       <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 capitalize">
                         {job.location} · {job.work_mode} ·{' '}
                         <span className="font-mono tabular-nums">
-                          {job.min_experience}–{job.max_experience} yrs
+                          {formatExperienceRange(job.min_experience, job.max_experience)}
                         </span>
                       </p>
                     </div>

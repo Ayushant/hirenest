@@ -1,4 +1,5 @@
 import { formatRequirementBudgetWithSubtitle } from './format';
+import { formatExperienceRange } from './format';
 import { decomposeCompoundSkills } from './matchingEngine';
 import type { Requirement, Submission } from '../types/db';
 
@@ -154,7 +155,7 @@ export function buildSanitizedWhatsAppMessage(params: {
   const budgetInfo = formatRequirementBudgetWithSubtitle(requirement);
   const skillsList = decomposeCompoundSkills(requirement.skills || []);
   const topSkills = skillsList.length > 0 ? skillsList.slice(0, 8).join(', ') : 'See full JD in portal';
-  const expRange = `${requirement.min_experience}–${requirement.max_experience} yrs`;
+  const expRange = formatExperienceRange(requirement.min_experience, requirement.max_experience);
   const empLabel =
     requirement.employment_type === 'full_time'
       ? 'Full-Time (FTE)'

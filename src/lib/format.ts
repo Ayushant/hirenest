@@ -241,3 +241,34 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   candidate: 'Direct candidate',
   pending: 'Pending approval',
 };
+
+/** "8+ yrs" for open-ended, "10 yrs" for fixed, "8–12 yrs" for a range. */
+export function formatExperienceRange(
+  min: number | null | undefined,
+  max: number | null | undefined,
+  unit: 'yrs' | 'y' | 'YRS' = 'yrs'
+): string {
+  const lo = min ?? 0;
+  if (max === null || max === undefined) return `${lo}+ ${unit}`;
+  if (max === lo) return `${lo} ${unit}`;
+  return `${lo}–${max} ${unit}`;
+}
+
+/** Parses "8+", "10", or "8-12" into min/max years. max=null means open-ended. */
+export function parseExperienceInput(
+  raw: string
+): { min: number; max: number | null } | { error: string } {
+  const t = raw.trim().replace(/\s+/g, '').replace(/[–—]/g, '-').replace(/yrs?|years?/gi, '');
+  let m = /^(\d+(?:\.\d)?)\+$/.exec(t);
+  if (m) return { min: Number(m[1]), max: null };
+  m = /^(\d+(?:\.\d)?)$/.exec(t);
+  if (m) return { min: Number(m[1]), max: Number(m[1]) };
+  m = /^(\d+(?:\.\d)?)-(\d+(?:\.\d)?)$/.exec(t);
+  if (m) {
+    const lo = Number(m[1]);
+    const hi = Number(m[2]);
+    if (hi < lo) return { error: 'Maximum must be greater than or equal to minimum.' };
+    return { min: lo, max: hi };
+  }
+  return { error: 'Enter experience like 8+, 10 or 8-12.' };
+}

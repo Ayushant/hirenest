@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatExperienceRange } from '../../lib/format';
 import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -880,7 +881,7 @@ export const ClientRequirementDetailPage: React.FC = () => {
     <div className="max-w-[1200px]">
       <PageHeader
         title={req.title}
-        description={`${req.location} (${req.work_mode}) · ${req.min_experience}–${req.max_experience} yrs · ${req.openings} opening(s)`}
+        description={`${req.location} (${req.work_mode}) · ${formatExperienceRange(req.min_experience, req.max_experience)} · ${req.openings} opening(s)`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <RequirementStatusBadge status={req.status} />

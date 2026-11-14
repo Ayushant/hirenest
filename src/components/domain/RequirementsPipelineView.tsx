@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { formatExperienceRange } from '../../lib/format';
 import {
   Briefcase,
   Building2,
@@ -224,10 +225,8 @@ export const RequirementsPipelineGrid: React.FC<{
             const isDistributed = req.status === 'open' || Boolean(share);
 
             const expText =
-              req.min_experience !== undefined && req.max_experience !== undefined
-                ? req.min_experience === req.max_experience
-                  ? `${req.min_experience}+ YRS`
-                  : `${req.min_experience}-${req.max_experience} YRS`
+              req.min_experience !== undefined && req.min_experience !== null
+                ? formatExperienceRange(req.min_experience, req.max_experience, 'YRS')
                 : 'NOT SPECIFIED';
 
             const locationText =

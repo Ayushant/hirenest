@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { formatExperienceRange } from '../../lib/format';
 import { displayClientName } from '../../lib/clientIdentity';
 import {
   RequirementRibbon,
@@ -820,7 +821,7 @@ export const VendorRequirementsPage: React.FC = () => {
                           {req.title}
                         </div>
                         <div className="text-[12px] text-[var(--text-secondary)]">
-                          {req.min_experience}–{req.max_experience} yrs · {req.openings} opening(s)
+                          {formatExperienceRange(req.min_experience, req.max_experience)} · {req.openings} opening(s)
                         </div>
                       </td>
                       <td className="capitalize text-[var(--text-secondary)]">
@@ -988,7 +989,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
     <div className="max-w-[1200px]">
       <PageHeader
         title={req.title}
-        description={`${req.location} (${req.work_mode}) · ${req.min_experience}–${req.max_experience} yrs · Vendor budget: ${budgetInfo.formatted}${budgetInfo.subtitle ? ` (${budgetInfo.subtitle})` : ''}`}
+        description={`${req.location} (${req.work_mode}) · ${formatExperienceRange(req.min_experience, req.max_experience)} · Vendor budget: ${budgetInfo.formatted}${budgetInfo.subtitle ? ` (${budgetInfo.subtitle})` : ''}`}
         actions={
           <div className="flex items-center gap-2">
             {share && <SlaBadge dueAt={share.due_at} showCountdown />}
@@ -1207,7 +1208,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
             <div className="py-2 flex justify-between gap-2">
               <dt className="text-[12px] text-[var(--text-secondary)]">Experience</dt>
               <dd className="font-mono tabular-nums text-[var(--text-primary)]">
-                {req.min_experience}–{req.max_experience} yrs
+                {formatExperienceRange(req.min_experience, req.max_experience)}
               </dd>
             </div>
             <div className="py-2 flex justify-between gap-2">
