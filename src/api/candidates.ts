@@ -305,6 +305,41 @@ export async function fetchMatchesForRequirement(params: {
   const existingMatches = (matchesRes.data || []) as CandidateMatch[];
   const allCandidates = (candidatesRes.data || []) as Candidate[];
 
+  // Reusable candidates (rejected, released, or from closed / on-hold requirements) must always
+  // be evaluated against a new or similar requirement, even if they fall outside the newest 250.
+  try {
+    const { data: pastSubs } = await supabase
+      .from('submissions')
+      .select('candidate_id, stage, requirements:requirement_id(status)')
+      .neq('requirement_id', params.requirementId)
+      .limit(1500);
+    const ACTIVE = new Set(['applied', 'recruiter_review', 'client_review', 'interviewing', 'offered']);
+    const have = new Set(allCandidates.map((c) => c.id));
+    const missing = new Set<string>();
+    for (const sub of (pastSubs || []) as unknown as Array<{
+      candidate_id: string;
+      stage: string;
+      requirements: { status: string } | { status: string }[] | null;
+    }>) {
+      const rq = Array.isArray(sub.requirements) ? sub.requirements[0] : sub.requirements;
+      const reusable =
+        sub.stage === 'rejected' ||
+        sub.stage === 'withdrawn' ||
+        (ACTIVE.has(sub.stage) && (rq?.status === 'closed' || rq?.status === 'filled' || rq?.status === 'on_hold'));
+      if (reusable && !have.has(sub.candidate_id)) missing.add(sub.candidate_id);
+    }
+    const ids = Array.from(missing).slice(0, 300);
+    if (ids.length > 0) {
+      const { data: extra } = await supabase
+        .from('candidates')
+        .select('*, source_vendor:source_vendor_org_id(id, name), owner_vendor:owner_vendor_org_id(id, name)')
+        .in('id', ids);
+      allCandidates.push(...((extra || []) as Candidate[]));
+    }
+  } catch {
+    // Non-fatal: fall back to the standard pool.
+  }
+
   // Match intelligence is only meaningful for ACTIVE (open) requirements.
   if (!requirement || isRequirementSoftDeleted(requirement) || requirement.status !== 'open') {
     return { data: [], count: 0 };

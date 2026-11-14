@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { computeFineTunedCandidateMatch } from './src/lib/matchingEngine';
+import type { Candidate, Requirement } from './src/types/db';
 
 /**
  * Alert engine: in-app notifications + email (Resend REST API when RESEND_API_KEY is set).
@@ -246,4 +248,72 @@ export async function runComplianceAlerts(admin: SupabaseClient): Promise<{ vend
     });
   }
   return { vendors: vendorsNotified, admins: adminsNotified };
+}
+
+/**
+ * Run every ~10 min: when a new open requirement appears, auto-match the reusable candidates
+ * (rejected, released, or from closed / on-hold requirements) and tell HQ how many qualify.
+ * Each requirement is evaluated once (dedupe key), shortly after it opens.
+ */
+export async function runReusableCandidateAlerts(admin: SupabaseClient): Promise<{ requirements: number; notified: number }> {
+  const since = new Date(Date.now() - 72 * 3600_000).toISOString();
+  const { data: reqs } = await admin
+    .from('requirements')
+    .select('*')
+    .eq('status', 'open')
+    .gte('created_at', since)
+    .limit(50);
+  if (!reqs || reqs.length === 0) return { requirements: 0, notified: 0 };
+
+  // Reusable candidate ids with the reason they are reusable.
+  const { data: subs } = await admin
+    .from('submissions')
+    .select('candidate_id, requirement_id, stage, requirements:requirement_id(status)')
+    .limit(3000);
+  const ACTIVE = new Set(['applied', 'recruiter_review', 'client_review', 'interviewing', 'offered']);
+  const reusableIds = new Set<string>();
+  for (const sub of (subs || []) as unknown as Array<{ candidate_id: string; stage: string; requirements: { status: string } | { status: string }[] | null }>) {
+    const rq = Array.isArray(sub.requirements) ? sub.requirements[0] : sub.requirements;
+    if (
+      sub.stage === 'rejected' ||
+      sub.stage === 'withdrawn' ||
+      (ACTIVE.has(sub.stage) && (rq?.status === 'closed' || rq?.status === 'filled' || rq?.status === 'on_hold'))
+    ) {
+      reusableIds.add(sub.candidate_id);
+    }
+  }
+  if (reusableIds.size === 0) {
+    // Still mark as evaluated so we do not rescan every run.
+    for (const r of reqs) await claim(admin, `reusable:${r.id}`);
+    return { requirements: reqs.length, notified: 0 };
+  }
+
+  const candidates: Candidate[] = [];
+  const idList = Array.from(reusableIds);
+  for (let i = 0; i < idList.length; i += 200) {
+    const { data } = await admin.from('candidates').select('*').in('id', idList.slice(i, i + 200));
+    candidates.push(...((data || []) as Candidate[]));
+  }
+
+  let notified = 0;
+  for (const r of reqs as Requirement[]) {
+    if (!(await claim(admin, `reusable:${r.id}`))) continue;
+    // Candidates already in this requirement's pipeline are not "reusable" for it.
+    const { data: already } = await admin.from('submissions').select('candidate_id').eq('requirement_id', r.id);
+    const inPipeline = new Set((already || []).map((a) => a.candidate_id as string));
+    let count = 0;
+    for (const c of candidates) {
+      if (inPipeline.has(c.id)) continue;
+      const m = computeFineTunedCandidateMatch(r, c, null);
+      if (m.final_score >= MIN_MATCH && m.matched_skills.length > 0) count += 1;
+    }
+    if (count === 0) continue;
+    notified += await notifyUsers(admin, await staffUsers(admin, ['admin', 'recruiter']), {
+      kind: 'reusable_matches',
+      title: `${count} reusable candidate(s) match "${r.title}"`,
+      body: `${count} candidate(s) from rejected, released or closed requirements match the new requirement "${r.title}" at ${MIN_MATCH}% or higher. Open the Matches tab and tick "Reusable only".`,
+      link: `/admin/requirements/${r.id}`,
+    });
+  }
+  return { requirements: reqs.length, notified };
 }

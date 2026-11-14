@@ -25,7 +25,7 @@ import {
 import { extractStructuredFieldsFromText } from './src/lib/resumeParser';
 import { registerStaffRoutes, registerStaffEnforcement } from './staffRoutes';
 import { registerVendorTeamRoutes } from './vendorTeamRoutes';
-import { runSlaAlerts, runSlaAutoClose, runMorningDigest, runComplianceAlerts } from './alertsEngine';
+import { runReusableCandidateAlerts, runSlaAlerts, runSlaAutoClose, runMorningDigest, runComplianceAlerts } from './alertsEngine';
 import {
   type PrivacyNoticeRecord,
   type PrivacyAcknowledgementRecord,
@@ -5139,6 +5139,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     try {
       if (job === 'sla' || job === 'all') out.sla = await runSlaAlerts(admin);
       if (job === 'sla' || job === 'sla_close' || job === 'all') out.sla_close = await runSlaAutoClose(admin);
+      if (job === 'sla' || job === 'reusable' || job === 'all') out.reusable = await runReusableCandidateAlerts(admin);
       if (job === 'morning' || job === 'all') out.morning = await runMorningDigest(admin);
       if (job === 'compliance' || job === 'all') out.compliance = await runComplianceAlerts(admin);
       res.json({ ok: true, emailConfigured: Boolean(process.env.RESEND_API_KEY), ...out });
