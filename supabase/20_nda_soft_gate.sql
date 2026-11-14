@@ -41,3 +41,4 @@ $$;
 grant execute on function public.vendor_nda_is_verified(uuid) to authenticated;
 
 commit;
+

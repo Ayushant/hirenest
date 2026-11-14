@@ -168,6 +168,21 @@ export async function updateCandidateProfile(
   return data as Candidate;
 }
 
+/** Admin-only: set or clear the owner vendor org on any candidate. */
+export async function reassignCandidateVendor(
+  candidateId: string,
+  vendorOrgId: string | null
+): Promise<void> {
+  const { error } = await supabase
+    .from('candidates')
+    .update({
+      owner_vendor_org_id: vendorOrgId,
+      source_vendor_org_id: vendorOrgId, // keep both in sync when admin maps
+    })
+    .eq('id', candidateId);
+  if (error) throw error;
+}
+
 export async function updateCandidateContacts(
   candidateId: string,
   payload: {

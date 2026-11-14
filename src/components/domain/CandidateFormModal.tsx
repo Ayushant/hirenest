@@ -7,6 +7,7 @@ import {
   Dialog,
   Button,
   Input,
+  Select,
   Textarea,
   SkillsChipInput,
   Badge,
@@ -17,7 +18,10 @@ import {
   createCandidateRpc,
   uploadCandidateResume,
   fetchCandidateNameById,
+  reassignCandidateVendor,
 } from '../../api/candidates';
+import { fetchOrganizations } from '../../api/admin';
+import { useQuery } from '@tanstack/react-query';
 import { computeFileSha256, validateResumeFile } from '../../lib/hash';
 import { parseResumeFile } from '../../lib/resumeParser';
 import { recordPrivacyAcknowledgementApi } from '../../lib/dpdpPrivacy';
@@ -80,6 +84,7 @@ export const CandidateFormModal: React.FC<{
   defaultName?: string;
   defaultMode?: 'single' | 'bulk';
   defaultEmploymentType?: EmploymentType;
+  isAdmin?: boolean;
 }> = ({
   open,
   onClose,
@@ -89,11 +94,20 @@ export const CandidateFormModal: React.FC<{
   defaultName = '',
   defaultMode = 'single',
   defaultEmploymentType = 'full_time',
+  isAdmin = false,
 }) => {
   const { toast } = useToast();
   const [mode, setMode] = useState<'single' | 'bulk'>(defaultMode);
   const [engagementType, setEngagementType] = useState<EmploymentType>(defaultEmploymentType);
   const contactPolicy = getContractContactPolicy(engagementType);
+
+  // Vendor mapping (admin only)
+  const [selectedVendorOrgId, setSelectedVendorOrgId] = useState<string>('');
+  const { data: vendorsData } = useQuery({
+    queryKey: ['organizations_vendors_modal'],
+    queryFn: () => fetchOrganizations({ type: 'vendor', page: 1, pageSize: 200 }),
+    enabled: isAdmin,
+  });
 
   // Single candidate state
   const [skills, setSkills] = useState<string[]>([]);
@@ -143,6 +157,7 @@ export const CandidateFormModal: React.FC<{
       setFileError(null);
       setSkillsError(null);
       setContactError(null);
+      setSelectedVendorOrgId('');
     }
   }, [open, defaultMode, isSelfOnboarding, defaultEmploymentType]);
 
@@ -419,6 +434,10 @@ export const CandidateFormModal: React.FC<{
           );
         }
 
+        if (isAdmin && selectedVendorOrgId) {
+          await reassignCandidateVendor(result.candidate_id, selectedVendorOrgId).catch(() => undefined);
+        }
+
         createdCount += 1;
         lastCreatedId = result.candidate_id;
         setBulkItems((prev) =>
@@ -528,6 +547,11 @@ export const CandidateFormModal: React.FC<{
         await uploadCandidateResume(result.candidate_id, resumeFile, resumeHash, { reparse: false });
       }
 
+      // Admin: map candidate to selected vendor org after creation
+      if (isAdmin && selectedVendorOrgId) {
+        await reassignCandidateVendor(result.candidate_id, selectedVendorOrgId);
+      }
+
       if (dpdpNoticeAccepted) {
         await recordPrivacyAcknowledgementApi({
           subjectRef: `cand_${result.candidate_id}`,
@@ -615,6 +639,26 @@ export const CandidateFormModal: React.FC<{
             <span className="text-[12px] leading-[16px] text-[var(--text-tertiary)]">
               Auto-extracts Name, Role, Location, Experience &amp; Skills
             </span>
+          </div>
+        )}
+
+        {/* Admin: map candidate(s) to a vendor agency at creation time (single or bulk) */}
+        {isAdmin && !isSelfOnboarding && (
+          <div className="mb-4 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 space-y-2">
+            <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+              Map to vendor agency <span className="font-normal text-[var(--text-secondary)]">(optional)</span>
+            </span>
+            <Select
+              value={selectedVendorOrgId}
+              onChange={(e) => setSelectedVendorOrgId(e.target.value)}
+              options={[
+                { value: '', label: '— No vendor (Internal / Direct) —' },
+                ...(vendorsData?.data || []).map((v) => ({ value: v.id, label: v.name })),
+              ]}
+            />
+            <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+              Assigns <code>owner_vendor_org_id</code> so {mode === 'bulk' ? 'these candidates appear' : 'this candidate appears'} in that vendor agency's talent pool.
+            </p>
           </div>
         )}
 

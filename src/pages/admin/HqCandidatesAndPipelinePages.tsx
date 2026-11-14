@@ -47,6 +47,7 @@ import {
   updateCandidateProfile,
   updateCandidateContacts,
   uploadCandidateResume,
+  reassignCandidateVendor,
 } from '../../api/candidates';
 import {
   fetchSubmissions,
@@ -93,6 +94,7 @@ export const HqCandidatesListPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const prefix = profile?.role === 'admin' ? '/admin' : '/recruiter';
+  const isAdmin = profile?.role === 'admin';
 
   const [page, setPage] = useState(1);
   const [originalSource, setOriginalSource] = useState<CandidateSource | ''>(
@@ -356,6 +358,7 @@ export const HqCandidatesListPage: React.FC = () => {
       <CandidateFormModal
         open={addOpen}
         defaultMode={modalMode}
+        isAdmin={isAdmin}
         onClose={() => setAddOpen(false)}
         onCreated={(candidateId) => {
           queryClient.invalidateQueries({ queryKey: ['candidates'] });
@@ -411,6 +414,33 @@ export const HqCandidateDetailPage: React.FC = () => {
   const [linkUserOpen, setLinkUserOpen] = useState(false);
   const [linkUserIdInput, setLinkUserIdInput] = useState('');
   const [linkingUser, setLinkingUser] = useState(false);
+
+  // Vendor reassign
+  const [vendorReassignOpen, setVendorReassignOpen] = useState(false);
+  const [vendorReassignId, setVendorReassignId] = useState('');
+  const [vendorReassigning, setVendorReassigning] = useState(false);
+
+  const { data: vendorsData } = useQuery({
+    queryKey: ['organizations_vendors_detail'],
+    queryFn: () => fetchOrganizations({ type: 'vendor', page: 1, pageSize: 200 }),
+    enabled: isAdmin,
+  });
+
+  const handleVendorReassign = async () => {
+    if (!id) return;
+    setVendorReassigning(true);
+    try {
+      await reassignCandidateVendor(id, vendorReassignId || null);
+      toast({ title: 'Vendor mapping updated', tone: 'success' });
+      setVendorReassignOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['candidate_detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+    } catch (err) {
+      toast({ title: 'Could not update vendor', description: String(err), tone: 'error' });
+    } finally {
+      setVendorReassigning(false);
+    }
+  };
 
   const { data: cand, isLoading } = useQuery({
     queryKey: ['candidate_detail', id],
@@ -967,6 +997,21 @@ export const HqCandidateDetailPage: React.FC = () => {
                 source={cand.original_source}
               />
             </div>
+            {isAdmin && (
+              <div className="py-2 flex justify-between items-center gap-2">
+                <span className="text-[var(--text-secondary)]">Vendor mapping</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setVendorReassignId(cand.owner_vendor_org_id || cand.source_vendor_org_id || '');
+                    setVendorReassignOpen(true);
+                  }}
+                >
+                  Reassign vendor
+                </Button>
+              </div>
+            )}
             <div className="py-2 flex justify-between gap-2">
               <span className="text-[var(--text-secondary)]">Experience</span>
               <span className="font-mono tabular-nums text-[var(--text-primary)]">
@@ -1211,6 +1256,44 @@ export const HqCandidateDetailPage: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Dialog>
+
+      {/* Reassign Vendor Modal */}
+      <Dialog
+        open={vendorReassignOpen}
+        onClose={() => setVendorReassignOpen(false)}
+        title="Map / Reassign Candidate Vendor"
+        description="Select which vendor owns this candidate. Assigning a vendor maps the candidate to that vendor's talent pool."
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[12px] font-semibold text-[var(--text-primary)] mb-1">
+              Vendor Agency
+            </label>
+            <Select
+              value={vendorReassignId}
+              onChange={(e) => setVendorReassignId(e.target.value)}
+              options={[
+                { value: '', label: '— No vendor (Internal / Direct) —' },
+                ...(vendorsData?.data || []).map((v) => ({ value: v.id, label: v.name })),
+              ]}
+            />
+          </div>
+          <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
+            Updating the vendor will synchronize both <code>owner_vendor_org_id</code> and <code>source_vendor_org_id</code>.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setVendorReassignOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleVendorReassign}
+              loading={vendorReassigning}
+            >
+              Save Vendor Mapping
+            </Button>
+          </div>
+        </div>
       </Dialog>
 
       {/* Resume Viewer Modal */}
