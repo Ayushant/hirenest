@@ -562,6 +562,16 @@
   animation: hero-shimmer 6s linear infinite;
 }
 
+/* Sign-in thread: one pulse travelling the requirement loop */
+@keyframes thread-travel {
+  from { offset-distance: 0%; }
+  to { offset-distance: 100%; }
+}
+
+.thread-pulse {
+  animation: thread-travel 9s linear 1.8s infinite;
+}
+
 .marquee-mask {
   -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
   mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);

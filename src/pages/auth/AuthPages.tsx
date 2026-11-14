@@ -3,15 +3,15 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { LogOut, RefreshCw, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { LogOut, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth, getHomeRouteForRole } from '../../auth/AuthProvider';
 import { Button, Input, Select } from '../../components/ui/kit';
 import { mapSupabaseError } from '../../lib/errors';
+import { RequirementThread } from './RequirementThread';
 import { useToast } from '../../components/ui/Toast';
 
 const NAVY = '#14213D';
-const BRAND = 'var(--primary-bg)';
 
 // Shared Two-Column Split Layout for Auth Pages:
 // Left 42% in deep storm-slate #1B2742 with a subtle sky radial wash at the top, wordmark, and a concise 3-line product statement in #E3DDD3;
@@ -213,196 +213,145 @@ export const SignInPage: React.FC = () => {
     }
   };
 
-  const flowSteps = [
-    { title: 'Requirement', detail: 'Client or HQ opens it; scored and routed automatically.' },
-    { title: 'Shortlist', detail: 'Vendors submit matches; HQ forwards the ranked list.' },
-    { title: 'Interview', detail: 'Structured feedback on a shared rubric, on the clock.' },
-    { title: 'Offer', detail: 'Logged to the same requirement thread, start to close.' },
-  ];
-
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-[var(--app-bg)] text-[var(--text-primary)]">
-      {/* Left panel — brand, value prop, and the real requirement flow */}
-      <div
-        className="hidden lg:flex lg:w-[42%] flex-col justify-between px-10 py-10 xl:px-14 xl:py-14 text-white shrink-0"
+    <div className="min-h-screen flex flex-col lg:flex-row bg-[var(--zp-canvas)] text-[var(--text-primary)]">
+      {/* Navy panel: the requirement thread is the one visual moment on this page */}
+      <aside
+        className="hidden lg:flex lg:w-[45%] flex-col px-12 py-10 xl:px-16 xl:py-12 text-[#F8F4F0] shrink-0"
         style={{ background: NAVY }}
       >
-        <Link to="/" className="flex items-center gap-2.5">
+        <Link to="/" className="flex items-center gap-3 self-start rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#38ACEF]">
           <img
             src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
-            alt="HireNest"
-            className="h-8 w-8 rounded-[6px] bg-white object-contain p-0.5"
+            alt=""
+            className="h-10 w-10 rounded-[10px] bg-white object-contain p-0.5"
           />
-          <span className="text-[14px] font-semibold tracking-[-0.01em]">HireNestOS</span>
+          <span className="font-display text-[17px] font-semibold tracking-[-0.02em]">HireNestOS</span>
         </Link>
 
-        <div className="space-y-10">
-          <div className="space-y-3 max-w-sm">
-            <div className="h-[3px] w-5 rounded-full" style={{ background: BRAND }} />
-            <p className="text-[18px] leading-[1.4] font-semibold tracking-[-0.01em]">
-              One requirement, routed between HQ, clients, vendors and candidates — with a clock on every handoff.
-            </p>
-          </div>
-
-          <div>
-            {flowSteps.map((step, i) => (
-              <div key={step.title} className="flex gap-3.5">
-                <div className="flex flex-col items-center">
-                  <span
-                    className="w-6 h-6 rounded-full font-mono text-[11px] font-semibold flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.1)', color: '#B9D1FB' }}
-                  >
-                    {i + 1}
-                  </span>
-                  {i < flowSteps.length - 1 && <span className="w-px flex-1 my-1" style={{ background: 'rgba(255,255,255,0.12)' }} />}
-                </div>
-                <div className="pb-6">
-                  <div className="text-[13.5px] font-semibold text-white">{step.title}</div>
-                  <p className="text-[12.5px] mt-0.5 leading-relaxed" style={{ color: '#B5AFA2' }}>{step.detail}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="flex-1 flex items-center justify-center py-8">
+          <RequirementThread className="w-full max-w-[520px] h-auto overflow-visible" />
         </div>
 
-        <div className="text-[11px]" style={{ color: '#A39F92' }}>
-          Built by{' '}
-          <a href="https://atkind.com" target="_blank" rel="noopener noreferrer" className="text-[#B5AFA2] hover:text-white hover:underline transition-colors">
-            Atkind Pvt Ltd
-          </a>
+        <div className="max-w-[440px]">
+          <p className="font-display text-[clamp(32px,3vw,44px)] leading-[1.05] font-medium tracking-[-0.03em] text-[#FFFEFB]">
+            One sign-in for every side of the hire.
+          </p>
+          <p className="mt-4 text-[15px] leading-[1.6] text-[#B9C3D6]">
+            HQ, hiring clients, staffing vendors and candidates each land in their own workspace,
+            looking at the same requirement.
+          </p>
         </div>
-      </div>
+      </aside>
 
-      {/* Right panel — the sign-in form */}
-      <div className="flex-1 flex flex-col">
-        <header className="lg:hidden border-b border-[var(--border)] bg-[var(--surface)]">
-          <div className="px-4 sm:px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
-              <img
-                src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
-                alt="HireNest"
-                className="h-8 w-8 rounded-[6px] bg-white object-contain p-0.5 border border-[var(--border)]"
-              />
-              <span className="text-[14px] font-semibold tracking-[-0.01em]">HireNestOS</span>
+      {/* Form side: sits directly on the cream canvas, no card */}
+      <div className="flex-1 flex flex-col min-h-screen lg:min-h-0">
+        <header className="flex items-center justify-between gap-4 px-5 sm:px-10 h-16 lg:h-20">
+          <Link to="/" className="lg:hidden flex items-center gap-2.5">
+            <img
+              src="/assets/aistudio/WhatsApp_Image_2026-10-25_at_12.39.21_03c58b61.jpeg"
+              alt=""
+              className="h-9 w-9 rounded-[8px] bg-white object-contain p-0.5 border border-[var(--border)]"
+            />
+            <span className="font-display text-[16px] font-semibold tracking-[-0.02em]">HireNestOS</span>
+          </Link>
+          <p className="ml-auto text-[14px] text-[var(--text-secondary)]">
+            <span className="hidden sm:inline">New to HireNestOS? </span>
+            <Link to="/signup" className="font-semibold text-[var(--accent)] underline-offset-4 hover:underline">
+              Create an account
             </Link>
-            <span className="text-[13px] text-[var(--text-secondary)]">
-              Need a workspace?{' '}
-              <Link to="/signup" className="font-medium text-[var(--accent)] hover:underline">
-                Create an account
-              </Link>
-            </span>
-          </div>
+          </p>
         </header>
 
-        <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-[380px]">
-          <div className="bg-[var(--surface)] rounded-[12px] border border-[var(--border)] p-7">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h1 className="text-[19px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">Sign in</h1>
-                <p className="text-[13px] text-[var(--text-secondary)] mt-1">
-                  Enter your email and password to access your workspace.
-                </p>
-              </div>
-              <Link to="/signup" className="hidden lg:inline text-[12px] font-medium text-[var(--accent)] hover:underline shrink-0 ml-4">
-                Create account
-              </Link>
-            </div>
+        <main className="flex-1 flex items-center px-5 sm:px-10 py-10">
+          <div className="w-full max-w-[400px] mx-auto lg:mx-0 lg:ml-[clamp(40px,8vw,120px)]">
+            <h1 className="font-display text-[44px] sm:text-[52px] leading-[1] font-medium tracking-[-0.035em] text-[var(--text-primary)]">
+              Sign in
+            </h1>
+            <p className="mt-3 text-[16px] leading-[1.5] text-[var(--text-secondary)]">
+              Welcome back. Use the work email you registered with.
+            </p>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-9 space-y-5">
               <div>
-                <label htmlFor="signin-email" className="block text-[12px] font-medium text-[var(--text-secondary)] mb-1.5">
+                <label htmlFor="signin-email" className="block text-[14px] font-semibold text-[var(--text-primary)] mb-2">
                   Work email
                 </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)] pointer-events-none" />
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="name@company.com"
-                    className="pl-9 h-10"
-                    {...register('email')}
-                    error={errors.email?.message}
-                  />
-                </div>
+                <Input
+                  id="signin-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@company.com"
+                  className="!h-12 !text-[16px] !px-3.5 !rounded-[8px]"
+                  {...register('email')}
+                  error={errors.email?.message}
+                />
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="signin-password" className="block text-[12px] font-medium text-[var(--text-secondary)]">
+                <div className="flex items-baseline justify-between mb-2">
+                  <label htmlFor="signin-password" className="block text-[14px] font-semibold text-[var(--text-primary)]">
                     Password
                   </label>
-                  <Link to="/forgot-password" className="text-[12px] font-medium text-[var(--accent)] hover:underline">
+                  <Link to="/forgot-password" className="text-[14px] font-medium text-[var(--accent)] underline-offset-4 hover:underline">
                     Forgot password?
                   </Link>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)] pointer-events-none" />
                   <Input
                     id="signin-password"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
-                    placeholder="••••••••"
-                    className="pl-9 pr-9 h-10"
+                    className="!h-12 !text-[16px] !pl-3.5 !pr-16 !rounded-[8px]"
                     {...register('password')}
                     error={errors.password?.message}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    className="absolute right-1.5 top-1.5 h-9 px-2.5 rounded-[6px] text-[13px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--focus-ring)]"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPassword}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? 'Hide' : 'Show'}
                   </button>
                 </div>
               </div>
 
               {authError && (
-                <div className="rounded-[6px] border border-[var(--border)] bg-[var(--status-danger-bg)] p-3 text-[12px] leading-[16px] text-[var(--status-danger)]">
-                  <div className="flex items-start gap-1.5 font-medium">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)] shrink-0 mt-1.5" />
-                    <span>{authError}</span>
-                  </div>
+                <div
+                  role="alert"
+                  className="rounded-[8px] border-l-[3px] border-[var(--status-danger)] bg-[var(--status-danger-bg)] px-3.5 py-3 text-[14px] leading-[20px] text-[var(--status-danger)]"
+                >
+                  {authError}
                 </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full h-10"
+                className="w-full !h-12 !text-[16px] !rounded-[12px] mt-2"
                 loading={loading}
               >
-                Sign in
+                {loading ? 'Signing in…' : 'Sign in'}
               </Button>
             </form>
-
-            <div className="mt-6 pt-5 border-t border-[var(--border)] flex items-center justify-between text-[13px] text-[var(--text-secondary)]">
-              <span>Don't have an account?</span>
-              <Link to="/signup" className="font-semibold text-[var(--accent)] hover:underline">
-                Create account
-              </Link>
-            </div>
           </div>
-        </div>
         </main>
 
-        <footer className="border-t border-[var(--border)] py-5 px-4 sm:px-6">
-          <div className="max-w-[1180px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-[var(--text-tertiary)]">
-            <span>© 2026 HireNest Workforce Pvt Ltd.</span>
-            <div className="flex items-center gap-5">
-              <Link to="/privacy-policy" className="hover:text-[var(--text-secondary)] transition-colors">
-                Privacy policy
-              </Link>
-              <a
-                href="https://atkind.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-[var(--text-secondary)] transition-colors"
-              >
-                Built by Atkind Pvt Ltd
-              </a>
-            </div>
+        <footer className="px-5 sm:px-10 py-6 flex flex-wrap items-center justify-between gap-3 text-[13px] text-[var(--text-tertiary)]">
+          <span>© 2026 HireNest Workforce Pvt Ltd</span>
+          <div className="flex items-center gap-5">
+            <Link to="/privacy-policy" className="hover:text-[var(--text-primary)] transition-colors">
+              Privacy policy
+            </Link>
+            <a
+              href="https://atkind.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--text-primary)] transition-colors"
+            >
+              Built by Atkind
+            </a>
           </div>
         </footer>
       </div>
