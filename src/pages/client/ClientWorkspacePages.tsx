@@ -155,9 +155,9 @@ export const ClientDashboardPage: React.FC = () => {
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   const hiringFunnel = useMemo(() => [
-    { name: 'Shared', value: offerMetrics.candidatesShared, color: '#6A89A7' },
-    { name: 'Interviewing', value: upcomingInterviews?.count ?? 0, color: '#4F95DB' },
-    { name: 'Offered', value: offerMetrics.offersIssued, color: '#4F46D8' },
+    { name: 'Shared', value: offerMetrics.candidatesShared, color: '#939084' },
+    { name: 'Interviewing', value: upcomingInterviews?.count ?? 0, color: '#C98A4B' },
+    { name: 'Offered', value: offerMetrics.offersIssued, color: '#1D5FD1' },
     { name: 'Accepted', value: offerMetrics.offersAccepted, color: '#2A9D8F' },
     { name: 'Onboarded', value: offerMetrics.onboardedCandidates, color: '#17734A' },
   ], [offerMetrics, upcomingInterviews]);
@@ -165,7 +165,7 @@ export const ClientDashboardPage: React.FC = () => {
   return (
     <div className="space-y-7">
       {/* Header Band */}
-      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
+      <div className="dashboard-header-band rounded-[12px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
         <GreetingHeader
           firstName={firstName}
           subtitle="Client hiring overview, offer management, and confirmed onboarding tracker."
@@ -194,14 +194,14 @@ export const ClientDashboardPage: React.FC = () => {
           label="Open Requirements"
           value={openReqs?.count ?? 0}
           icon={<Briefcase className="w-5 h-5" />}
-          accentColor="#4F46D8"
+          accentColor="#1D5FD1"
           onClick={() => navigate('/client/requirements')}
         />
         <KpiCard
           label="Candidates Shared"
           value={offerMetrics.candidatesShared}
           icon={<Users className="w-5 h-5" />}
-          accentColor="#4F95DB"
+          accentColor="#C98A4B"
           onClick={() => navigate('/client/candidates')}
         />
         <KpiCard
@@ -215,7 +215,7 @@ export const ClientDashboardPage: React.FC = () => {
           label="Pending Feedback"
           value={pendingFeedback.length}
           icon={<MessageCircle className="w-5 h-5" />}
-          accentColor={pendingFeedback.length > 0 ? '#B8322B' : '#6A89A7'}
+          accentColor={pendingFeedback.length > 0 ? '#B8322B' : '#939084'}
           onClick={() => navigate('/client/interviews')}
         />
       </KpiRow>
@@ -224,7 +224,7 @@ export const ClientDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Needs attention */}
         <DashboardSection title="Needs attention">
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
             {(reviewSubs?.count ?? 0) > 0 && (
               <ActionItem
                 icon={<Users className="w-4 h-4" />}
@@ -251,7 +251,7 @@ export const ClientDashboardPage: React.FC = () => {
                 label="Upcoming joining dates"
                 count={offerMetrics.upcomingJoiningsCount}
                 badge="Scheduled"
-                badgeColor="#4F95DB"
+                badgeColor="#C98A4B"
                 onClick={() => navigate('/client/onboarded')}
               />
             )}
@@ -294,16 +294,16 @@ export const ClientDashboardPage: React.FC = () => {
         }
       >
         <KpiRow cols={6}>
-          <KpiCard label="Offers issued" value={offerMetrics.offersIssued} icon={<Send className="w-4 h-4" />} accentColor="#4F46D8" onClick={() => navigate('/client/offers')} />
+          <KpiCard label="Offers issued" value={offerMetrics.offersIssued} icon={<Send className="w-4 h-4" />} accentColor="#1D5FD1" onClick={() => navigate('/client/offers')} />
           <KpiCard label="Accepted" value={offerMetrics.offersAccepted} icon={<CheckCircle className="w-4 h-4" />} accentColor="#17734A" onClick={() => navigate('/client/offers')} />
           <KpiCard label="Declined" value={offerMetrics.offersDeclined} icon={<AlertTriangle className="w-4 h-4" />} accentColor="#B8322B" onClick={() => navigate('/client/offers')} />
           <KpiCard label="Pending" value={offerMetrics.pendingOffers} icon={<Clock className="w-4 h-4" />} accentColor="#D99A2B" onClick={() => navigate('/client/offers')} />
           <KpiCard label="Onboarded" value={offerMetrics.onboardedCandidates} icon={<CheckCircle className="w-4 h-4" />} accentColor="#2A9D8F" onClick={() => navigate('/client/onboarded')} />
-          <KpiCard label="Upcoming joinings" value={offerMetrics.upcomingJoiningsCount} icon={<CalendarCheck className="w-4 h-4" />} accentColor="#6A89A7" onClick={() => navigate('/client/onboarded')} />
+          <KpiCard label="Upcoming joinings" value={offerMetrics.upcomingJoiningsCount} icon={<CalendarCheck className="w-4 h-4" />} accentColor="#939084" onClick={() => navigate('/client/onboarded')} />
         </KpiRow>
 
         {offerMetrics.upcomingJoinings.length > 0 && (
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
             <div className="px-4 py-3 flex items-center justify-between border-b border-[var(--border)]">
               <span className="text-[12px] font-semibold text-[var(--text-primary)]">
                 Upcoming Joining Dates (Expected DOJ)
@@ -315,7 +315,7 @@ export const ClientDashboardPage: React.FC = () => {
                 key={submission.id}
                 label={`${submission.candidates?.full_name || 'Candidate'} · ${submission.requirements?.title || 'Requirement'}`}
                 badge={record.expectedDoj ? formatLocalDate(record.expectedDoj) : 'TBD'}
-                badgeColor="#4F95DB"
+                badgeColor="#C98A4B"
                 onClick={() => navigate('/client/onboarded')}
               />
             ))}
@@ -481,7 +481,7 @@ export const ClientRequirementsPage: React.FC = () => {
       />
 
       {isManager && duplicateGroups.length > 0 && (
-        <div className="rounded-[10px] border border-amber-500/35 bg-amber-500/10 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="rounded-[12px] border border-amber-500/35 bg-amber-500/10 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
             <div>
@@ -720,7 +720,7 @@ export const ClientRequirementsPage: React.FC = () => {
                             <label
                               key={item.id}
                               className={`flex items-start justify-between gap-3 p-3 text-[12px] cursor-pointer ${
-                                isCanonical ? 'bg-[#4F46D8]/5' : 'hover:bg-[var(--bg-hover)]'
+                                isCanonical ? 'bg-[#1D5FD1]/5' : 'hover:bg-[var(--bg-hover)]'
                               }`}
                             >
                               <div className="flex items-start gap-2.5">
@@ -734,7 +734,7 @@ export const ClientRequirementsPage: React.FC = () => {
                                       [grp.groupKey]: item.id,
                                     }))
                                   }
-                                  className="mt-1 accent-[#4F46D8]"
+                                  className="mt-1 accent-[#1D5FD1]"
                                 />
                                 <div>
                                   <div className="flex items-center gap-2">

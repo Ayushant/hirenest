@@ -87,7 +87,7 @@ export const PublicJobsListPage: React.FC = () => {
       <PublicNav />
 
       {/* Hero */}
-      <section className="bg-gradient-to-b from-[#1B1A33] to-[#0F111E] text-white">
+      <section className="bg-gradient-to-b from-[#14213D] to-[#0C1424] text-white">
         <div className="mx-auto max-w-5xl space-y-6 px-5 pb-10 pt-10 sm:px-8 sm:pb-12 sm:pt-14">
           <div className="space-y-3">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-200">

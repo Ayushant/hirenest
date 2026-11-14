@@ -395,7 +395,7 @@ export const CandidateJobsForMePage: React.FC = () => {
         </div>
 
         <aside className="lg:col-span-4 space-y-4">
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] p-4 space-y-4">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] p-4 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-[11px] uppercase tracking-wide text-[var(--sidebar-muted)]">
                 Candidate profile
@@ -449,7 +449,7 @@ export const CandidateJobsForMePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] p-4 space-y-3">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] p-4 space-y-3">
             <p className="text-[13px] font-medium text-white">How your match score works</p>
             <p className="text-[12px] text-[var(--sidebar-muted)] leading-relaxed">
               Every score is computed the same way for every job: skill overlap (40%), experience fit (25%),
@@ -457,18 +457,18 @@ export const CandidateJobsForMePage: React.FC = () => {
             </p>
             <div className="pt-2.5 border-t border-white/10 space-y-2 text-[12px] text-[var(--sidebar-text)]">
               <div className="flex items-start gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-[#4FC8F5] shrink-0 mt-0.5" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#8AB3F6] shrink-0 mt-0.5" />
                 <span>No gender or identity fields are stored or used in scoring.</span>
               </div>
               <div className="flex items-start gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-[#4FC8F5] shrink-0 mt-0.5" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#8AB3F6] shrink-0 mt-0.5" />
                 <span>Your data stays scoped to HireNest HQ under DPDP Notice HN-DPDP-NOTICE-2026-V2.</span>
               </div>
             </div>
           </div>
 
           {myCandidate.skills.length > 0 && (
-            <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-4 space-y-2">
+            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4 space-y-2">
               <p className="text-[13px] font-medium text-[var(--text-primary)]">Your tracked skills</p>
               <div className="flex flex-wrap gap-1.5">
                 {myCandidate.skills.slice(0, 12).map((skill) => (
@@ -955,7 +955,7 @@ export const CandidateProfilePage: React.FC = () => {
         </div>
         <Link
           to="/candidate/privacy"
-          className="font-medium text-[#4F46D8] hover:underline shrink-0"
+          className="font-medium text-[#1D5FD1] hover:underline shrink-0"
         >
           Open My Privacy &amp; Rights Center →
         </Link>

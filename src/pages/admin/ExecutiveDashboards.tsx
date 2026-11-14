@@ -88,16 +88,16 @@ export const CeoDashboardPage: React.FC = () => {
 
   // Pipeline funnel
   const funnelStages = [
-    { name: 'Requirements', value: reqs.length, color: 'var(--chart-1, #6366F1)' },
-    { name: 'Submissions', value: totalSubmissions, color: 'var(--chart-2, #8B5CF6)' },
-    { name: 'Client review', value: clientReviewSubs, color: 'var(--chart-3, #A78BFA)' },
-    { name: 'Interviewing', value: interviewingSubs, color: 'var(--chart-4, #C4B5FD)' },
+    { name: 'Requirements', value: reqs.length, color: 'var(--chart-1, #1D5FD1)' },
+    { name: 'Submissions', value: totalSubmissions, color: 'var(--chart-2, #1A56C2)' },
+    { name: 'Client review', value: clientReviewSubs, color: 'var(--chart-3, #38ACEF)' },
+    { name: 'Interviewing', value: interviewingSubs, color: 'var(--chart-4, #B9D1FB)' },
     { name: 'Placed', value: placedSubs, color: 'var(--chart-5, #16A34A)' },
   ];
 
   // Requirements by status for donut
   const reqsByStatus = summary?.requirements_by_status || {};
-  const donutColors = ['var(--chart-1, #6366F1)', 'var(--chart-2, #8B5CF6)', 'var(--chart-3, #F59E0B)', 'var(--chart-4, #EF4444)', 'var(--chart-5, #16A34A)'];
+  const donutColors = ['var(--chart-1, #1D5FD1)', 'var(--chart-2, #1A56C2)', 'var(--chart-3, #F59E0B)', 'var(--chart-4, #EF4444)', 'var(--chart-5, #16A34A)'];
   const reqDonutData = Object.entries(reqsByStatus).map(([status, count], i) => ({
     name: status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
     value: count as number,

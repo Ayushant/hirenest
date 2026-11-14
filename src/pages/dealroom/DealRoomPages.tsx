@@ -159,11 +159,11 @@ const DealRoomCard: React.FC<{
   return (
     <div
       onClick={onClick}
-      className="group rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col gap-3"
+      className="group rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col gap-3"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
-          <div className="h-9 w-9 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] flex items-center justify-center shrink-0 text-[var(--text-secondary)] group-hover:text-[#4F46D8] transition-colors">
+          <div className="h-9 w-9 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] flex items-center justify-center shrink-0 text-[var(--text-secondary)] group-hover:text-[#1D5FD1] transition-colors">
             <MessageSquare className="h-4 w-4" strokeWidth={1.75} />
           </div>
           <div className="min-w-0">
@@ -276,7 +276,7 @@ const DealRoomDetailView: React.FC<{
           </p>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-[var(--bg-subtle)] border border-[var(--border)] text-[12px] text-[var(--text-secondary)]">
-          <Shield className="h-3.5 w-3.5 text-[#4F46D8]" />
+          <Shield className="h-3.5 w-3.5 text-[#1D5FD1]" />
           Identity Protected
         </div>
       </div>
@@ -424,7 +424,7 @@ const ConversationTab: React.FC<{
                 <div
                   className={`max-w-[70%] rounded-[8px] px-3 py-2 text-[13px] leading-[20px] ${
                     isOwn
-                      ? 'bg-[#4F46D8] text-white'
+                      ? 'bg-[#1D5FD1] text-white'
                       : 'bg-[var(--bg-subtle)] border border-[var(--border)] text-[var(--text-primary)]'
                   } ${isFlagged ? 'ring-2 ring-amber-400/50' : ''} ${
                     isBlocked ? 'ring-2 ring-red-400/50 opacity-60' : ''

@@ -22,9 +22,9 @@ const WORKSPACES = [
     label: 'HQ Admin',
     initials: 'HQ',
     description: 'Manage operations, approvals & SLAs',
-    bgTint: 'bg-[#F2EEFE]',
-    borderTint: 'border-[#CBC0FA]',
-    textTint: 'text-[#4F46D8]',
+    bgTint: 'bg-[#EEF4FF]',
+    borderTint: 'border-[#B9D1FB]',
+    textTint: 'text-[#1D5FD1]',
   },
   {
     id: 'client',
@@ -49,14 +49,14 @@ const WORKSPACES = [
     label: 'Candidate',
     initials: 'CA',
     description: 'Browse jobs & track applications',
-    bgTint: 'bg-[#E3F0FD]',
-    borderTint: 'border-[#BDDDFC]',
-    textTint: 'text-[#1F5F99]',
+    bgTint: 'bg-[#F7EADB]',
+    borderTint: 'border-[#CFDFFC]',
+    textTint: 'text-[#36342E]',
   },
 ] as const;
 
 const FEATURE_PILLS = [
-  { label: 'AI Matching', dotColor: '#88BDF2' },
+  { label: 'AI Matching', dotColor: '#E8BE8F' },
   { label: 'Vendor SLAs', dotColor: '#2A9D8F' },
   { label: '6D Quality Score', dotColor: '#D99A2B' },
 ] as const;
@@ -78,9 +78,9 @@ export const WelcomePage: React.FC = () => {
       <div
         style={{
           backgroundImage:
-            'radial-gradient(ellipse at top, rgba(136, 189, 242, 0.14), transparent 68%)',
+            'radial-gradient(ellipse at top, rgba(232, 190, 143, 0.14), transparent 68%)',
         }}
-        className="lg:w-[45%] bg-[#1E2A36] text-[#D6E1EC] p-8 sm:p-12 lg:p-14 flex flex-col justify-between shrink-0 min-h-[320px] lg:min-h-screen"
+        className="lg:w-[45%] bg-[#1B2742] text-[#E3DDD3] p-8 sm:p-12 lg:p-14 flex flex-col justify-between shrink-0 min-h-[320px] lg:min-h-screen"
       >
         {/* Top: Logo + Wordmark */}
         <div className="flex items-center gap-3">
@@ -93,7 +93,7 @@ export const WelcomePage: React.FC = () => {
             <span className="text-[15px] leading-[20px] font-semibold text-white">
               HireNest
             </span>
-            <span className="text-[12px] leading-[16px] text-[#8FA6BC]">
+            <span className="text-[12px] leading-[16px] text-[#A39F92]">
               Hire Nest Workforce Pvt Ltd
             </span>
           </div>
@@ -106,9 +106,9 @@ export const WelcomePage: React.FC = () => {
           </h1>
 
           {/* Section accent bar */}
-          <div className="h-[3px] w-4 rounded-full bg-[#88BDF2]" />
+          <div className="h-[3px] w-4 rounded-full bg-[#E8BE8F]" />
 
-          <p className="text-[14px] leading-[22px] text-[#D6E1EC]">
+          <p className="text-[14px] leading-[22px] text-[#E3DDD3]">
             AI-powered staffing pipeline, from requirement to placement,
             governed by SLAs, quality scoring, and structured interviews.
           </p>
@@ -118,7 +118,7 @@ export const WelcomePage: React.FC = () => {
             {FEATURE_PILLS.map((pill) => (
               <span
                 key={pill.label}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#273747] border border-[#34485D] text-[12px] text-[#D6E1EC] font-medium"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1B2742] border border-[#46423B] text-[12px] text-[#E3DDD3] font-medium"
               >
                 <span
                   className="h-1.5 w-1.5 rounded-full shrink-0"
@@ -131,7 +131,7 @@ export const WelcomePage: React.FC = () => {
         </div>
 
         {/* Bottom: Operations credit + Atkind attribution */}
-        <div className="space-y-1 pt-6 border-t border-[#2A3949]/60 text-[12px] leading-[16px] text-[#8FA6BC]">
+        <div className="space-y-1 pt-6 border-t border-[#1E2C4A]/60 text-[12px] leading-[16px] text-[#A39F92]">
           <div className="font-mono tabular-nums">HireNest Workforce Operations</div>
           <div>
             Built by{' '}
@@ -139,7 +139,7 @@ export const WelcomePage: React.FC = () => {
               href="https://atkind.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-[#88BDF2] hover:text-white hover:underline transition-colors"
+              className="font-medium text-[#E8BE8F] hover:text-white hover:underline transition-colors"
             >
               Atkind Pvt Ltd
             </a>
@@ -172,7 +172,7 @@ export const WelcomePage: React.FC = () => {
           </div>
 
           {/* Main gateway card */}
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-6 space-y-5 text-left">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-6 space-y-5 text-left">
 
             {/* Card heading */}
             <div className="space-y-1">

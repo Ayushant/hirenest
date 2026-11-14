@@ -8,18 +8,18 @@ export const PrivacyPolicyPage: React.FC = () => {
       <div className="max-w-3xl mx-auto px-6 py-12">
         <Link
           to="/landing"
-          className="inline-flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#1D4ED8] mb-8"
+          className="inline-flex items-center gap-1.5 text-[13px] text-[#858175] hover:text-[#1A56C2] mb-8"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to HireNestOS
         </Link>
 
-        <h1 className="text-[28px] font-bold text-[#0F172A] mb-2">Privacy Policy</h1>
-        <p className="text-[14px] text-[#64748B] mb-10">
+        <h1 className="text-[28px] font-bold text-[#14213D] mb-2">Privacy Policy</h1>
+        <p className="text-[14px] text-[#858175] mb-10">
           Last updated: November 2026 · HireNest Workforce Pvt Ltd
         </p>
 
-        <div className="space-y-8 text-[14px] leading-[24px] text-[#334155]">
+        <div className="space-y-8 text-[14px] leading-[24px] text-[#46423B]">
           <Section title="1. Information We Collect">
             <p>When you apply for early access or use HireNestOS, we may collect:</p>
             <ul className="list-disc pl-5 space-y-1 mt-2">
@@ -91,13 +91,13 @@ export const PrivacyPolicyPage: React.FC = () => {
           <Section title="8. Contact Us">
             <p>
               For any privacy-related questions or to exercise your data rights, contact us at:{' '}
-              <a href="mailto:hireatkind@gmail.com" className="text-[#1D4ED8] hover:underline">
+              <a href="mailto:hireatkind@gmail.com" className="text-[#1A56C2] hover:underline">
                 hireatkind@gmail.com
               </a>
             </p>
           </Section>
 
-          <div className="border-t border-[#E2E8F0] pt-6 mt-10 text-[13px] text-[#94A3B8]">
+          <div className="border-t border-[#E3DDD3] pt-6 mt-10 text-[13px] text-[#A39F92]">
             <p>
               HireNest Workforce Pvt Ltd · Built by{' '}
               <a href="https://atkind.com" target="_blank" rel="noopener noreferrer" className="hover:underline">
@@ -113,7 +113,7 @@ export const PrivacyPolicyPage: React.FC = () => {
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <section>
-    <h2 className="text-[18px] font-semibold text-[#0F172A] mb-3">{title}</h2>
+    <h2 className="text-[18px] font-semibold text-[#14213D] mb-3">{title}</h2>
     {children}
   </section>
 );

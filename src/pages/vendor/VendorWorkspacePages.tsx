@@ -241,9 +241,9 @@ export const VendorDashboardPage: React.FC = () => {
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   const submissionFunnel = useMemo(() => [
-    { name: 'Shared', value: offerMetrics.candidatesShared, color: '#6A89A7' },
-    { name: 'Interviewing', value: interviewsData?.count ?? 0, color: '#4F95DB' },
-    { name: 'Offered', value: offerMetrics.offersIssued, color: '#4F46D8' },
+    { name: 'Shared', value: offerMetrics.candidatesShared, color: '#939084' },
+    { name: 'Interviewing', value: interviewsData?.count ?? 0, color: '#C98A4B' },
+    { name: 'Offered', value: offerMetrics.offersIssued, color: '#1D5FD1' },
     { name: 'Accepted', value: offerMetrics.offersAccepted, color: '#2A9D8F' },
     { name: 'Onboarded', value: offerMetrics.onboardedCandidates, color: '#17734A' },
   ], [offerMetrics, interviewsData]);
@@ -302,7 +302,7 @@ export const VendorDashboardPage: React.FC = () => {
 
       {/* Active Plan Banner */}
       {orgPlan && orgPlan.planId !== 'free_trial' && (
-        <div className="rounded-[10px] border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-5 py-3.5 flex items-center gap-3">
+        <div className="rounded-[12px] border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-5 py-3.5 flex items-center gap-3">
           <ShieldCheck className="h-5 w-5 text-[var(--accent)] shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[14px] leading-[20px] font-semibold text-[var(--text-primary)]">
@@ -405,11 +405,11 @@ export const VendorDashboardPage: React.FC = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
           {[
-            { n: 1, name: 'Shared', value: offerMetrics.candidatesShared, color: '#7C4EE0', dwell: dwellByStage.shared,
+            { n: 1, name: 'Shared', value: offerMetrics.candidatesShared, color: '#1A56C2', dwell: dwellByStage.shared,
               rateLabel: 'Offer rate', rate: pct(offerMetrics.offersIssued, offerMetrics.candidatesShared) },
-            { n: 2, name: 'Interviewing', value: interviewsData?.count ?? 0, color: '#4F46D8', dwell: dwellByStage.interviewing,
+            { n: 2, name: 'Interviewing', value: interviewsData?.count ?? 0, color: '#1D5FD1', dwell: dwellByStage.interviewing,
               rateLabel: null, rate: null },
-            { n: 3, name: 'Offered', value: offerMetrics.offersIssued, color: '#3A8EF0', dwell: dwellByStage.offered,
+            { n: 3, name: 'Offered', value: offerMetrics.offersIssued, color: '#38ACEF', dwell: dwellByStage.offered,
               rateLabel: 'Accepted', rate: pct(offerMetrics.offersAccepted, offerMetrics.offersIssued) },
             { n: 4, name: 'Accepted', value: offerMetrics.offersAccepted, color: '#2A9D8F', dwell: dwellByStage.accepted,
               rateLabel: 'Joined', rate: pct(offerMetrics.onboardedCandidates, offerMetrics.offersAccepted) },
@@ -552,7 +552,7 @@ export const VendorDashboardPage: React.FC = () => {
             <VendorPerformancePanel performance={perf} />
           </DashboardSection>
         ) : (
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-5 text-[13px] text-[var(--text-secondary)]">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-5 text-[13px] text-[var(--text-secondary)]">
             Agency performance standing appears once enough submissions have been rated.
           </div>
         )}
@@ -2435,7 +2435,7 @@ export const VendorMatchIntelligencePage: React.FC = () => {
         />
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4">
             <div className="w-full sm:w-96">
               <Select
                 label="Target requirement"
@@ -2474,7 +2474,7 @@ export const VendorMatchIntelligencePage: React.FC = () => {
               onAction={() => navigate('/vendor/candidates')}
             />
           ) : (
-            <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
               {matchesData.data.map((m, idx) => {
                 const alreadySubmitted = mySubmissions.some(
                   (s) => s.candidate_id === m.candidate_id

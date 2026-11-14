@@ -187,7 +187,7 @@ export const AdminSubscriptionPage: React.FC = () => {
       />
 
       {/* Info Banner */}
-      <div className="rounded-[10px] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 flex items-start gap-3">
+      <div className="rounded-[12px] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 flex items-start gap-3">
         <CreditCard className="h-5 w-5 text-[var(--accent)] shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="text-[14px] leading-[20px] font-semibold text-[var(--text-primary)]">
@@ -214,7 +214,7 @@ export const AdminSubscriptionPage: React.FC = () => {
             onRetry={() => refetch()}
           />
         ) : orgs && orgs.length > 0 ? (
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-x-auto">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] overflow-x-auto">
             <table>
               <thead>
                 <tr>
@@ -311,7 +311,7 @@ export const AdminSubscriptionPage: React.FC = () => {
             </table>
           </div>
         ) : (
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
             <Building2 className="h-8 w-8 text-[var(--border)] mx-auto mb-2" />
             <p className="text-[13px] text-[var(--text-tertiary)]">
               No vendor or client organisations onboarded yet.
@@ -498,7 +498,7 @@ export const AdminSubscriptionPage: React.FC = () => {
         </div>
 
         {showBetaPricing && (
-          <div className="rounded-[10px] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 space-y-2">
+          <div className="rounded-[12px] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 space-y-2">
             <div className="flex items-center gap-2 text-[14px] leading-[20px] font-semibold text-[var(--text-primary)]">
               <Sparkles className="h-4 w-4 text-[var(--accent)]" />
               Beta Partner Programme
@@ -528,7 +528,7 @@ export const AdminSubscriptionPage: React.FC = () => {
             return (
               <div
                 key={plan.id}
-                className={`rounded-[10px] border p-5 flex flex-col gap-4 ${
+                className={`rounded-[12px] border p-5 flex flex-col gap-4 ${
                   isRecommended
                     ? 'border-[var(--accent)] bg-[var(--surface)] shadow-2xs'
                     : 'border-[var(--border)] bg-[var(--surface)]'

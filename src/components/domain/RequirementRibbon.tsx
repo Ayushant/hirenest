@@ -15,7 +15,7 @@ export function RequirementRibbon({ requirement, className = '' }: Props) {
       className={`inline-flex items-center h-[18px] pl-2 pr-3 mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white ${className}`}
       style={{
         background: isIt
-          ? 'linear-gradient(90deg, #4F46E5, #7C3AED)'
+          ? 'linear-gradient(90deg, #1D5FD1, #1A56C2)'
           : 'linear-gradient(90deg, #D97706, #F59E0B)',
         // ribbon notch on the right edge
         clipPath: 'polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%)',

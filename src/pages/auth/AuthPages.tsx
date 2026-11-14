@@ -10,11 +10,11 @@ import { Button, Input, Select } from '../../components/ui/kit';
 import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../../components/ui/Toast';
 
-const NAVY = '#1B1A33';
+const NAVY = '#14213D';
 const BRAND = 'var(--primary-bg)';
 
 // Shared Two-Column Split Layout for Auth Pages:
-// Left 42% in deep storm-slate #1E2A36 with a subtle sky radial wash at the top, wordmark, and a concise 3-line product statement in #D6E1EC;
+// Left 42% in deep storm-slate #1B2742 with a subtle sky radial wash at the top, wordmark, and a concise 3-line product statement in #E3DDD3;
 // Right 58% on Storm 50 with a white form card (10px radius, 1px border).
 const AuthSplitLayout: React.FC<{
   children: React.ReactNode;
@@ -25,9 +25,9 @@ const AuthSplitLayout: React.FC<{
     <div
       style={{
         backgroundImage:
-          'radial-gradient(ellipse at top, rgba(136, 189, 242, 0.16), transparent 65%)',
+          'radial-gradient(ellipse at top, rgba(232, 190, 143, 0.16), transparent 65%)',
       }}
-      className="lg:w-[42%] bg-[#1E2A36] text-[#D6E1EC] p-8 sm:p-12 flex flex-col justify-between shrink-0"
+      className="lg:w-[42%] bg-[#1B2742] text-[#E3DDD3] p-8 sm:p-12 flex flex-col justify-between shrink-0"
     >
       <div className="flex items-center gap-3">
         <img
@@ -39,23 +39,23 @@ const AuthSplitLayout: React.FC<{
           <span className="text-[15px] leading-[20px] font-semibold text-white">
             HireNest
           </span>
-          <span className="text-[12px] leading-[16px] text-[#8FA6BC]">
+          <span className="text-[12px] leading-[16px] text-[#A39F92]">
             Hire Nest Workforce Pvt Ltd
           </span>
         </div>
       </div>
 
       <div className="my-10 lg:my-0 max-w-md space-y-3">
-        <div className="h-[3px] w-4 rounded-full bg-[#88BDF2]" />
+        <div className="h-[3px] w-4 rounded-full bg-[#E8BE8F]" />
         <p className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-white">
           Governed enterprise staffing for HQ, hiring companies, vendor agencies, and candidates.
         </p>
-        <p className="text-[13px] leading-[20px] text-[#D6E1EC]">
+        <p className="text-[13px] leading-[20px] text-[#E3DDD3]">
           One source of truth for requirements, vendor SLAs, candidate ownership, structured interviews, and 6-dimension quality scoring.
         </p>
       </div>
 
-      <div className="space-y-1 text-[12px] leading-[16px] text-[#8FA6BC]">
+      <div className="space-y-1 text-[12px] leading-[16px] text-[#A39F92]">
         <div className="font-mono tabular-nums">HireNest Workforce Operations</div>
         <div>
           Built by{' '}
@@ -63,7 +63,7 @@ const AuthSplitLayout: React.FC<{
             href="https://atkind.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-[#88BDF2] hover:text-white hover:underline transition-colors"
+            className="font-medium text-[#E8BE8F] hover:text-white hover:underline transition-colors"
           >
             Atkind Pvt Ltd
           </a>
@@ -74,7 +74,7 @@ const AuthSplitLayout: React.FC<{
     {/* Right 58% Storm 50 Canvas with White Form Card */}
     <div className="flex-1 lg:w-[58%] flex flex-col items-center justify-center p-6 sm:p-10 bg-[var(--app-bg)]">
       <div
-        className={`w-full ${maxWidthClass} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7 space-y-5 text-left`}
+        className={`w-full ${maxWidthClass} rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7 space-y-5 text-left`}
       >
         <div className="flex items-center gap-3 pb-3 border-b border-[var(--border)]">
           <img
@@ -250,7 +250,7 @@ export const SignInPage: React.FC = () => {
                 <div className="flex flex-col items-center">
                   <span
                     className="w-6 h-6 rounded-full font-mono text-[11px] font-semibold flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.1)', color: '#C4B5FD' }}
+                    style={{ background: 'rgba(255,255,255,0.1)', color: '#B9D1FB' }}
                   >
                     {i + 1}
                   </span>
@@ -258,16 +258,16 @@ export const SignInPage: React.FC = () => {
                 </div>
                 <div className="pb-6">
                   <div className="text-[13.5px] font-semibold text-white">{step.title}</div>
-                  <p className="text-[12.5px] mt-0.5 leading-relaxed" style={{ color: '#9099C2' }}>{step.detail}</p>
+                  <p className="text-[12.5px] mt-0.5 leading-relaxed" style={{ color: '#B5AFA2' }}>{step.detail}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="text-[11px]" style={{ color: '#6B74A0' }}>
+        <div className="text-[11px]" style={{ color: '#A39F92' }}>
           Built by{' '}
-          <a href="https://atkind.com" target="_blank" rel="noopener noreferrer" className="text-[#9099C2] hover:text-white hover:underline transition-colors">
+          <a href="https://atkind.com" target="_blank" rel="noopener noreferrer" className="text-[#B5AFA2] hover:text-white hover:underline transition-colors">
             Atkind Pvt Ltd
           </a>
         </div>
@@ -296,7 +296,7 @@ export const SignInPage: React.FC = () => {
 
         <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-[380px]">
-          <div className="bg-[var(--surface)] rounded-[10px] border border-[var(--border)] p-7">
+          <div className="bg-[var(--surface)] rounded-[12px] border border-[var(--border)] p-7">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h1 className="text-[19px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">Sign in</h1>

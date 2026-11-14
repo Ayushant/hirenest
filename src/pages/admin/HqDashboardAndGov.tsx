@@ -130,9 +130,9 @@ export const HqDashboardPage: React.FC = () => {
   ].filter((d) => d.value > 0), [reqByStatus]);
 
   const funnelStages = useMemo(() => [
-    { name: 'Applied', value: subByStage.applied ?? 0, color: '#6A89A7' },
-    { name: 'Recruiter review', value: subByStage.recruiter_review ?? 0, color: '#4F95DB' },
-    { name: 'Client review', value: subByStage.client_review ?? 0, color: '#4F46D8' },
+    { name: 'Applied', value: subByStage.applied ?? 0, color: '#939084' },
+    { name: 'Recruiter review', value: subByStage.recruiter_review ?? 0, color: '#C98A4B' },
+    { name: 'Client review', value: subByStage.client_review ?? 0, color: '#1D5FD1' },
     { name: 'Interviewing', value: subByStage.interviewing ?? 0, color: '#2A9D8F' },
     { name: 'Offered', value: subByStage.offered ?? 0, color: '#D99A2B' },
     { name: 'Onboarded', value: subByStage.onboarded ?? 0, color: '#17734A' },
@@ -215,12 +215,12 @@ export const HqDashboardPage: React.FC = () => {
   const totalReqs = Object.values(reqByStatus).reduce((a, b) => a + (b || 0), 0);
   const totalSubs = Object.values(subByStage).reduce((a, b) => a + (b || 0), 0);
 
-  const REQ_COLORS = ['#2A9D8F', '#D99A2B', '#6A89A7', '#384959', '#4F46D8', '#B8322B'];
+  const REQ_COLORS = ['#2A9D8F', '#D99A2B', '#939084', '#36342E', '#1D5FD1', '#B8322B'];
 
   return (
     <div className="space-y-7">
       {/* Header Band */}
-      <div className="dashboard-header-band rounded-[10px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
+      <div className="dashboard-header-band rounded-[12px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
         <GreetingHeader
           firstName={profile?.full_name?.split(' ')[0]}
           subtitle="Governed overview across client requisitions, vendor SLAs, and pipeline stages."
@@ -250,14 +250,14 @@ export const HqDashboardPage: React.FC = () => {
           label="Client Organizations"
           value={summary.clients ?? 0}
           icon={<Building2 className="w-5 h-5" />}
-          accentColor="#4F46D8"
+          accentColor="#1D5FD1"
           onClick={() => navigate(isAdmin ? '/admin/organizations' : `${prefix}/requirements`)}
         />
         <KpiCard
           label="Vendor Agencies"
           value={summary.vendors ?? 0}
           icon={<Briefcase className="w-5 h-5" />}
-          accentColor="#4F95DB"
+          accentColor="#C98A4B"
           onClick={() => navigate(isAdmin ? '/admin/organizations' : `${prefix}/vendor-performance`)}
         />
         <KpiCard
@@ -279,7 +279,7 @@ export const HqDashboardPage: React.FC = () => {
       {/* Needs Attention */}
       {attentionItems.some((item) => item.count > 0) && (
         <DashboardSection title="Needs attention">
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
             {attentionItems.map((item) => (
               <ActionItem
                 key={item.label}
@@ -347,14 +347,14 @@ export const HqDashboardPage: React.FC = () => {
             label="Candidates shared"
             value={offerMetrics.candidatesShared}
             icon={<Send className="w-4 h-4" />}
-            accentColor="#4F95DB"
+            accentColor="#C98A4B"
             onClick={() => navigate(`${prefix}/submissions`)}
           />
           <KpiCard
             label="Offers issued"
             value={offerMetrics.offersIssued}
             icon={<Briefcase className="w-4 h-4" />}
-            accentColor="#4F46D8"
+            accentColor="#1D5FD1"
             onClick={() => navigate(`${prefix}/offers`)}
           />
           <KpiCard
@@ -382,7 +382,7 @@ export const HqDashboardPage: React.FC = () => {
             label="Upcoming joinings"
             value={offerMetrics.upcomingJoiningsCount}
             icon={<CalendarCheck className="w-4 h-4" />}
-            accentColor="#6A89A7"
+            accentColor="#939084"
             onClick={() => navigate(`${prefix}/onboarded`)}
           />
         </KpiRow>
@@ -392,14 +392,14 @@ export const HqDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <ChartCard title="Candidates by source" subtitle={`${totalCandidates} total`}>
           <div className="px-3 space-y-4 py-2">
-            <ProgressBar label="Vendor" value={candBySource.vendor ?? 0} total={totalCandidates} color="#4F46D8" />
-            <ProgressBar label="Direct" value={candBySource.direct ?? 0} total={totalCandidates} color="#4F95DB" />
+            <ProgressBar label="Vendor" value={candBySource.vendor ?? 0} total={totalCandidates} color="#1D5FD1" />
+            <ProgressBar label="Direct" value={candBySource.direct ?? 0} total={totalCandidates} color="#C98A4B" />
             <ProgressBar label="HireNest" value={candBySource.internal ?? 0} total={totalCandidates} color="#2A9D8F" />
           </div>
         </ChartCard>
 
         <ChartCard title="Requirements breakdown" className="lg:col-span-2">
-          <div className="rounded-[10px] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+          <div className="rounded-[12px] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
             {(['open', 'pending_approval', 'draft', 'on_hold', 'filled', 'closed'] as const).map((st) => (
               <div
                 key={st}
@@ -424,7 +424,7 @@ export const HqDashboardPage: React.FC = () => {
             </Link>
           }
         >
-          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
             {openReqsList.slice(0, 6).map((req) => {
               const budgetInfo = formatRequirementBudgetWithSubtitle(req);
               return (

@@ -596,7 +596,7 @@ export const OffersWorkspaceView: React.FC<{
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-[12px] font-semibold text-[var(--text-primary)]">
-              <ShieldCheck className="h-4 w-4 text-[#4F46D8]" />
+              <ShieldCheck className="h-4 w-4 text-[#1D5FD1]" />
               <span>Shared Offer &amp; Onboarding Lifecycle Governance</span>
             </div>
             <p className="text-[12px] leading-[18px] text-[var(--text-secondary)]">
@@ -671,7 +671,7 @@ export const OffersWorkspaceView: React.FC<{
         <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[#4F46D8]" />
+              <Calendar className="h-4 w-4 text-[#1D5FD1]" />
               <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">
                 Upcoming Scheduled Joining Dates (Pre-Boarding Watchlist · Not Yet Counted as Onboarded)
               </h2>
@@ -747,7 +747,7 @@ export const OffersWorkspaceView: React.FC<{
                 setDateFromFilter('');
                 setDateToFilter('');
               }}
-              className="text-[12px] text-[#4F46D8] hover:underline cursor-pointer"
+              className="text-[12px] text-[#1D5FD1] hover:underline cursor-pointer"
             >
               Reset filters
             </button>
@@ -917,7 +917,7 @@ export const OffersWorkspaceView: React.FC<{
                         <button
                           type="button"
                           onClick={() => setSelectedSubmissionId(submission.id)}
-                          className="font-medium text-[var(--text-primary)] hover:text-[#4F46D8] text-left cursor-pointer"
+                          className="font-medium text-[var(--text-primary)] hover:text-[#1D5FD1] text-left cursor-pointer"
                         >
                           {submission.candidates?.full_name || 'Candidate'}
                         </button>

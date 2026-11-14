@@ -196,7 +196,7 @@ export const PublicJobPage: React.FC = () => {
       <PublicNav />
 
       {/* Hero */}
-      <header className="bg-gradient-to-b from-[#1B1A33] to-[#0F111E] text-white">
+      <header className="bg-gradient-to-b from-[#14213D] to-[#0C1424] text-white">
         <div className="mx-auto max-w-5xl space-y-5 px-5 pb-10 pt-8 sm:px-8 sm:pb-12">
           <Link to="/jobs" className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-300 hover:text-indigo-200">
             ← All open roles

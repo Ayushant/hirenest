@@ -146,7 +146,7 @@ export const ScoreBar: React.FC<{
 
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   const barColor =
-    clamped < 40 ? 'bg-[var(--status-danger-dot)]' : 'bg-[#6E4ADE]';
+    clamped < 40 ? 'bg-[var(--status-danger-dot)]' : 'bg-[#174DB0]';
 
   return (
     <div className="inline-flex items-center gap-2 min-w-[96px]">

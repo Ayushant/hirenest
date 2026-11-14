@@ -432,9 +432,9 @@ export const PrivacyGovernancePage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Document Governance Banner */}
-      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-8 w-8 rounded-[6px] bg-[#4F46D8]/10 text-[#4F46D8] flex items-center justify-center shrink-0">
+          <div className="h-8 w-8 rounded-[6px] bg-[#1D5FD1]/10 text-[#1D5FD1] flex items-center justify-center shrink-0">
             <ShieldCheck className="h-4 w-4" />
           </div>
           <div className="min-w-0">
@@ -551,7 +551,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                 <tbody>
                   {data.roadmapPhases.map((item) => (
                     <tr key={item.phase}>
-                      <td className="font-mono tabular-nums font-semibold text-[#4F46D8]">
+                      <td className="font-mono tabular-nums font-semibold text-[#1D5FD1]">
                         {item.phase}
                       </td>
                       <td>
@@ -647,25 +647,25 @@ export const PrivacyGovernancePage: React.FC = () => {
               </div>
               <ul className="space-y-2 text-[13px] leading-[20px] text-[var(--text-secondary)]">
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[#4F46D8] shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-4 w-4 text-[#1D5FD1] shrink-0 mt-0.5" />
                   <span>
                     <strong className="text-[var(--text-primary)]">Legal Role &amp; Notice Sign-Off:</strong> Confirm Data Fiduciary vs. Client Data Processor roles per workflow with Indian privacy counsel and approve final notice copy.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[#4F46D8] shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-4 w-4 text-[#1D5FD1] shrink-0 mt-0.5" />
                   <span>
                     <strong className="text-[var(--text-primary)]">Grievance Officer &amp; DSR Decisions:</strong> Designate the Grievance Officer (<span className="font-mono text-[12px]">dpo-grievance@hirenestworkforce.com</span>), verify requester identity, and approve access/correction/erasure outcomes within SLA.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[#4F46D8] shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-4 w-4 text-[#1D5FD1] shrink-0 mt-0.5" />
                   <span>
                     <strong className="text-[var(--text-primary)]">Retention &amp; Legal Hold Governance:</strong> Define statutory retention windows and authorise legal/commercial dispute holds on submission records.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[#4F46D8] shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-4 w-4 text-[#1D5FD1] shrink-0 mt-0.5" />
                   <span>
                     <strong className="text-[var(--text-primary)]">Vendor &amp; Client DPAs:</strong> Execute data processing clauses with clients, staffing vendors, and sub-processors; lead regulatory notification if a reportable breach occurs.
                   </span>
@@ -703,7 +703,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                 <div key={n.noticeId} className="p-5 space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5">
-                      <span className="font-mono tabular-nums text-[12px] font-semibold text-[#4F46D8]">
+                      <span className="font-mono tabular-nums text-[12px] font-semibold text-[#1D5FD1]">
                         {n.noticeId}
                       </span>
                       <Badge tone="rich_blue">v{n.version}</Badge>
@@ -874,7 +874,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                   {data.processingRecords.map((rec) => (
                     <tr key={rec.id}>
                       <td>
-                        <div className="font-mono tabular-nums text-[12px] font-semibold text-[#4F46D8]">
+                        <div className="font-mono tabular-nums text-[12px] font-semibold text-[#1D5FD1]">
                           {rec.id}
                         </div>
                         <div className="font-medium text-[var(--text-primary)]">
@@ -915,7 +915,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                         <div className="text-[12px] text-[var(--text-secondary)]">
                           {rec.systems.join(', ')}
                         </div>
-                        <div className="font-mono text-[12px] text-[#4F46D8] mt-0.5">
+                        <div className="font-mono text-[12px] text-[#1D5FD1] mt-0.5">
                           Policy: {rec.retentionPolicyId}
                         </div>
                       </td>
@@ -1032,7 +1032,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                 <tbody>
                   {data.requests.map((reqItem) => (
                     <tr key={reqItem.requestId}>
-                      <td className="font-mono tabular-nums font-semibold text-[#4F46D8]">
+                      <td className="font-mono tabular-nums font-semibold text-[#1D5FD1]">
                         {reqItem.requestId}
                       </td>
                       <td>
@@ -1156,7 +1156,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                 <tbody>
                   {data.retentionPolicies.map((pol) => (
                     <tr key={pol.policyId}>
-                      <td className="font-mono tabular-nums font-semibold text-[#4F46D8]">
+                      <td className="font-mono tabular-nums font-semibold text-[#1D5FD1]">
                         {pol.policyId}
                       </td>
                       <td>
@@ -1257,7 +1257,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                 <tbody>
                   {data.deletionJobs.map((job) => (
                     <tr key={job.jobId}>
-                      <td className="font-mono tabular-nums font-semibold text-[#4F46D8]">
+                      <td className="font-mono tabular-nums font-semibold text-[#1D5FD1]">
                         {job.jobId}
                       </td>
                       <td>
@@ -1545,7 +1545,7 @@ export const PrivacyGovernancePage: React.FC = () => {
                 <tbody>
                   {data.auditEvents.map((evt) => (
                     <tr key={evt.eventId}>
-                      <td className="font-mono tabular-nums text-[12px] font-medium text-[#4F46D8]">
+                      <td className="font-mono tabular-nums text-[12px] font-medium text-[#1D5FD1]">
                         {evt.eventId}
                       </td>
                       <td>
@@ -1629,7 +1629,7 @@ export const PrivacyGovernancePage: React.FC = () => {
               <tbody>
                 {data.incidents.map((inc) => (
                   <tr key={inc.incidentId}>
-                    <td className="font-mono tabular-nums font-semibold text-[#4F46D8]">
+                    <td className="font-mono tabular-nums font-semibold text-[#1D5FD1]">
                       {inc.incidentId}
                     </td>
                     <td className="max-w-[240px]">

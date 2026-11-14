@@ -1,240 +1,289 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Zapier-inspired type system (see DESIGN.md): display face for hero moments, Inter for everything else */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Brand "Rich Blue" */
-  --color-rich-blue-50: #F2EEFE;
-  --color-rich-blue-100: #E6DFFC;
-  --color-rich-blue-200: #CBC0FA;
-  --color-rich-blue-300: #AB92F5;
-  --color-rich-blue-400: #8C68EA;
-  --color-rich-blue-500: #6E4ADE;
-  --color-rich-blue-600: #4F46D8;
-  --color-rich-blue-700: #4338B5;
-  --color-rich-blue-800: #372C8F;
-  --color-rich-blue-900: #2A2270;
-  --color-rich-blue-950: #1B1A33;
+  /* Brand blue (#1D5FD1 is the single CTA accent) */
+  --color-brand-50: #EEF4FF;
+  --color-brand-100: #DCE8FD;
+  --color-brand-200: #B9D1FB;
+  --color-brand-300: #8AB3F6;
+  --color-brand-400: #4F8EEE;
+  --color-brand-500: #1D5FD1;
+  --color-brand-600: #174DB0;
+  --color-brand-700: #1A56C2;
+  --color-brand-800: #123E8F;
+  --color-brand-900: #0D2C66;
+  --color-brand-950: #081A3D;
 
-  /* Stormy Morning (secondary family) */
-  --color-storm-slate: #384959;
-  --color-storm-blue: #6A89A7;
-  --color-storm-sky: #88BDF2;
-  --color-storm-mist: #BDDDFC;
-  --color-sky-50: #F2F8FE;
-  --color-sky-100: #E3F0FD;
-  --color-sky-200: #BDDDFC;
-  --color-sky-300: #88BDF2;
-  --color-sky-500: #4F95DB;
-  --color-sky-700: #1F5F99;
+  /* Legacy brand names re-pointed to the blue scale so old classes follow the new brand */
+  --color-rich-blue-50: #EEF4FF;
+  --color-rich-blue-100: #DCE8FD;
+  --color-rich-blue-200: #B9D1FB;
+  --color-rich-blue-300: #8AB3F6;
+  --color-rich-blue-400: #4F8EEE;
+  --color-rich-blue-500: #1D5FD1;
+  --color-rich-blue-600: #1D5FD1;
+  --color-rich-blue-700: #1A56C2;
+  --color-rich-blue-800: #123E8F;
+  --color-rich-blue-900: #0D2C66;
+  --color-rich-blue-950: #14213D;
 
-  /* Neutrals "Storm" (blue-grey built from storm-slate) */
-  --color-storm-0: #FFFFFF;
-  --color-storm-25: #F9FBFD;
-  --color-storm-50: #F3F6F9;
-  --color-storm-100: #E6ECF2;
-  --color-storm-200: #D3DCE6;
-  --color-storm-300: #B4C2D0;
-  --color-storm-400: #8A9CAF;
-  --color-storm-500: #66788A;
-  --color-storm-600: #4D5E6F;
-  --color-storm-700: #384959;
-  --color-storm-800: #27333F;
-  --color-storm-900: #18212A;
-  --color-storm-950: #0E141A;
+  /* Tailwind's cool palettes remapped to warm equivalents, so hardcoded
+     slate/indigo/violet/blue classes across pages adopt the warm cream + navy + blue system */
+  --color-white: #FFFEFB;
+  --color-black: #14213D;
+
+  --color-slate-50: #F8F4F0;
+  --color-slate-100: #F0EBE4;
+  --color-slate-200: #E3DDD3;
+  --color-slate-300: #C5C0B1;
+  --color-slate-400: #A39F92;
+  --color-slate-500: #858175;
+  --color-slate-600: #605D52;
+  --color-slate-700: #46423B;
+  --color-slate-800: #1E2C4A;
+  --color-slate-900: #14213D;
+  --color-slate-950: #0C1424;
+
+  --color-gray-50: #F8F4F0;
+  --color-gray-100: #F0EBE4;
+  --color-gray-200: #E3DDD3;
+  --color-gray-300: #C5C0B1;
+  --color-gray-400: #A39F92;
+  --color-gray-500: #858175;
+  --color-gray-600: #605D52;
+  --color-gray-700: #46423B;
+  --color-gray-800: #1E2C4A;
+  --color-gray-900: #14213D;
+
+  --color-indigo-50: #EEF4FF;
+  --color-indigo-100: #DCE8FD;
+  --color-indigo-200: #B9D1FB;
+  --color-indigo-300: #8AB3F6;
+  --color-indigo-400: #4F8EEE;
+  --color-indigo-500: #1D5FD1;
+  --color-indigo-600: #174DB0;
+  --color-indigo-700: #1A56C2;
+  --color-indigo-800: #123E8F;
+  --color-indigo-900: #0D2C66;
+
+  --color-violet-50: #EEF4FF;
+  --color-violet-100: #DCE8FD;
+  --color-violet-200: #B9D1FB;
+  --color-violet-300: #8AB3F6;
+  --color-violet-400: #4F8EEE;
+  --color-violet-500: #1D5FD1;
+  --color-violet-600: #174DB0;
+  --color-violet-700: #1A56C2;
+
+  --color-purple-50: #EEF4FF;
+  --color-purple-100: #DCE8FD;
+  --color-purple-500: #1D5FD1;
+  --color-purple-600: #174DB0;
+  --color-purple-700: #1A56C2;
+
+  --color-blue-50: #EEF4FF;
+  --color-blue-100: #DCE8FD;
+  --color-blue-200: #B9D1FB;
+  --color-blue-300: #8AB3F6;
+  --color-blue-400: #4F8EEE;
+  --color-blue-500: #1D5FD1;
+  --color-blue-600: #174DB0;
+  --color-blue-700: #1A56C2;
+  --color-blue-800: #123E8F;
+
+  /* Warm neutral ladder (cream -> navy) */
+  --color-cream: #FFFEFB;
+  --color-cream-soft: #F8F4F0;
+  --color-ink: #14213D;
+  --color-ink-soft: #1E2C4A;
+  --color-ink-mid: #36342E;
+  --color-body: #605D52;
+  --color-body-mid: #939084;
+  --color-mute: #C5C0B1;
+
+  --animate-marquee: marquee 40s linear infinite;
 }
 
 @layer base {
   :root {
-    --font-sans: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-    /* Brand Rich Blue scale */
-    --rich-blue-50: #F2EEFE;
-    --rich-blue-100: #E6DFFC;
-    --rich-blue-200: #CBC0FA;
-    --rich-blue-300: #AB92F5;
-    --rich-blue-400: #8C68EA;
-    --rich-blue-500: #6E4ADE;
-    --rich-blue-600: #4F46D8;
-    --rich-blue-700: #4338B5;
-    --rich-blue-800: #372C8F;
-    --rich-blue-900: #2A2270;
-    --rich-blue-950: #1B1A33;
+    /* Zapier-inspired primitives */
+    --zp-brand: #1D5FD1;
+    --zp-brand-hover: #174DB0;
+    --zp-brand-text: #1A56C2;
+    --zp-canvas: #FFFEFB;
+    --zp-canvas-soft: #F8F4F0;
+    --zp-ink: #14213D;
+    --zp-ink-soft: #1E2C4A;
+    --zp-ink-mid: #36342E;
+    --zp-body: #605D52;
+    --zp-body-mid: #939084;
+    --zp-mute: #C5C0B1;
 
-    /* Stormy Morning secondary scale */
-    --storm-slate: #384959;
-    --storm-blue: #6A89A7;
-    --storm-sky: #88BDF2;
-    --storm-mist: #BDDDFC;
-    --sky-50: #F2F8FE;
-    --sky-100: #E3F0FD;
-    --sky-200: #BDDDFC;
-    --sky-300: #88BDF2;
-    --sky-500: #4F95DB;
-    --sky-700: #1F5F99;
+    /* Light surface mapping: warm cream, never pure white */
+    --app-bg: #F8F4F0;        /* canvas-soft */
+    --bg: #FFFEFB;            /* canvas */
+    --surface: #FFFEFB;       /* canvas */
+    --bg-subtle: #F8F4F0;     /* canvas-soft */
+    --bg-hover: #F4EFE9;
+    --border: #E6E0D6;
+    --border-strong: #C5C0B1; /* mute */
+    --track: #EFE9E1;
 
-    /* Storm neutrals */
-    --storm-0: #FFFFFF;
-    --storm-25: #F9FBFD;
-    --storm-50: #F3F6F9;
-    --storm-100: #E6ECF2;
-    --storm-200: #D3DCE6;
-    --storm-300: #B4C2D0;
-    --storm-400: #8A9CAF;
-    --storm-500: #66788A;
-    --storm-600: #4D5E6F;
-    --storm-700: #384959;
-    --storm-800: #27333F;
-    --storm-900: #18212A;
-    --storm-950: #0E141A;
+    /* Light text mapping: logo navy, never pure black */
+    --text-primary: #14213D;   /* ink */
+    --text-secondary: #605D52; /* body */
+    --text-tertiary: #716E64;  /* body, darkened for AA on cream */
+    --text-button-sec: #14213D;
 
-    /* Light surface mapping */
-    --app-bg: #F3F6F9;        /* Storm 50 */
-    --bg: #FFFFFF;            /* Content surface */
-    --surface: #FFFFFF;       /* Content surface */
-    --bg-subtle: #F9FBFD;     /* Storm 25 */
-    --bg-hover: #F9FBFD;      /* Storm 25 */
-    --border: #D3DCE6;        /* Storm 200 */
-    --border-strong: #B4C2D0; /* Storm 300 */
-    --track: #E6ECF2;         /* Storm 100 */
+    /* Primary & accent: the single blue */
+    --primary-bg: #1D5FD1;
+    --primary-hover: #174DB0;
+    --primary-text: #FFFEFB;
+    --accent: #1A56C2;             /* blue for text/indicators, AA on cream */
+    --focus-ring: rgba(29, 95, 209, 0.18);
+    --focus-border: #1D5FD1;
+    --row-selected-bg: #EEF4FF;
+    --row-selected-bar: #1D5FD1;
+    --highlight-soft: #E6EFFE;
+    --marker-new: #1D5FD1;
+    --header-band-bg: #F8F4F0;
+    --drawer-header-bg: #F8F4F0;
+    --ai-block-bg: #F4F8FF;
+    --ai-block-border: #CFDFFC;
 
-    /* Light text mapping */
-    --text-primary: #18212A;   /* Storm 900 */
-    --text-secondary: #4D5E6F; /* Storm 600 */
-    --text-tertiary: #66788A;  /* Storm 500 */
-    --text-button-sec: #27333F;/* Storm 800 */
+    /* Sidebar: logo navy with blue active indicator */
+    --sidebar-bg: #14213D;
+    --sidebar-border: rgba(255, 254, 251, 0.08);
+    --sidebar-text: #EDE7DF;
+    --sidebar-muted: #A39F92;
+    --sidebar-hover: rgba(255, 254, 251, 0.06);
+    --sidebar-active-bg: rgba(29, 95, 209, 0.16);
+    --sidebar-active-bar: #1D5FD1;
+    --sidebar-active-text: #FFFEFB;
 
-    /* Primary & Accent mapping */
-    --primary-bg: #4F46D8;         /* Rich Blue 600 */
-    --primary-hover: #4338B5;      /* Rich Blue 700 */
-    --primary-text: #FFFFFF;
-    --accent: #4F46D8;             /* Rich Blue 600 */
-    --focus-ring: #E6DFFC;         /* Rich Blue 100 */
-    --focus-border: #4F46D8;       /* Rich Blue 600 */
-    --row-selected-bg: #F2EEFE;    /* Rich Blue 50 */
-    --row-selected-bar: #4F46D8;   /* Rich Blue 600 */
-    --highlight-soft: #E3F0FD;     /* Sky 100 */
-    --marker-new: #4F95DB;         /* Sky 500 */
-    --header-band-bg: #F2F8FE;     /* Sky 50 */
-    --drawer-header-bg: #F2F8FE;   /* Sky 50 */
-    --ai-block-bg: #F2F8FE;        /* Sky 50 */
-    --ai-block-border: #BDDDFC;    /* Sky 200 */
+    /* Semantic soft-tint tokens, warmed to sit on cream */
+    --status-success: #1F6B45;
+    --status-success-bg: #E8F2E6;
+    --status-success-dot: #2F9461;
+    --status-warning: #8A5300;
+    --status-warning-bg: #FCEFD6;
+    --status-warning-dot: #D99A2B;
+    --status-danger: #B3261E;
+    --status-danger-bg: #FBE8E4;
+    --status-danger-dot: #D93A2B;
+    --status-info: #36342E;
+    --status-info-bg: #EFE9E1;
+    --status-info-dot: #605D52;
+    --status-neutral: #605D52;
+    --status-neutral-bg: #EFE9E1;
+    --status-neutral-dot: #939084;
+    --warning: #D99A2B;
 
-    /* Sidebar (Indigo-Navy Deep) */
-    --sidebar-bg: #1E1B3A;
-    --sidebar-border: rgba(255, 255, 255, 0.08);
-    --sidebar-text: #DCD8F5;
-    --sidebar-muted: #9089BC;
-    --sidebar-hover: rgba(255, 255, 255, 0.06);
-    --sidebar-active-bg: rgba(140, 104, 234, 0.16);
-    --sidebar-active-bar: #8C68EA;
-    --sidebar-active-text: #FFFFFF;
-
-    /* Semantic soft-tint tokens (700 text on soft tint background) */
-    --status-success: #17734A;
-    --status-success-bg: #E7F4EC;
-    --status-warning: #8F5A0A;
-    --status-warning-bg: #FDF1DC;
-    --status-danger: #B8322B;
-    --status-danger-bg: #FBEAE8;
-    --status-info: #1F5F99;
-    --status-info-bg: #E3F0FD;
-    --status-neutral: #4D5E6F;
-    --status-neutral-bg: #E6ECF2;
-
-    /* Extended stage / source soft-tint chips */
-    --chip-storm-blue-text: #384959;
-    --chip-storm-blue-bg: #E6ECF2;
-    --chip-storm-blue-dot: #6A89A7;
-    --chip-rich-blue-text: #4338B5;
-    --chip-rich-blue-bg: #F2EEFE;
-    --chip-rich-blue-dot: #4F46D8;
-    --chip-sky-text: #1F5F99;
-    --chip-sky-bg: #E3F0FD;
-    --chip-sky-dot: #4F95DB;
-    --chip-teal-text: #176B60;
-    --chip-teal-bg: #E3F5F2;
+    /* Extended stage / source chips */
+    --chip-storm-blue-text: #36342E;
+    --chip-storm-blue-bg: #EFE9E1;
+    --chip-storm-blue-dot: #939084;
+    --chip-rich-blue-text: #1A56C2;
+    --chip-rich-blue-bg: #E6EFFE;
+    --chip-rich-blue-dot: #1D5FD1;
+    --chip-sky-text: #7A4A1E;
+    --chip-sky-bg: #F7EADB;
+    --chip-sky-dot: #C98A4B;
+    --chip-teal-text: #1E6358;
+    --chip-teal-bg: #E4F1EC;
     --chip-teal-dot: #2A9D8F;
 
     /* Chart & category palette (in order) */
-    --cat-1: #4F46D8; /* rich blue */
-    --cat-2: #4F95DB; /* sky */
-    --cat-3: #6A89A7; /* storm blue */
-    --cat-4: #384959; /* storm slate */
+    --cat-1: #1D5FD1; /* blue */
+    --cat-2: #14213D; /* ink */
+    --cat-3: #C98A4B; /* sand */
+    --cat-4: #939084; /* body-mid */
     --cat-5: #2A9D8F; /* teal */
     --cat-6: #D99A2B; /* amber */
 
-    /* Floating elevation only */
-    --shadow-floating: 0 8px 24px rgba(14, 20, 26, 0.10);
+    --shadow-floating: 0 12px 32px rgba(20, 33, 61, 0.12);
+    --radius-card: 12px;
+    --radius-control: 8px;
   }
 
   .dark {
-    --app-bg: #0E141A;
-    --bg: #141C24;
-    --surface: #141C24;
-    --bg-subtle: #18222C;
-    --bg-hover: #18222C;
-    --border: #253240;
-    --border-strong: #2F3F50;
-    --track: #1E2A36;
+    --app-bg: #0C1424;
+    --bg: #111B30;
+    --surface: #111B30;
+    --bg-subtle: #16213A;
+    --bg-hover: #1B2742;
+    --border: #26344F;
+    --border-strong: #34445F;
+    --track: #1F2B44;
 
-    --text-primary: #E4ECF4;
-    --text-secondary: #A3B4C5;
-    --text-tertiary: #73879B;
-    --text-button-sec: #E4ECF4;
+    --text-primary: #F8F4F0;
+    --text-secondary: #C5C0B1;
+    --text-tertiary: #9E998C;
+    --text-button-sec: #F8F4F0;
 
-    --primary-bg: #8C68EA;         /* Rich Blue 400 */
-    --primary-hover: #AB92F5;      /* Rich Blue 300 */
-    --primary-text: #1B1A33;       /* Rich Blue 950 */
-    --accent: #88BDF2;             /* Sky */
-    --focus-ring: rgba(140, 104, 234, 0.25);
-    --focus-border: #8C68EA;
-    --row-selected-bg: rgba(140, 104, 234, 0.12);
-    --row-selected-bar: #8C68EA;
-    --highlight-soft: rgba(79, 149, 219, 0.18);
-    --marker-new: #88BDF2;
-    --header-band-bg: #121C27;
-    --drawer-header-bg: #121C27;
-    --ai-block-bg: #121C27;
-    --ai-block-border: #253240;
+    --primary-bg: #1D5FD1;
+    --primary-hover: #3A7BE6;
+    --primary-text: #FFFEFB;
+    --accent: #4F8EEE;
+    --focus-ring: rgba(29, 95, 209, 0.28);
+    --focus-border: #4F8EEE;
+    --row-selected-bg: rgba(29, 95, 209, 0.12);
+    --row-selected-bar: #1D5FD1;
+    --highlight-soft: rgba(29, 95, 209, 0.14);
+    --marker-new: #4F8EEE;
+    --header-band-bg: #111B30;
+    --drawer-header-bg: #16213A;
+    --ai-block-bg: #16213A;
+    --ai-block-border: #26344F;
 
-    --sidebar-bg: #120F26;
-    --sidebar-border: #211D40;
-    --sidebar-text: #DCD8F5;
-    --sidebar-muted: #9089BC;
-    --sidebar-hover: rgba(255, 255, 255, 0.06);
-    --sidebar-active-bg: rgba(140, 104, 234, 0.16);
-    --sidebar-active-bar: #8C68EA;
-    --sidebar-active-text: #FFFFFF;
+    --sidebar-bg: #09101E;
+    --sidebar-border: #1B2742;
+    --sidebar-text: #EDE7DF;
+    --sidebar-muted: #A39F92;
+    --sidebar-hover: rgba(255, 254, 251, 0.06);
+    --sidebar-active-bg: rgba(29, 95, 209, 0.18);
+    --sidebar-active-bar: #1D5FD1;
+    --sidebar-active-text: #FFFEFB;
 
-    /* Semantic tints at 15% opacity with 300-shade text */
-    --status-success: #6EE7B7;
-    --status-success-bg: rgba(23, 115, 74, 0.18);
-    --status-warning: #FCD34D;
+    --status-success: #8FD6A8;
+    --status-success-bg: rgba(47, 148, 97, 0.18);
+    --status-success-dot: #4FBF84;
+    --status-warning: #F5C66B;
     --status-warning-bg: rgba(217, 154, 43, 0.18);
-    --status-danger: #FCA5A5;
-    --status-danger-bg: rgba(184, 50, 43, 0.18);
-    --status-info: #88BDF2;
-    --status-info-bg: rgba(79, 149, 219, 0.18);
-    --status-neutral: #B4C2D0;
-    --status-neutral-bg: rgba(102, 120, 138, 0.18);
+    --status-warning-dot: #E7AE45;
+    --status-danger: #F5A39A;
+    --status-danger-bg: rgba(217, 58, 43, 0.18);
+    --status-danger-dot: #E8594B;
+    --status-info: #E3DDD3;
+    --status-info-bg: rgba(197, 192, 177, 0.14);
+    --status-info-dot: #C5C0B1;
+    --status-neutral: #C5C0B1;
+    --status-neutral-bg: rgba(147, 144, 132, 0.18);
+    --status-neutral-dot: #939084;
 
-    --chip-storm-blue-text: #BDDDFC;
-    --chip-storm-blue-bg: rgba(106, 137, 167, 0.18);
-    --chip-storm-blue-dot: #88BDF2;
-    --chip-rich-blue-text: #AB92F5;
-    --chip-rich-blue-bg: rgba(79, 70, 216, 0.18);
-    --chip-rich-blue-dot: #8C68EA;
-    --chip-sky-text: #88BDF2;
-    --chip-sky-bg: rgba(79, 149, 219, 0.18);
-    --chip-sky-dot: #88BDF2;
-    --chip-teal-text: #5EEAD4;
+    --chip-storm-blue-text: #E3DDD3;
+    --chip-storm-blue-bg: rgba(147, 144, 132, 0.18);
+    --chip-storm-blue-dot: #C5C0B1;
+    --chip-rich-blue-text: #8AB3F6;
+    --chip-rich-blue-bg: rgba(29, 95, 209, 0.16);
+    --chip-rich-blue-dot: #4F8EEE;
+    --chip-sky-text: #E8BE8F;
+    --chip-sky-bg: rgba(201, 138, 75, 0.18);
+    --chip-sky-dot: #C98A4B;
+    --chip-teal-text: #7FD8C9;
     --chip-teal-bg: rgba(42, 157, 143, 0.18);
     --chip-teal-dot: #2A9D8F;
 
-    --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.5);
   }
 
   html {
@@ -254,8 +303,13 @@
   }
 
   h1, h2, h3, h4 {
-    font-family: var(--font-sans);
-    letter-spacing: -0.01em;
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+    color: var(--text-primary);
+  }
+
+  ::selection {
+    background: rgba(29, 95, 209, 0.22);
     color: var(--text-primary);
   }
 
@@ -284,9 +338,9 @@
   thead th {
     font-size: 12px;
     line-height: 16px;
-    font-weight: 500;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     color: var(--text-tertiary);
     padding: 10px 16px;
     text-align: left;
@@ -366,13 +420,13 @@
   letter-spacing: -0.01em;
 }
 
-/* Atmosphere: Workspace dashboard header band in Sky 50 (dark: #121C27) with faint 24px dot grid in storm-blue at 8% opacity */
+/* Atmosphere: workspace dashboard header band in cream with a faint 24px warm dot grid */
 .dashboard-header-band {
   background-color: var(--header-band-bg);
-  background-image: radial-gradient(rgba(106, 137, 167, 0.14) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(147, 144, 132, 0.22) 1px, transparent 1px);
   background-size: 24px 24px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 /* Section titles preceded by a 16×3px bar in sky #88BDF2 (section titles only) */
@@ -388,20 +442,129 @@
   width: 16px;
   height: 3px;
   border-radius: 1.5px;
-  background-color: #88BDF2;
+  background-color: var(--zp-brand);
   flex-shrink: 0;
 }
 
-/* Brand gradient: violet -> indigo -> blue. Marketing surfaces only (hero CTA, logo mark); app chrome stays flat --primary-bg for consistency. */
+/* Brand fill: the single logo-blue accent (Zapier structure, HireNest colour). Kept as a class so existing call sites keep working. */
 .brand-gradient-bg {
-  background-image: linear-gradient(90deg, #7C4EE0 0%, #4F46D8 55%, #3A8EF0 100%);
+  background-color: var(--zp-brand);
+  background-image: none;
+  transition: background-color 160ms ease-out, transform 160ms ease-out;
+}
+.brand-gradient-bg:hover {
+  background-color: var(--zp-brand-hover);
 }
 
 .brand-gradient-text {
-  background-image: linear-gradient(90deg, #7C4EE0 0%, #4F46D8 55%, #3A8EF0 100%);
+  /* Logo body -> wing: royal blue into sky */
+  background-image: linear-gradient(90deg, #1D5FD1 0%, #38ACEF 50%, #1D5FD1 100%);
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+@layer components {
+/* Display type helpers (DESIGN.md: display-xl / display-lg / eyebrow-uppercase) */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.type-display-xl {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(40px, 6.2vw, 76px);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+
+.type-display-lg {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(32px, 4.2vw, 48px);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+}
+
+.type-eyebrow {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Zapier-style buttons for marketing surfaces: 12px radius, never pills */
+.zp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 24px;
+  padding: 12px 22px;
+  transition: background-color 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+.zp-btn:active { transform: translateY(1px); }
+.zp-btn-primary { background: var(--zp-brand); color: var(--zp-canvas); }
+.zp-btn-primary:hover { background: var(--zp-brand-hover); box-shadow: 0 8px 24px -8px rgba(29, 95, 209, 0.55); }
+.zp-btn-secondary { background: var(--zp-ink); color: var(--zp-canvas); }
+.zp-btn-secondary:hover { background: var(--zp-ink-soft); }
+.zp-btn-tertiary { background: transparent; color: var(--zp-ink); border: 1px solid var(--zp-ink); }
+.zp-btn-tertiary:hover { background: var(--zp-ink); color: var(--zp-canvas); }
+}
+
+/* ── Hero motion ─────────────────────────────────────────────── */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes hero-dash {
+  to { stroke-dashoffset: -24; }
+}
+
+@keyframes hero-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(1.9); opacity: 0; }
+}
+
+@keyframes hero-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.hero-grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(20, 33, 61, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20, 33, 61, 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 75%);
+}
+
+.hero-flow-line {
+  stroke-dasharray: 4 8;
+  animation: hero-dash 1.2s linear infinite;
+}
+
+.hero-pulse-ring {
+  animation: hero-pulse 2.4s ease-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.hero-shimmer-text {
+  animation: hero-shimmer 6s linear infinite;
+}
+
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
 }
 
 /* Motion accessibility */

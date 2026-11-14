@@ -9,22 +9,22 @@ import {
 import { decomposeCompoundSkills } from '../../lib/matchingEngine';
 
 // Category palette (in order):
-// #4F46D8 rich blue · #4F95DB sky · #6A89A7 storm blue · #384959 storm slate · #2A9D8F teal · #D99A2B amber
+// #1D5FD1 blue · #C98A4B sand · #939084 body-mid · #36342E ink-mid · #2A9D8F teal · #D99A2B amber
 export const CATEGORY_PALETTE = [
-  '#4F46D8',
-  '#4F95DB',
-  '#6A89A7',
-  '#384959',
+  '#1D5FD1',
+  '#C98A4B',
+  '#939084',
+  '#36342E',
   '#2A9D8F',
   '#D99A2B',
 ] as const;
 
 // Avatar deterministic 100-tint bg + 700-shade text from the category palette
 const AVATAR_STYLES = [
-  { bg: '#E6DFFC', text: '#4338B5' }, // Rich Blue 100 / 700
-  { bg: '#E3F0FD', text: '#1F5F99' }, // Sky 100 / 700
-  { bg: '#E6ECF2', text: '#384959' }, // Storm Blue 100 / 700
-  { bg: '#E6ECF2', text: '#27333F' }, // Storm Slate 100 / 800
+  { bg: '#DCE8FD', text: '#1A56C2' }, // Rich Blue 100 / 700
+  { bg: '#F7EADB', text: '#36342E' }, // Sky 100 / 700
+  { bg: '#EFE9E1', text: '#36342E' }, // Storm Blue 100 / 700
+  { bg: '#EFE9E1', text: '#1E2C4A' }, // Storm Slate 100 / 800
   { bg: '#E4F5F2', text: '#1A6B61' }, // Teal 100 / 700
   { bg: '#FDF1DC', text: '#8F5A0A' }, // Amber 100 / 700
 ];
@@ -63,7 +63,7 @@ export const Avatar: React.FC<{
   );
 };
 
-// MatchScoreRing: circular progress ring for a 0-100 match score, violet-to-blue gradient stroke
+// MatchScoreRing: circular progress ring for a 0-100 match score, blue gradient stroke
 export const MatchScoreRing: React.FC<{
   score: number;
   size?: number;
@@ -81,8 +81,8 @@ export const MatchScoreRing: React.FC<{
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#7C4EE0" />
-            <stop offset="100%" stopColor="#3A8EF0" />
+            <stop offset="0%" stopColor="#1A56C2" />
+            <stop offset="100%" stopColor="#38ACEF" />
           </linearGradient>
         </defs>
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--track)" strokeWidth={stroke} />
@@ -106,7 +106,7 @@ export const MatchScoreRing: React.FC<{
   );
 };
 
-// Button: 32px (sm 28px), 13/500, 6px radius; primary Rich Blue 600, secondary white + Storm 200 border, ghost, danger
+// Button: 32px (sm 28px), 13/600, 8px radius; primary blue, secondary cream + warm border, ghost, danger
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
@@ -127,7 +127,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const base =
-      'inline-flex items-center justify-center gap-1.5 font-medium rounded-[6px] transition-colors duration-120 ease-out focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--focus-ring)] disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap shrink-0 cursor-pointer';
+      'inline-flex items-center justify-center gap-1.5 font-semibold rounded-[8px] transition-colors duration-120 ease-out focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--focus-ring)] disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap shrink-0 cursor-pointer';
     const variants: Record<string, string> = {
       primary:
         'bg-[var(--primary-bg)] text-[var(--primary-text)] hover:bg-[var(--primary-hover)]',
@@ -161,7 +161,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = 'Button';
 
-// Input: 34px height, 6px radius, label 12/500 Storm 600, focus = 3px Rich Blue 100 ring
+// Input: 34px height, 6px radius, label 12/500 body, focus = 3px blue ring
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
@@ -203,7 +203,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 );
 Input.displayName = 'Input';
 
-// Select: 34px height, 6px radius, focus = 3px Rich Blue 100 ring
+// Select: 34px height, 6px radius, focus = 3px blue ring
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
@@ -248,7 +248,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
 );
 Select.displayName = 'Select';
 
-// Textarea: 6px radius, focus = 3px Rich Blue 100 ring
+// Textarea: 6px radius, focus = 3px blue ring
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
@@ -400,13 +400,13 @@ export const Badge: React.FC<{
   );
 };
 
-// Card: 10px radius, 1px border, flat white surface
+// Card: 12px radius, 1px border, flat cream surface
 export const Card: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ children, className = '' }) => (
   <div
-    className={`rounded-[10px] border border-[var(--border)] bg-[var(--surface)] ${className}`}
+    className={`rounded-[12px] border border-[var(--border)] bg-[var(--surface)] ${className}`}
   >
     {children}
   </div>
@@ -422,7 +422,7 @@ export const MetricStrip: React.FC<{
     onClick?: () => void;
   }>;
 }> = ({ items }) => (
-  <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)] overflow-hidden">
+  <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)] overflow-hidden">
     {items.map((item, idx) => {
       const dotColor = CATEGORY_PALETTE[idx % CATEGORY_PALETTE.length];
       return (
@@ -472,7 +472,7 @@ export const StatCard: React.FC<{
   onClick?: () => void;
 }> = ({ label, value, sublabel, tone = 'default', onClick }) => {
   const dotMap: Record<string, string> = {
-    default: '#4F46D8',
+    default: '#1D5FD1',
     emerald: '#2A9D8F',
     amber: '#D99A2B',
     red: '#B8322B',
@@ -510,7 +510,7 @@ export const StatCard: React.FC<{
   );
 };
 
-// Tabs: Text tabs with a 2px Rich Blue 600 underline on the active tab and a mono count chip
+// Tabs: Text tabs with a 2px blue underline on the active tab and a mono count chip
 export const Tabs: React.FC<{
   tabs: Array<{ id: string; label: string; count?: number }>;
   activeTab: string;
@@ -559,7 +559,7 @@ export const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = ({
   rows = 6,
   cols = 5,
 }) => (
-  <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+  <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
     <div className="border-b border-[var(--border)] bg-[var(--bg-subtle)] px-4 h-9 grid grid-cols-5 gap-4 items-center">
       {Array.from({ length: cols }).map((_, i) => (
         <Skeleton key={i} className="h-3 w-20" />
@@ -577,7 +577,7 @@ export const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = ({
   </div>
 );
 
-// EmptyState: Left-aligned inside the panel; a 40px rounded-10 Sky 100 tile with a 20px Rich Blue 600 stroke icon; one title line, one guidance line, one button
+// EmptyState: Left-aligned inside the panel; a 40px rounded-12 blue-tint tile with a 20px blue stroke icon; one title line, one guidance line, one button
 export const EmptyState: React.FC<{
   title: string;
   description: string;
@@ -593,8 +593,8 @@ export const EmptyState: React.FC<{
   secondaryActionLabel,
   onSecondaryAction,
 }) => (
-  <div className="p-6 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-left">
-    <div className="h-10 w-10 rounded-[10px] bg-[var(--highlight-soft)] flex items-center justify-center mb-3">
+  <div className="p-6 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] text-left">
+    <div className="h-10 w-10 rounded-[12px] bg-[var(--highlight-soft)] flex items-center justify-center mb-3">
       <Inbox strokeWidth={1.75} className="h-5 w-5 text-[var(--accent)]" />
     </div>
     <h3 className="text-[14px] leading-[20px] font-medium text-[var(--text-primary)]">{title}</h3>
@@ -623,7 +623,7 @@ export const ErrorState: React.FC<{
   message: string;
   onRetry?: () => void;
 }> = ({ message, onRetry }) => (
-  <div className="py-4 px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-between gap-4">
+  <div className="py-4 px-4 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-between gap-4">
     <div className="flex items-center gap-2 text-[13px] leading-[20px] text-[var(--text-primary)]">
       <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-danger-dot)] shrink-0" />
       <span>{message}</span>
@@ -678,7 +678,7 @@ export const Pagination: React.FC<{
   );
 };
 
-// Dialog (Modal): 480px default (640px for forms), 10px radius, floating shadow
+// Dialog (Modal): 480px default (640px for forms), 12px radius, floating shadow
 let dialogIdSeq = 0;
 
 export const Dialog: React.FC<{
@@ -745,7 +745,7 @@ export const Dialog: React.FC<{
       : maxWidth;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#14213D]/45 backdrop-blur-[2px]">
       <div
         ref={panelRef}
         role="dialog"
@@ -753,7 +753,7 @@ export const Dialog: React.FC<{
         aria-labelledby={titleId}
         tabIndex={-1}
         style={{ boxShadow: 'var(--shadow-floating)' }}
-        className={`w-full ${normalizedWidth} rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden max-h-[90vh] flex flex-col outline-none`}
+        className={`w-full ${normalizedWidth} rounded-[12px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden max-h-[90vh] flex flex-col outline-none`}
       >
         <div className="flex items-start justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
@@ -781,7 +781,7 @@ export const Dialog: React.FC<{
   );
 };
 
-// Drawer (Slide-over right panel): 480px from right with a Sky 50 header strip
+// Drawer (Slide-over right panel): 480px from right with a cream header strip
 export const Drawer: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -797,7 +797,7 @@ export const Drawer: React.FC<{
       : widthClass;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30">
+    <div className="fixed inset-0 z-50 flex justify-end bg-[#14213D]/35 backdrop-blur-[2px]">
       <div
         role="dialog"
         aria-modal="true"
@@ -830,7 +830,7 @@ export const Drawer: React.FC<{
   );
 };
 
-// RatingInput 1–5: Five 24px rounded-6 squares; filled Rich Blue 500 (score 5 = Rich Blue 700), empty Storm 100
+// RatingInput 1–5: Five 24px rounded-6 squares; filled blue (score 5 = deep blue), empty track
 const RATING_LABELS: Record<number, string> = {
   1: 'Poor',
   2: 'Below average',
@@ -867,8 +867,8 @@ export const RatingInput: React.FC<{
             className={`h-6 w-6 rounded-[6px] text-[12px] leading-[16px] font-mono tabular-nums flex items-center justify-center transition-colors cursor-pointer ${
               filled
                 ? isFive
-                  ? 'bg-[#4338B5] text-white font-medium'
-                  : 'bg-[#6E4ADE] text-white font-medium'
+                  ? 'bg-[#1A56C2] text-white font-medium'
+                  : 'bg-[#174DB0] text-white font-medium'
                 : 'bg-[var(--track)] text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]'
             }`}
           >

@@ -466,10 +466,10 @@ export const HqRequirementsListPage: React.FC = () => {
       )}
 
       {/* Simple Requirement Sharing Flow Strip (Matches User Diagram) */}
-      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[var(--text-primary)]">
-            <span className="inline-flex items-center gap-1.5 text-[#4F46D8]">
+            <span className="inline-flex items-center gap-1.5 text-[#1D5FD1]">
               <Share2 className="h-3.5 w-3.5" />
               Simple Sharing Flow:
             </span>
@@ -505,7 +505,7 @@ export const HqRequirementsListPage: React.FC = () => {
 
       {/* Duplicate Requirements Governance Banner */}
       {duplicateGroups.length > 0 && (
-        <div className="rounded-[10px] border border-amber-500/35 bg-amber-500/10 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="rounded-[12px] border border-amber-500/35 bg-amber-500/10 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
             <div>
@@ -793,7 +793,7 @@ export const HqRequirementsListPage: React.FC = () => {
                               setShareModalTarget(req);
                             }}
                           >
-                            <Share2 className="h-3.5 w-3.5 text-[#4F46D8]" />
+                            <Share2 className="h-3.5 w-3.5 text-[#1D5FD1]" />
                             Share
                           </Button>
                           <Button
@@ -949,7 +949,7 @@ export const HqRequirementsListPage: React.FC = () => {
                               key={item.id}
                               className={`flex items-start justify-between gap-3 p-3 text-[12px] cursor-pointer transition-colors ${
                                 isCanonical
-                                  ? 'bg-[#4F46D8]/5'
+                                  ? 'bg-[#1D5FD1]/5'
                                   : 'hover:bg-[var(--bg-hover)]'
                               }`}
                             >
@@ -964,7 +964,7 @@ export const HqRequirementsListPage: React.FC = () => {
                                       [grp.groupKey]: item.id,
                                     }))
                                   }
-                                  className="mt-1 accent-[#4F46D8]"
+                                  className="mt-1 accent-[#1D5FD1]"
                                 />
                                 <div>
                                   <div className="flex flex-wrap items-center gap-2">
@@ -2176,7 +2176,7 @@ export const HqRequirementDetailPage: React.FC = () => {
                     return (
                       <div
                         key={st}
-                        className="w-64 shrink-0 rounded-[10px] border border-[var(--border)] bg-[var(--app-bg)] p-2.5 space-y-2.5"
+                        className="w-64 shrink-0 rounded-[12px] border border-[var(--border)] bg-[var(--app-bg)] p-2.5 space-y-2.5"
                       >
                         <div className="flex items-center justify-between px-1">
                           <span
@@ -2198,7 +2198,7 @@ export const HqRequirementDetailPage: React.FC = () => {
                               <div
                                 key={sub.id}
                                 onClick={() => setDrawerSubmissionId(sub.id)}
-                                className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-2 cursor-pointer hover:border-[var(--border-strong)] transition-colors"
+                                className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-2 cursor-pointer hover:border-[var(--border-strong)] transition-colors"
                               >
                                 <div className="text-[13px] leading-[20px] font-medium text-[var(--text-primary)] truncate">
                                   {sub.candidates?.full_name || sub.candidate_id}

@@ -147,7 +147,7 @@ const BdmDashboardPage: React.FC = () => {
         <TableSkeleton rows={4} cols={4} />
       ) : (
         <>
-          <div className="grid sm:grid-cols-3 rounded-[10px] border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
+          <div className="grid sm:grid-cols-3 rounded-[12px] border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
             <StatCard label="Active clients" value={byClient.length} />
             <StatCard
               label="Open requirements"
@@ -212,7 +212,7 @@ const BdmDashboardPage: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              <div className="rounded-[10px] border border-[var(--border)] divide-y divide-[var(--border)] overflow-hidden bg-[var(--surface)]">
+              <div className="rounded-[12px] border border-[var(--border)] divide-y divide-[var(--border)] overflow-hidden bg-[var(--surface)]">
                 {pagedClients.length === 0 ? (
                   <EmptyState title="No matching clients" description="Try a different filter term." />
                 ) : pagedClients.map(([id, c]) => {
@@ -250,7 +250,7 @@ const BdmDashboardPage: React.FC = () => {
           )}
 
           <div className="grid lg:grid-cols-3 gap-5">
-            <div className="lg:col-span-2 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-5 space-y-3">
+            <div className="lg:col-span-2 bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <History className="h-4 w-4 text-[var(--text-tertiary)]" />
@@ -280,7 +280,7 @@ const BdmDashboardPage: React.FC = () => {
               )}
             </div>
 
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-5 space-y-3">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <GitPullRequest className="h-4 w-4 text-[var(--text-tertiary)]" />
                 <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Pipeline stage mix</h3>

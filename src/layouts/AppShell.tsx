@@ -404,7 +404,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         />
       )}
 
-      {/* Left Sidebar: 240px wide, storm-slate deep #1E2A36 (#0A1016 in dark) */}
+      {/* Left Sidebar: 240px wide, logo navy (#09101E in dark) */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-[240px] bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] flex flex-col transition-transform duration-150 ease-out lg:static lg:translate-x-0 shrink-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -443,7 +443,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </button>
         </div>
 
-        {/* Role-Scoped Navigation: 34px tall items, 13px, 16px stroke icons, 2px sky #88BDF2 left bar when active */}
+        {/* Role-Scoped Navigation: 34px tall items, 13px, 16px stroke icons, 3px blue left bar when active */}
         <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4">
           {navGroups.map((group, gIdx) => (
             <div key={gIdx} className="space-y-0.5">
@@ -469,7 +469,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                     className={({ isActive }) =>
                       `relative h-[34px] px-2.5 rounded-[8px] flex items-center justify-between gap-2 text-[13px] leading-[20px] transition-colors duration-120 ${
                         isActive
-                          ? 'bg-gradient-to-r from-[#7C4EE0] via-[#4F46D8] to-[#3A8EF0] text-white font-semibold shadow-sm'
+                          ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] font-semibold before:absolute before:left-0 before:top-[7px] before:bottom-[7px] before:w-[3px] before:rounded-full before:bg-[var(--sidebar-active-bar)]'
                           : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover)] hover:text-white font-normal'
                       }`
                     }
@@ -480,13 +480,13 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                           <Icon
                             strokeWidth={1.75}
                             className={`h-4 w-4 shrink-0 ${
-                              isActive ? 'text-white' : 'text-[var(--sidebar-muted)]'
+                              isActive ? 'text-[#4F8EEE]' : 'text-[var(--sidebar-muted)]'
                             }`}
                           />
                           <span className="truncate">{item.label}</span>
                         </span>
                         {item.badgeCount !== undefined && item.badgeCount > 0 && (
-                          <span className="rounded-[6px] bg-[#88BDF2]/20 px-1.5 py-0.5 font-mono tabular-nums text-[12px] leading-[16px] text-[#88BDF2] font-medium">
+                          <span className="rounded-[6px] bg-[#1D5FD1]/20 px-1.5 py-0.5 font-mono tabular-nums text-[12px] leading-[16px] text-[#8AB3F6] font-medium">
                             {item.badgeCount}
                           </span>
                         )}
@@ -519,7 +519,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               href="https://atkind.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-[#88BDF2] hover:text-white hover:underline transition-colors"
+              className="font-medium text-[#8AB3F6] hover:text-white hover:underline transition-colors"
             >
               Atkind Pvt Ltd
             </a>
@@ -609,7 +609,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 onClick={() => setAiDrawerOpen(true)}
                 className="h-8 px-2.5 rounded-[6px] inline-flex items-center gap-1.5 text-[13px] leading-[20px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
               >
-                <span className="h-2 w-2 rounded-full bg-[#88BDF2] shrink-0" />
+                <span className="h-2 w-2 rounded-full bg-[#1D5FD1] shrink-0" />
                 <span>Assistant</span>
                 <kbd className="hidden sm:inline font-mono text-[12px] leading-[16px] text-[var(--text-tertiary)]">
                   ⌘J
@@ -634,7 +634,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               {notifOpen && (
                 <div
                   style={{ boxShadow: 'var(--shadow-floating)' }}
-                  className="absolute right-0 mt-1.5 w-80 sm:w-96 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] z-50 overflow-hidden"
+                  className="absolute right-0 mt-1.5 w-80 sm:w-96 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] z-50 overflow-hidden"
                 >
                   <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--drawer-header-bg)] px-4 py-2.5">
                     <span className="text-[12px] leading-[16px] font-medium text-[var(--text-primary)]">
@@ -768,7 +768,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       ? 'bg-[var(--status-danger-dot)]'
                       : subscriptionData.daysRemaining <= 5
                         ? 'bg-[var(--status-warning-dot)]'
-                        : 'bg-[#4F46D8]'
+                        : 'bg-[#1D5FD1]'
                   }`}
                 />
                 {subscriptionData.subscription.subscriptionStatus === 'expired' ? (
@@ -800,7 +800,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                         ? '/client/subscription'
                         : '/vendor/subscription'
                 }
-                className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#4F46D8] px-2.5 py-1 text-[12px] leading-[16px] font-medium text-white hover:bg-[#193EA3] transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#1D5FD1] px-2.5 py-1 text-[12px] leading-[16px] font-medium text-white hover:bg-[#174DB0] transition-colors shrink-0"
               >
                 <CreditCard className="h-3 w-3" />
                 <span>Purchase Plan / Upgrade Now</span>

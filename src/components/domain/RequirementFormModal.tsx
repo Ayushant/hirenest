@@ -647,7 +647,7 @@ export const RequirementFormModal: React.FC<{
                 type="checkbox"
                 checked={publishForVendors}
                 onChange={(e) => setPublishForVendors(e.target.checked)}
-                className="h-4 w-4 rounded border-[var(--border)] accent-[#4F46D8] cursor-pointer"
+                className="h-4 w-4 rounded border-[var(--border)] accent-[#1D5FD1] cursor-pointer"
               />
             </div>
           </div>

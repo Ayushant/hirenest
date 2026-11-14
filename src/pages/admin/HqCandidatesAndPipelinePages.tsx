@@ -1216,7 +1216,7 @@ export const HqCandidateDetailPage: React.FC = () => {
       {/* Resume Viewer Modal */}
       {resumeViewerUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-[10px] shadow-xl w-[90vw] max-w-[900px] h-[85vh] flex flex-col">
+          <div className="bg-white rounded-[12px] shadow-xl w-[90vw] max-w-[900px] h-[85vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
               <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">
                 Resume - {cand?.full_name}

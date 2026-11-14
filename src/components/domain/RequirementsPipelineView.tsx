@@ -102,7 +102,7 @@ export const PipelineQuickFilterBar: React.FC<{
             onClick={() => onChange(opt.id)}
             className={`h-7 px-2.5 rounded-[6px] border text-[12px] leading-[16px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
               isActive
-                ? 'border-[#4F46D8] bg-[#4F46D8] text-white shadow-2xs'
+                ? 'border-[#1D5FD1] bg-[#1D5FD1] text-white shadow-2xs'
                 : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -244,7 +244,7 @@ export const RequirementsPipelineGrid: React.FC<{
               <div
                 key={req.id}
                 onClick={() => onSelectRequirement(req)}
-                className="group rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between gap-4"
+                className="group rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--border-strong)] transition-all cursor-pointer flex flex-col justify-between gap-4"
               >
                 {/* Card Top Header */}
                 <div className="flex items-start justify-between gap-3">
@@ -258,7 +258,7 @@ export const RequirementsPipelineGrid: React.FC<{
                         onChange={() => onToggleSelect(req.id)}
                       />
                     )}
-                    <div className="h-9 w-9 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] flex items-center justify-center shrink-0 text-[var(--text-secondary)] group-hover:text-[#4F46D8] transition-colors">
+                    <div className="h-9 w-9 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] flex items-center justify-center shrink-0 text-[var(--text-secondary)] group-hover:text-[#1D5FD1] transition-colors">
                       <Briefcase className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0">
@@ -270,7 +270,7 @@ export const RequirementsPipelineGrid: React.FC<{
                         <span className="font-mono text-[var(--text-tertiary)]">
                           ID: {shortId}
                         </span>
-                        <span className="rounded-[4px] bg-[#4F46D8]/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.03em] text-[#4F46D8]">
+                        <span className="rounded-[4px] bg-[#1D5FD1]/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.03em] text-[#1D5FD1]">
                           {budgetInfo.isClientMapped ? 'CLIENT / OS' : 'RECRUITER / OS'}
                         </span>
                         {req.employment_type && (
@@ -292,7 +292,7 @@ export const RequirementsPipelineGrid: React.FC<{
                     <span
                       className={`inline-flex items-center rounded-[6px] border px-2 py-0.5 font-mono text-[10px] leading-[14px] font-semibold uppercase tracking-[0.03em] ${
                         isDistributed
-                          ? 'border-[#4F46D8]/25 bg-[#4F46D8]/10 text-[#4F46D8]'
+                          ? 'border-[#1D5FD1]/25 bg-[#1D5FD1]/10 text-[#1D5FD1]'
                           : 'border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--text-secondary)]'
                       }`}
                     >
@@ -334,7 +334,7 @@ export const RequirementsPipelineGrid: React.FC<{
                           onShareRequirement(req);
                         }}
                         title={`Share requirement ${req.title} via WhatsApp, Link, or In-app`}
-                        className="h-7 px-2.5 rounded-[6px] border border-[#4F46D8]/35 bg-[#4F46D8]/10 text-[12px] font-semibold text-[#4F46D8] hover:bg-[#4F46D8] hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="h-7 px-2.5 rounded-[6px] border border-[#1D5FD1]/35 bg-[#1D5FD1]/10 text-[12px] font-semibold text-[#1D5FD1] hover:bg-[#1D5FD1] hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Share2 className="h-3 w-3" />
                         <span>Share Requirement</span>
@@ -354,7 +354,7 @@ export const RequirementsPipelineGrid: React.FC<{
                         <span>Delete</span>
                       </button>
                     )}
-                    <div className="inline-flex items-center gap-0.5 text-[var(--text-tertiary)] group-hover:text-[#4F46D8] transition-colors">
+                    <div className="inline-flex items-center gap-0.5 text-[var(--text-tertiary)] group-hover:text-[#1D5FD1] transition-colors">
                       <ArrowDownRight className="h-3.5 w-3.5" />
                       <ArrowDownRight className="h-3.5 w-3.5 -ml-1.5 opacity-75" />
                       <ArrowDownRight className="h-3.5 w-3.5 -ml-1.5 opacity-50" />

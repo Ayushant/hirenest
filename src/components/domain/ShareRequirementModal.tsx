@@ -357,7 +357,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
         {/* Step 1 & Step 2 Readiness Strip */}
         <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-[12px] leading-[16px]">
-            <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#4F46D8]/10 text-[#4F46D8] px-2 py-1 font-medium">
+            <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#1D5FD1]/10 text-[#1D5FD1] px-2 py-1 font-medium">
               <CheckCircle2 className="h-3.5 w-3.5" />
               1. Client Requirement Received
             </span>
@@ -404,7 +404,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                 setAudienceType('vendor');
                 setIsMessageEdited(false);
               }}
-              className={`text-left rounded-[10px] border p-4 transition-all cursor-pointer ${
+              className={`text-left rounded-[12px] border p-4 transition-all cursor-pointer ${
                 audienceType === 'vendor'
                   ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/20'
                   : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--bg-hover)]'
@@ -433,7 +433,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                 setAudienceType('direct_candidate');
                 setIsMessageEdited(false);
               }}
-              className={`text-left rounded-[10px] border p-4 transition-all cursor-pointer ${
+              className={`text-left rounded-[12px] border p-4 transition-all cursor-pointer ${
                 audienceType === 'direct_candidate'
                   ? 'border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/20'
                   : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--bg-hover)]'
@@ -473,7 +473,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                         setSelectedVendorIds(approvedVendors.map((v) => v.id));
                       }
                     }}
-                    className="text-[12px] font-medium text-[#4F46D8] hover:underline cursor-pointer"
+                    className="text-[12px] font-medium text-[#1D5FD1] hover:underline cursor-pointer"
                   >
                     {selectedVendorIds.length === approvedVendors.length
                       ? 'Clear selection'
@@ -502,7 +502,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                         }
                         className={`h-7 px-2.5 rounded-[6px] border text-[12px] leading-[16px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                           isSelected
-                            ? 'border-[#4F46D8] bg-[#4F46D8] text-white'
+                            ? 'border-[#1D5FD1] bg-[#1D5FD1] text-white'
                             : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
                         }`}
                       >
@@ -558,7 +558,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                     type="checkbox"
                     checked={enableDirectCandidateFeed}
                     onChange={(e) => setEnableDirectCandidateFeed(e.target.checked)}
-                    className="accent-[#4F46D8]"
+                    className="accent-[#1D5FD1]"
                   />
                   <span>Publish to Direct Candidate In-app Job Feed</span>
                 </label>
@@ -594,7 +594,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                 onClick={() => setSharingMethod('whatsapp')}
                 className={`px-3 py-1.5 rounded-[6px] text-[12px] leading-[16px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   sharingMethod === 'whatsapp'
-                    ? 'bg-[#4F46D8] text-white'
+                    ? 'bg-[#1D5FD1] text-white'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
@@ -606,7 +606,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                 onClick={() => setSharingMethod('copy_link')}
                 className={`px-3 py-1.5 rounded-[6px] text-[12px] leading-[16px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   sharingMethod === 'copy_link'
-                    ? 'bg-[#4F46D8] text-white'
+                    ? 'bg-[#1D5FD1] text-white'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
@@ -618,7 +618,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                 onClick={() => setSharingMethod('in_app')}
                 className={`px-3 py-1.5 rounded-[6px] text-[12px] leading-[16px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   sharingMethod === 'in_app'
-                    ? 'bg-[#4F46D8] text-white'
+                    ? 'bg-[#1D5FD1] text-white'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
@@ -641,7 +641,7 @@ export const ShareRequirementModal: React.FC<ShareRequirementModalProps> = ({
                       setIsMessageEdited(false);
                       setCustomMessage(autoWhatsAppMessage);
                     }}
-                    className="text-[12px] text-[#4F46D8] hover:underline cursor-pointer"
+                    className="text-[12px] text-[#1D5FD1] hover:underline cursor-pointer"
                   >
                     Reset to default template
                   </button>
@@ -836,7 +836,7 @@ export const RequirementSharingFlowPanel: React.FC<{
   return (
     <div className="space-y-6">
       {/* Visual 7-Step Requirement Sharing & Response Architecture (Matches User Flowchart) */}
-      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-5 space-y-4">
+      <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-[14px] leading-[20px] font-semibold text-[var(--text-primary)]">
@@ -855,14 +855,14 @@ export const RequirementSharingFlowPanel: React.FC<{
         {/* 7-Step Flow Grid */}
         <div className="grid grid-cols-1 md:grid-cols-7 gap-2.5 text-[12px]">
           {/* Step 1 */}
-          <div className="rounded-[8px] border border-[#4F46D8]/30 bg-[#4F46D8]/10 p-3 flex flex-col justify-between">
+          <div className="rounded-[8px] border border-[#1D5FD1]/30 bg-[#1D5FD1]/10 p-3 flex flex-col justify-between">
             <div className="font-semibold text-[var(--text-primary)]">
               1. Requirement Received
             </div>
             <div className="mt-1 text-[12px] text-[var(--text-secondary)]">
               Added to HireNestOS
             </div>
-            <div className="mt-2 font-mono text-[12px] text-[#4F46D8] font-semibold">
+            <div className="mt-2 font-mono text-[12px] text-[#1D5FD1] font-semibold">
               ✓ Recorded
             </div>
           </div>
@@ -871,7 +871,7 @@ export const RequirementSharingFlowPanel: React.FC<{
           <div
             className={`rounded-[8px] border p-3 flex flex-col justify-between ${
               summary.step2Approved
-                ? 'border-[#4F46D8]/30 bg-[#4F46D8]/10'
+                ? 'border-[#1D5FD1]/30 bg-[#1D5FD1]/10'
                 : 'border-amber-500/35 bg-amber-500/10'
             }`}
           >
@@ -943,7 +943,7 @@ export const RequirementSharingFlowPanel: React.FC<{
           </div>
 
           {/* Step 6 */}
-          <div className="rounded-[8px] border border-[#4F46D8]/30 bg-[#4F46D8]/10 p-3 flex flex-col justify-between">
+          <div className="rounded-[8px] border border-[#1D5FD1]/30 bg-[#1D5FD1]/10 p-3 flex flex-col justify-between">
             <div className="font-semibold text-[var(--text-primary)]">
               6. Track Responses
             </div>
@@ -952,7 +952,7 @@ export const RequirementSharingFlowPanel: React.FC<{
               <div>Cand. apps: <strong>{summary.candidateResponsesCount}</strong></div>
               <div>Follow-ups: <strong>{summary.totalFollowUpsCount}</strong></div>
             </div>
-            <div className="mt-2 text-[10px] text-[#4F46D8] font-medium">
+            <div className="mt-2 text-[10px] text-[#1D5FD1] font-medium">
               Live in HireNestOS
             </div>
           </div>
@@ -1020,7 +1020,7 @@ export const RequirementSharingFlowPanel: React.FC<{
       </div>
 
       {/* Recorded Sharing Activity Ledger (What was shared, with whom, method, and what happened next) */}
-      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+      <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
         <div className="px-4 py-3 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2">
           <div>
             <h4 className="text-[13px] leading-[18px] font-semibold text-[var(--text-primary)]">

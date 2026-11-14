@@ -779,8 +779,8 @@ export const OsWorkspacePage: React.FC = () => {
           windowMode === 'overlapping' && !win.isMaximized ? 'cursor-move' : 'cursor-default'
         } ${
           isFocused
-            ? 'bg-[#0F172A]/95 border-[#38BDF8]/30'
-            : 'bg-[#0B0F19]/90 border-slate-800/80'
+            ? 'bg-[#14213D]/95 border-[#1D5FD1]/30'
+            : 'bg-[#0C1424]/90 border-slate-800/80'
         }`}
       >
         <div className="flex items-center gap-2.5 min-w-0">
@@ -811,11 +811,11 @@ export const OsWorkspacePage: React.FC = () => {
                 toggleMaximizeWindow(win.id);
               }}
               title="Maximize window"
-              className="h-2.5 w-2.5 rounded-full bg-slate-700 hover:bg-[#38BDF8] transition-colors cursor-pointer"
+              className="h-2.5 w-2.5 rounded-full bg-slate-700 hover:bg-[#1D5FD1] transition-colors cursor-pointer"
             />
           </div>
 
-          <span className="font-mono text-[10px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/25 shrink-0">
+          <span className="font-mono text-[10px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded bg-[#1D5FD1]/10 text-[#1D5FD1] border border-[#1D5FD1]/25 shrink-0">
             {win.category}
           </span>
           <span className="text-[12px] font-semibold text-slate-100 truncate">
@@ -850,7 +850,7 @@ export const OsWorkspacePage: React.FC = () => {
   // ============================================================================
 
   const renderFinanceWindowContent = () => (
-    <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0B0F17]/85">
+    <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0C1424]/85">
       {/* Top KPI + Timeframe Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
         <div className="flex items-center gap-5">
@@ -873,7 +873,7 @@ export const OsWorkspacePage: React.FC = () => {
             <div className="text-[10px] font-mono uppercase tracking-[0.06em] text-slate-400">
               Gross Margin
             </div>
-            <div className="font-mono tabular-nums text-[15px] font-semibold text-[#38BDF8] mt-0.5">
+            <div className="font-mono tabular-nums text-[15px] font-semibold text-[#1D5FD1] mt-0.5">
               {activePoint.marginPct.toFixed(1)}%
             </div>
           </div>
@@ -900,7 +900,7 @@ export const OsWorkspacePage: React.FC = () => {
               }}
               className={`px-2 py-0.5 text-[12px] font-mono rounded-[4px] transition-colors cursor-pointer ${
                 timeframe === tf
-                  ? 'bg-[#38BDF8] text-slate-950 font-semibold'
+                  ? 'bg-[#1D5FD1] text-slate-950 font-semibold'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -918,9 +918,9 @@ export const OsWorkspacePage: React.FC = () => {
         >
           <defs>
             <linearGradient id="neonCyanArea" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.32" />
-              <stop offset="75%" stopColor="#0EA5E9" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="#0EA5E9" stopOpacity="0.0" />
+              <stop offset="0%" stopColor="#1D5FD1" stopOpacity="0.32" />
+              <stop offset="75%" stopColor="#4F8EEE" stopOpacity="0.06" />
+              <stop offset="100%" stopColor="#4F8EEE" stopOpacity="0.0" />
             </linearGradient>
             <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="3" result="blur" />
@@ -936,7 +936,7 @@ export const OsWorkspacePage: React.FC = () => {
               y1={gy}
               x2="500"
               y2={gy}
-              stroke="#1E293B"
+              stroke="#1E2C4A"
               strokeDasharray="3 3"
               strokeWidth="1"
             />
@@ -950,7 +950,7 @@ export const OsWorkspacePage: React.FC = () => {
             <path
               d={marginLinePath}
               fill="none"
-              stroke="#64748B"
+              stroke="#858175"
               strokeWidth="1.5"
               strokeDasharray="4 4"
             />
@@ -960,7 +960,7 @@ export const OsWorkspacePage: React.FC = () => {
           <path
             d={linePath}
             fill="none"
-            stroke="#38BDF8"
+            stroke="#1D5FD1"
             strokeWidth="2.25"
             filter="url(#neonGlow)"
           />
@@ -981,7 +981,7 @@ export const OsWorkspacePage: React.FC = () => {
                     y1={14}
                     x2={pt.x}
                     y2={152}
-                    stroke="#38BDF8"
+                    stroke="#1D5FD1"
                     strokeWidth="1"
                     strokeDasharray="2 2"
                     opacity="0.7"
@@ -994,9 +994,9 @@ export const OsWorkspacePage: React.FC = () => {
                     cx={pt.x}
                     cy={pt.y}
                     r="9"
-                    fill="#38BDF8"
+                    fill="#1D5FD1"
                     fillOpacity="0.2"
-                    stroke="#38BDF8"
+                    stroke="#1D5FD1"
                     strokeWidth="1"
                   />
                 )}
@@ -1006,8 +1006,8 @@ export const OsWorkspacePage: React.FC = () => {
                   cx={pt.x}
                   cy={pt.y}
                   r={isSelected ? 4.5 : 3.5}
-                  fill={isSelected ? '#FFFFFF' : '#0B0F17'}
-                  stroke="#38BDF8"
+                  fill={isSelected ? '#FFFFFF' : '#0C1424'}
+                  stroke="#1D5FD1"
                   strokeWidth="2.2"
                 />
 
@@ -1017,7 +1017,7 @@ export const OsWorkspacePage: React.FC = () => {
                   y={164}
                   textAnchor="middle"
                   className={`font-mono text-[9px] ${
-                    isSelected ? 'fill-[#38BDF8] font-semibold' : 'fill-slate-500'
+                    isSelected ? 'fill-[#1D5FD1] font-semibold' : 'fill-slate-500'
                   }`}
                 >
                   {pt.label}
@@ -1031,8 +1031,8 @@ export const OsWorkspacePage: React.FC = () => {
       {/* Bottom Selected Node Telemetry Strip */}
       <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[12px]">
         <div className="flex items-center gap-2 text-slate-300 truncate">
-          <span className="h-2 w-2 rounded-full bg-[#38BDF8] shrink-0" />
-          <span className="font-mono text-[#38BDF8]">{activePoint.label}:</span>
+          <span className="h-2 w-2 rounded-full bg-[#1D5FD1] shrink-0" />
+          <span className="font-mono text-[#1D5FD1]">{activePoint.label}:</span>
           <span className="truncate text-slate-300">{activePoint.annotation}</span>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -1041,7 +1041,7 @@ export const OsWorkspacePage: React.FC = () => {
             onClick={() => setShowMarginOverlay((v) => !v)}
             className={`font-mono text-[10px] px-2 py-0.5 rounded border cursor-pointer ${
               showMarginOverlay
-                ? 'border-[#38BDF8]/40 text-[#38BDF8] bg-[#38BDF8]/10'
+                ? 'border-[#1D5FD1]/40 text-[#1D5FD1] bg-[#1D5FD1]/10'
                 : 'border-slate-800 text-slate-500'
             }`}
           >
@@ -1056,7 +1056,7 @@ export const OsWorkspacePage: React.FC = () => {
   );
 
   const renderWorkflowWindowContent = () => (
-    <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0B0F17]/85">
+    <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0C1424]/85">
       {/* Top Toolbar */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
         <div className="flex items-center gap-3">
@@ -1074,7 +1074,7 @@ export const OsWorkspacePage: React.FC = () => {
           type="button"
           onClick={triggerWorkflowRun}
           disabled={workflowRunning}
-          className="h-7 px-2.5 rounded-[5px] bg-[#38BDF8] hover:bg-[#0EA5E9] disabled:opacity-50 text-slate-950 font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+          className="h-7 px-2.5 rounded-[5px] bg-[#1D5FD1] hover:bg-[#4F8EEE] disabled:opacity-50 text-slate-950 font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
         >
           <Play className="h-3 w-3 fill-current" />
           {workflowRunning ? 'Executing Pipeline...' : 'Execute Live Test'}
@@ -1082,12 +1082,12 @@ export const OsWorkspacePage: React.FC = () => {
       </div>
 
       {/* Interactive Node Graph Canvas */}
-      <div className="relative my-2 flex-1 min-h-[175px] rounded-[6px] border border-slate-800/90 bg-[#070A10] overflow-hidden">
+      <div className="relative my-2 flex-1 min-h-[175px] rounded-[6px] border border-slate-800/90 bg-[#09101E] overflow-hidden">
         {/* Subtle Dot Matrix Grid Background */}
         <div
           className="absolute inset-0 opacity-25 pointer-events-none"
           style={{
-            backgroundImage: 'radial-gradient(#38BDF8 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(#1D5FD1 1px, transparent 1px)',
             backgroundSize: '18px 18px',
           }}
         />
@@ -1096,8 +1096,8 @@ export const OsWorkspacePage: React.FC = () => {
         <svg viewBox="0 0 700 220" className="w-full h-full">
           <defs>
             <linearGradient id="edgeCyan" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#0284C7" stopOpacity="0.45" />
+              <stop offset="0%" stopColor="#1D5FD1" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#1A56C2" stopOpacity="0.45" />
             </linearGradient>
           </defs>
 
@@ -1126,7 +1126,7 @@ export const OsWorkspacePage: React.FC = () => {
           <path
             d="M 445 170 C 480 170, 480 76, 515 76"
             fill="none"
-            stroke="#334155"
+            stroke="#46423B"
             strokeWidth="1.5"
             strokeDasharray="4 4"
           />
@@ -1161,13 +1161,13 @@ export const OsWorkspacePage: React.FC = () => {
                   width="172"
                   height="56"
                   rx="6"
-                  fill={isSelected ? '#0F172A' : '#0B111E'}
+                  fill={isSelected ? '#14213D' : '#0C1424'}
                   stroke={
                     isStepActive
                       ? '#22C55E'
                       : isSelected
-                      ? '#38BDF8'
-                      : '#1E293B'
+                      ? '#1D5FD1'
+                      : '#1E2C4A'
                   }
                   strokeWidth={isSelected || isStepActive ? '1.8' : '1.2'}
                 />
@@ -1181,7 +1181,7 @@ export const OsWorkspacePage: React.FC = () => {
                     isStepActive
                       ? '#22C55E'
                       : node.status === 'running'
-                      ? '#38BDF8'
+                      ? '#1D5FD1'
                       : '#10B981'
                   }
                 />
@@ -1190,7 +1190,7 @@ export const OsWorkspacePage: React.FC = () => {
                 <text
                   x="22"
                   y="18"
-                  className="font-mono text-[8.5px] fill-[#38BDF8] uppercase tracking-wider"
+                  className="font-mono text-[8.5px] fill-[#1D5FD1] uppercase tracking-wider"
                 >
                   {node.type}
                 </text>
@@ -1226,7 +1226,7 @@ export const OsWorkspacePage: React.FC = () => {
       <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
         <div className="space-y-0.5 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] px-1.5 py-0.2 bg-[#38BDF8]/15 text-[#38BDF8] rounded">
+            <span className="font-mono text-[10px] px-1.5 py-0.2 bg-[#1D5FD1]/15 text-[#1D5FD1] rounded">
               {selectedWorkflowNode.type}
             </span>
             <span className="font-semibold text-slate-200 truncate">
@@ -1248,7 +1248,7 @@ export const OsWorkspacePage: React.FC = () => {
   );
 
   const renderCustomerProfilesWindowContent = () => (
-    <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0B0F17]/85">
+    <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0C1424]/85">
       {/* Filter & Search Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
         <div className="flex items-center gap-2 flex-1 min-w-[200px]">
@@ -1259,7 +1259,7 @@ export const OsWorkspacePage: React.FC = () => {
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
               placeholder="Filter accounts, SKU, code..."
-              className="w-full h-7 rounded-[5px] bg-slate-900/90 border border-slate-800 pl-8 pr-2 text-[12px] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#38BDF8]"
+              className="w-full h-7 rounded-[5px] bg-slate-900/90 border border-slate-800 pl-8 pr-2 text-[12px] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#1D5FD1]"
             />
           </div>
 
@@ -1272,7 +1272,7 @@ export const OsWorkspacePage: React.FC = () => {
                   onClick={() => setStageFilter(st)}
                   className={`px-2 py-0.5 text-[10px] font-mono rounded-[4px] transition-colors cursor-pointer ${
                     stageFilter === st
-                      ? 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40 font-medium'
+                      ? 'bg-[#1D5FD1]/20 text-[#1D5FD1] border border-[#1D5FD1]/40 font-medium'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -1286,7 +1286,7 @@ export const OsWorkspacePage: React.FC = () => {
         <button
           type="button"
           onClick={() => setShowNewLeadModal(true)}
-          className="h-7 px-2.5 rounded-[5px] border border-[#38BDF8]/40 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] text-[12px] font-medium inline-flex items-center gap-1 cursor-pointer"
+          className="h-7 px-2.5 rounded-[5px] border border-[#1D5FD1]/40 bg-[#1D5FD1]/10 hover:bg-[#1D5FD1]/20 text-[#1D5FD1] text-[12px] font-medium inline-flex items-center gap-1 cursor-pointer"
         >
           <Plus className="h-3 w-3" />
           New CRM Deal
@@ -1296,7 +1296,7 @@ export const OsWorkspacePage: React.FC = () => {
       {/* Split Data Table + Active Customer 360 Mini-Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 my-2 flex-1 min-h-0 overflow-hidden">
         {/* Rich Data Table */}
-        <div className="lg:col-span-8 overflow-y-auto border border-slate-800/80 rounded-[6px] bg-[#070A10]/90">
+        <div className="lg:col-span-8 overflow-y-auto border border-slate-800/80 rounded-[6px] bg-[#09101E]/90">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-800 text-[10px] font-mono uppercase tracking-[0.05em] text-slate-400 bg-slate-900/60 sticky top-0">
@@ -1314,7 +1314,7 @@ export const OsWorkspacePage: React.FC = () => {
                   c.stage === 'Active Contract'
                     ? 'bg-emerald-400'
                     : c.stage === 'Expansion'
-                    ? 'bg-[#38BDF8]'
+                    ? 'bg-[#1D5FD1]'
                     : c.stage === 'Qualified Lead'
                     ? 'bg-amber-400'
                     : 'bg-rose-500';
@@ -1324,13 +1324,13 @@ export const OsWorkspacePage: React.FC = () => {
                     onClick={() => setSelectedCustomerId(c.id)}
                     className={`cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-[#38BDF8]/12 text-white'
+                        ? 'bg-[#1D5FD1]/12 text-white'
                         : 'hover:bg-slate-900/70 text-slate-300'
                     }`}
                   >
                     <td className="py-2 px-2.5">
                       <div className="font-medium text-slate-100 flex items-center gap-1.5">
-                        <span className="font-mono text-[10px] text-[#38BDF8]">{c.code}</span>
+                        <span className="font-mono text-[10px] text-[#1D5FD1]">{c.code}</span>
                         <span className="truncate max-w-[140px]">{c.company}</span>
                       </div>
                       <div className="text-[10px] text-slate-500 truncate">
@@ -1355,7 +1355,7 @@ export const OsWorkspacePage: React.FC = () => {
                           c.healthScore >= 90
                             ? 'bg-emerald-500/15 text-emerald-400'
                             : c.healthScore >= 80
-                            ? 'bg-[#38BDF8]/15 text-[#38BDF8]'
+                            ? 'bg-[#1D5FD1]/15 text-[#1D5FD1]'
                             : 'bg-rose-500/15 text-rose-400'
                         }`}
                       >
@@ -1371,10 +1371,10 @@ export const OsWorkspacePage: React.FC = () => {
 
         {/* Customer 360 & ERP Sync Inspector Card */}
         {selectedCustomer && (
-          <div className="lg:col-span-4 border border-slate-800/90 rounded-[6px] bg-[#070A10]/90 p-3 flex flex-col justify-between">
+          <div className="lg:col-span-4 border border-slate-800/90 rounded-[6px] bg-[#09101E]/90 p-3 flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] text-[#38BDF8] uppercase tracking-wider">
+                <span className="font-mono text-[10px] text-[#1D5FD1] uppercase tracking-wider">
                   {selectedCustomer.code} · {selectedCustomer.segment}
                 </span>
                 <span className="font-mono text-[10px] text-slate-500">
@@ -1416,7 +1416,7 @@ export const OsWorkspacePage: React.FC = () => {
                 onClick={triggerWorkflowRun}
                 className="w-full h-7 rounded-[5px] bg-slate-800 hover:bg-slate-700 text-slate-200 text-[12px] font-mono inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <RefreshCw className="h-3 w-3 text-[#38BDF8]" />
+                <RefreshCw className="h-3 w-3 text-[#1D5FD1]" />
                 Sync ERP Order Ledger
               </button>
             </div>
@@ -1432,19 +1432,19 @@ export const OsWorkspacePage: React.FC = () => {
         </span>
         <span className="font-mono">
           Pipeline ARR:{' '}
-          <strong className="text-[#38BDF8]">${(totalArr / 1_000_000).toFixed(2)}M</strong>
+          <strong className="text-[#1D5FD1]">${(totalArr / 1_000_000).toFixed(2)}M</strong>
         </span>
       </div>
     </div>
   );
 
   const renderErpSupplyWindowContent = () => (
-    <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0B0F17]/85">
+    <div className="p-4 flex flex-col justify-between h-[calc(100%-36px)] bg-[#0C1424]/85">
       <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
         <div className="text-[12px] text-slate-300 font-medium">
           Active Warehouse & Workforce SKU Matrix
         </div>
-        <span className="font-mono text-[10px] text-[#38BDF8]">3 GLOBAL HUBS ONLINE</span>
+        <span className="font-mono text-[10px] text-[#1D5FD1]">3 GLOBAL HUBS ONLINE</span>
       </div>
 
       <div className="my-2 flex-1 overflow-y-auto divide-y divide-slate-800/70">
@@ -1457,7 +1457,7 @@ export const OsWorkspacePage: React.FC = () => {
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] text-[#38BDF8]">{item.sku}</span>
+                  <span className="font-mono text-[10px] text-[#1D5FD1]">{item.sku}</span>
                   <span className="font-medium text-slate-100 truncate">{item.name}</span>
                 </div>
                 <div className="text-[10.5px] text-slate-400 flex items-center gap-2 mt-0.5">
@@ -1510,17 +1510,17 @@ export const OsWorkspacePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#060911] text-slate-100 flex flex-col overflow-hidden select-none">
+    <div className="min-h-screen w-full bg-[#09101E] text-slate-100 flex flex-col overflow-hidden select-none">
       {/* ====================================================================
           TOP OS SYSTEM BAR (48px)
       ==================================================================== */}
-      <header className="h-12 px-4 border-b border-slate-800/90 bg-[#090D16]/95 backdrop-blur-md flex items-center justify-between gap-4 z-50 shrink-0">
+      <header className="h-12 px-4 border-b border-slate-800/90 bg-[#0C1424]/95 backdrop-blur-md flex items-center justify-between gap-4 z-50 shrink-0">
         {/* Left Brand & OS Mode Indicator */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="h-2.5 w-2.5 rounded-full bg-[#38BDF8] shadow-[0_0_10px_#38BDF8]" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[#1D5FD1] shadow-[0_0_10px_#1D5FD1]" />
             <span className="font-mono text-[13px] font-semibold tracking-tight text-white">
-              HIRENEST<span className="text-[#38BDF8]">OS</span>
+              HIRENEST<span className="text-[#1D5FD1]">OS</span>
             </span>
             <span className="hidden sm:inline-block font-mono text-[10px] uppercase tracking-[0.08em] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
               ERP + CRM + WINDOW KERNEL v4.2
@@ -1536,13 +1536,13 @@ export const OsWorkspacePage: React.FC = () => {
         </div>
 
         {/* Center Window Management Mode Switcher */}
-        <div className="flex items-center gap-1.5 bg-[#060911] p-1 rounded-[7px] border border-slate-800">
+        <div className="flex items-center gap-1.5 bg-[#09101E] p-1 rounded-[7px] border border-slate-800">
           <button
             type="button"
             onClick={() => setWindowMode('overlapping')}
             className={`h-7 px-2.5 rounded-[5px] text-[12px] font-mono inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
               windowMode === 'overlapping'
-                ? 'bg-[#38BDF8] text-slate-950 font-semibold'
+                ? 'bg-[#1D5FD1] text-slate-950 font-semibold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -1554,7 +1554,7 @@ export const OsWorkspacePage: React.FC = () => {
             onClick={() => setWindowMode('tiled')}
             className={`h-7 px-2.5 rounded-[5px] text-[12px] font-mono inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
               windowMode === 'tiled'
-                ? 'bg-[#38BDF8] text-slate-950 font-semibold'
+                ? 'bg-[#1D5FD1] text-slate-950 font-semibold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -1585,7 +1585,7 @@ export const OsWorkspacePage: React.FC = () => {
             onClick={() => setLivePulse((p) => !p)}
             className={`hidden sm:inline-flex h-7 px-2.5 rounded-[5px] border font-mono text-[12px] items-center gap-1.5 cursor-pointer ${
               livePulse
-                ? 'border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#38BDF8]'
+                ? 'border-[#1D5FD1]/40 bg-[#1D5FD1]/10 text-[#1D5FD1]'
                 : 'border-slate-800 bg-slate-900 text-slate-400'
             }`}
           >
@@ -1608,13 +1608,13 @@ export const OsWorkspacePage: React.FC = () => {
       ==================================================================== */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* LEFT SIDEBAR NAVIGATION FOR CRM & ERP (236px) */}
-        <aside className="w-[236px] border-r border-slate-800/90 bg-[#090D16]/95 flex flex-col justify-between shrink-0">
+        <aside className="w-[236px] border-r border-slate-800/90 bg-[#0C1424]/95 flex flex-col justify-between shrink-0">
           <div className="p-3 space-y-5 overflow-y-auto">
             {/* CRM Navigation Group */}
             <div className="space-y-1">
               <div className="px-2 pb-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.08em] text-slate-500">
                 <span>CRM · Customer & Pipeline</span>
-                <span className="text-[#38BDF8]">03</span>
+                <span className="text-[#1D5FD1]">03</span>
               </div>
               {[
                 {
@@ -1645,14 +1645,14 @@ export const OsWorkspacePage: React.FC = () => {
                     onClick={() => handleSidebarSelect(item.id)}
                     className={`w-full h-8 px-2.5 rounded-[6px] flex items-center justify-between text-[12px] transition-colors cursor-pointer ${
                       active
-                        ? 'bg-[#38BDF8]/15 text-white border border-[#38BDF8]/35 font-medium'
+                        ? 'bg-[#1D5FD1]/15 text-white border border-[#1D5FD1]/35 font-medium'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
                     }`}
                   >
                     <span className="flex items-center gap-2 truncate">
                       <Icon
                         className={`h-3.5 w-3.5 ${
-                          active ? 'text-[#38BDF8]' : 'text-slate-500'
+                          active ? 'text-[#1D5FD1]' : 'text-slate-500'
                         }`}
                       />
                       <span className="truncate">{item.label}</span>
@@ -1669,7 +1669,7 @@ export const OsWorkspacePage: React.FC = () => {
             <div className="space-y-1">
               <div className="px-2 pb-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.08em] text-slate-500">
                 <span>ERP · Resource & Finance</span>
-                <span className="text-[#38BDF8]">03</span>
+                <span className="text-[#1D5FD1]">03</span>
               </div>
               {[
                 {
@@ -1700,14 +1700,14 @@ export const OsWorkspacePage: React.FC = () => {
                     onClick={() => handleSidebarSelect(item.id)}
                     className={`w-full h-8 px-2.5 rounded-[6px] flex items-center justify-between text-[12px] transition-colors cursor-pointer ${
                       active
-                        ? 'bg-[#38BDF8]/15 text-white border border-[#38BDF8]/35 font-medium'
+                        ? 'bg-[#1D5FD1]/15 text-white border border-[#1D5FD1]/35 font-medium'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
                     }`}
                   >
                     <span className="flex items-center gap-2 truncate">
                       <Icon
                         className={`h-3.5 w-3.5 ${
-                          active ? 'text-[#38BDF8]' : 'text-slate-500'
+                          active ? 'text-[#1D5FD1]' : 'text-slate-500'
                         }`}
                       />
                       <span className="truncate">{item.label}</span>
@@ -1734,7 +1734,7 @@ export const OsWorkspacePage: React.FC = () => {
                     onClick={() => focusWindow(w.id)}
                     className={`w-full h-7 px-2.5 rounded-[5px] flex items-center justify-between text-[12px] transition-colors cursor-pointer ${
                       isFocused
-                        ? 'bg-slate-800/90 text-[#38BDF8] font-medium'
+                        ? 'bg-slate-800/90 text-[#1D5FD1] font-medium'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
                     }`}
                   >
@@ -1749,13 +1749,13 @@ export const OsWorkspacePage: React.FC = () => {
           </div>
 
           {/* Bottom System Telemetry Card */}
-          <div className="p-3 border-t border-slate-800/90 bg-[#060911]/80 space-y-2">
+          <div className="p-3 border-t border-slate-800/90 bg-[#09101E]/80 space-y-2">
             <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
               <span>KERNEL LATENCY</span>
-              <span className="text-[#38BDF8]">14.2 ms</span>
+              <span className="text-[#1D5FD1]">14.2 ms</span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-slate-900 overflow-hidden">
-              <div className="h-full w-[88%] bg-[#38BDF8]" />
+              <div className="h-full w-[88%] bg-[#1D5FD1]" />
             </div>
             <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
               <span>SYNC: CRM ↔ ERP</span>
@@ -1771,13 +1771,13 @@ export const OsWorkspacePage: React.FC = () => {
           className="flex-1 relative overflow-auto p-4"
           style={{
             backgroundImage:
-              'radial-gradient(circle at 18% 18%, rgba(56, 189, 248, 0.08), transparent 38%), radial-gradient(circle at 82% 75%, rgba(14, 165, 233, 0.07), transparent 42%), linear-gradient(to right, rgba(30, 41, 59, 0.22) 1px, transparent 1px), linear-gradient(to bottom, rgba(30, 41, 59, 0.22) 1px, transparent 1px)',
+              'radial-gradient(circle at 18% 18%, rgba(29, 95, 209, 0.08), transparent 38%), radial-gradient(circle at 82% 75%, rgba(255, 122, 61, 0.07), transparent 42%), linear-gradient(to right, rgba(20, 33, 61, 0.22) 1px, transparent 1px), linear-gradient(to bottom, rgba(20, 33, 61, 0.22) 1px, transparent 1px)',
             backgroundSize: '100% 100%, 100% 100%, 32px 32px, 32px 32px',
           }}
         >
           {/* Case 1: Single Maximized Window */}
           {maximizedWin ? (
-            <div className="w-full h-[calc(100vh-116px)] rounded-[10px] border border-[#38BDF8]/40 bg-[#0B0F19]/90 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="w-full h-[calc(100vh-116px)] rounded-[12px] border border-[#1D5FD1]/40 bg-[#0C1424]/90 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col">
               {renderWindowHeader(maximizedWin)}
               <div className="flex-1 min-h-0">{renderWindowBody(maximizedWin.id)}</div>
             </div>
@@ -1800,9 +1800,9 @@ export const OsWorkspacePage: React.FC = () => {
                     <div
                       key={win.id}
                       onMouseDown={() => focusWindow(win.id)}
-                      className={`${colSpan} rounded-[10px] border backdrop-blur-xl overflow-hidden flex flex-col transition-colors ${
+                      className={`${colSpan} rounded-[12px] border backdrop-blur-xl overflow-hidden flex flex-col transition-colors ${
                         isFocused
-                          ? 'border-[#38BDF8]/45 shadow-[0_0_28px_rgba(56,189,248,0.10)]'
+                          ? 'border-[#1D5FD1]/45 shadow-[0_0_28px_rgba(29, 95, 209,0.10)]'
                           : 'border-slate-800/90'
                       }`}
                     >
@@ -1830,9 +1830,9 @@ export const OsWorkspacePage: React.FC = () => {
                         width: `${win.w}px`,
                         height: `${win.h}px`,
                       }}
-                      className={`xl:absolute mb-4 xl:mb-0 w-full xl:w-auto rounded-[10px] border bg-[#0B0F19]/85 backdrop-blur-xl overflow-hidden flex flex-col transition-shadow ${
+                      className={`xl:absolute mb-4 xl:mb-0 w-full xl:w-auto rounded-[12px] border bg-[#0C1424]/85 backdrop-blur-xl overflow-hidden flex flex-col transition-shadow ${
                         isFocused
-                          ? 'border-[#38BDF8]/55 shadow-[0_18px_50px_rgba(0,0,0,0.75),0_0_25px_rgba(56,189,248,0.14)]'
+                          ? 'border-[#1D5FD1]/55 shadow-[0_18px_50px_rgba(0,0,0,0.75),0_0_25px_rgba(29, 95, 209,0.14)]'
                           : 'border-slate-800/90 shadow-[0_12px_32px_rgba(0,0,0,0.6)] opacity-95'
                       }`}
                     >
@@ -1847,7 +1847,7 @@ export const OsWorkspacePage: React.FC = () => {
           {/* ================================================================
               BOTTOM FLOATING OS DOCK / TASKBAR
           ================================================================ */}
-          <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-700/80 bg-[#090D16]/90 backdrop-blur-xl shadow-2xl">
+          <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-700/80 bg-[#0C1424]/90 backdrop-blur-xl shadow-2xl">
             {windows.map((w) => {
               const active = focusedWindow === w.id && w.isOpen && !w.isMinimized;
               return (
@@ -1857,7 +1857,7 @@ export const OsWorkspacePage: React.FC = () => {
                   onClick={() => focusWindow(w.id)}
                   className={`h-7 px-3 rounded-full font-mono text-[12px] flex items-center gap-1.5 transition-all cursor-pointer ${
                     active
-                      ? 'bg-[#38BDF8] text-slate-950 font-semibold shadow-[0_0_12px_rgba(56,189,248,0.5)]'
+                      ? 'bg-[#1D5FD1] text-slate-950 font-semibold shadow-[0_0_12px_rgba(29, 95, 209,0.5)]'
                       : w.isOpen && !w.isMinimized
                       ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
                       : 'bg-slate-900/70 text-slate-500 hover:text-slate-300'
@@ -1868,7 +1868,7 @@ export const OsWorkspacePage: React.FC = () => {
                       active
                         ? 'bg-slate-950'
                         : w.isOpen && !w.isMinimized
-                        ? 'bg-[#38BDF8]'
+                        ? 'bg-[#1D5FD1]'
                         : 'bg-slate-600'
                     }`}
                   />
@@ -1885,10 +1885,10 @@ export const OsWorkspacePage: React.FC = () => {
       ==================================================================== */}
       {showNewLeadModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-[420px] rounded-[10px] border border-[#38BDF8]/40 bg-[#0B0F19] p-5 space-y-4 shadow-2xl">
+          <div className="w-full max-w-[420px] rounded-[12px] border border-[#1D5FD1]/40 bg-[#0C1424] p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
-                <span className="font-mono text-[10px] text-[#38BDF8] uppercase">
+                <span className="font-mono text-[10px] text-[#1D5FD1] uppercase">
                   CRM → ERP INGEST
                 </span>
                 <h3 className="text-[15px] font-semibold text-white">
@@ -1915,7 +1915,7 @@ export const OsWorkspacePage: React.FC = () => {
                   value={newLeadCompany}
                   onChange={(e) => setNewLeadCompany(e.target.value)}
                   placeholder="e.g. Hyperion Photonics Inc."
-                  className="w-full h-8 rounded-[6px] bg-slate-900 border border-slate-700 px-3 text-white focus:outline-none focus:border-[#38BDF8]"
+                  className="w-full h-8 rounded-[6px] bg-slate-900 border border-slate-700 px-3 text-white focus:outline-none focus:border-[#1D5FD1]"
                 />
               </div>
 
@@ -1928,7 +1928,7 @@ export const OsWorkspacePage: React.FC = () => {
                   value={newLeadContact}
                   onChange={(e) => setNewLeadContact(e.target.value)}
                   placeholder="e.g. Nadia Chen · SVP Engineering"
-                  className="w-full h-8 rounded-[6px] bg-slate-900 border border-slate-700 px-3 text-white focus:outline-none focus:border-[#38BDF8]"
+                  className="w-full h-8 rounded-[6px] bg-slate-900 border border-slate-700 px-3 text-white focus:outline-none focus:border-[#1D5FD1]"
                 />
               </div>
 
@@ -1941,7 +1941,7 @@ export const OsWorkspacePage: React.FC = () => {
                   required
                   value={newLeadArr}
                   onChange={(e) => setNewLeadArr(e.target.value)}
-                  className="w-full h-8 rounded-[6px] bg-slate-900 border border-slate-700 px-3 font-mono text-white focus:outline-none focus:border-[#38BDF8]"
+                  className="w-full h-8 rounded-[6px] bg-slate-900 border border-slate-700 px-3 font-mono text-white focus:outline-none focus:border-[#1D5FD1]"
                 />
               </div>
 
@@ -1955,7 +1955,7 @@ export const OsWorkspacePage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="h-8 px-3.5 rounded-[6px] bg-[#38BDF8] hover:bg-[#0EA5E9] text-slate-950 font-semibold cursor-pointer"
+                  className="h-8 px-3.5 rounded-[6px] bg-[#1D5FD1] hover:bg-[#4F8EEE] text-slate-950 font-semibold cursor-pointer"
                 >
                   Ingest & Run ERP Workflow
                 </button>

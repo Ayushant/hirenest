@@ -44,7 +44,7 @@ export const MatchEvidencePanel: React.FC<{
       score: skillScore,
       contribution: skillsContribution,
       subtitle: 'Required technical skills and evidence of their use',
-      barColor: '#6E4ADE',
+      barColor: '#174DB0',
     },
     {
       key: 'experience',
@@ -64,7 +64,7 @@ export const MatchEvidencePanel: React.FC<{
       score: domainScore,
       contribution: domainContribution,
       subtitle: 'Industry, business domain and project relevance',
-      barColor: '#8B5CF6',
+      barColor: '#1A56C2',
     },
     {
       key: 'seniority',

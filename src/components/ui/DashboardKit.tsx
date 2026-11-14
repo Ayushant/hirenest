@@ -97,7 +97,7 @@ export const SinceLastVisit: React.FC<{ items: DeltaItem[] }> = ({ items }) => {
   if (!lastVisit && !hasActivity) return null;
 
   return (
-    <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-4">
+    <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="flex items-center gap-2 mb-3">
         <Activity className="w-4 h-4 text-[var(--text-secondary)]" />
         <span className="text-[13px] font-semibold text-[var(--text-primary)]">
@@ -132,8 +132,8 @@ export const SinceLastVisit: React.FC<{ items: DeltaItem[] }> = ({ items }) => {
 };
 
 const CHART_COLORS = [
-  '#4F46D8', '#4F95DB', '#2A9D8F', '#D99A2B', '#6A89A7', '#384959',
-  '#8C68EA', '#AB92F5', '#17734A', '#B8322B',
+  '#1D5FD1', '#C98A4B', '#2A9D8F', '#D99A2B', '#939084', '#36342E',
+  '#4F8EEE', '#8AB3F6', '#17734A', '#B8322B',
 ];
 
 // ─── KPI Card ─────────────────────────────────────────────
@@ -157,7 +157,7 @@ export const KpiCard: React.FC<{
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
-      className={`relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-5 transition-all ${
+      className={`relative overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-5 transition-all ${
         onClick ? 'cursor-pointer hover:border-[var(--border-strong)] hover:shadow-sm' : ''
       }`}
     >
@@ -242,7 +242,7 @@ export const ChartCard: React.FC<{
   className?: string;
 }> = ({ title, subtitle, action, children, className = '' }) => (
   <div
-    className={`rounded-[10px] border border-[var(--border)] bg-[var(--surface)] ${className}`}
+    className={`rounded-[12px] border border-[var(--border)] bg-[var(--surface)] ${className}`}
   >
     <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-3">
       <div>
@@ -266,7 +266,7 @@ export const MiniBarChart: React.FC<{
   data: Array<{ name: string; value: number }>;
   height?: number;
   color?: string;
-}> = ({ data, height = 220, color = '#4F46D8' }) => (
+}> = ({ data, height = 220, color = '#1D5FD1' }) => (
   <ResponsiveContainer width="100%" height={height}>
     <BarChart data={data} barCategoryGap="20%">
       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -343,7 +343,7 @@ export const TrendChart: React.FC<{
   height?: number;
   color?: string;
   showGrid?: boolean;
-}> = ({ data, height = 200, color = '#4F46D8', showGrid = true }) => (
+}> = ({ data, height = 200, color = '#1D5FD1', showGrid = true }) => (
   <ResponsiveContainer width="100%" height={height}>
     <AreaChart data={data}>
       {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />}
@@ -468,7 +468,7 @@ export const ProgressBar: React.FC<{
   value: number;
   total: number;
   color?: string;
-}> = ({ label, value, total, color = '#4F46D8' }) => {
+}> = ({ label, value, total, color = '#1D5FD1' }) => {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
   return (
     <div className="space-y-1.5">
