@@ -1,4 +1,5 @@
 import { parseJobDescription } from '../../lib/jobDescription';
+import { fetchCandidateHistory, PAST_OUTCOME_LABEL } from '../../lib/candidateHistory';
 import {
   RequirementRibbon,
   RequirementCategoryFilter,
@@ -1130,6 +1131,14 @@ export const HqRequirementDetailPage: React.FC = () => {
     enabled: Boolean(id),
   });
 
+  const matchCandidateIds = (matchesData?.data || []).map((m) => m.candidate_id);
+  const { data: historyMap } = useQuery({
+    queryKey: ['match_candidate_history', id, matchCandidateIds.join(',')],
+    queryFn: () => fetchCandidateHistory(matchCandidateIds, id),
+    enabled: Boolean(id) && matchCandidateIds.length > 0,
+  });
+  const [reusableOnly, setReusableOnly] = useState(false);
+
   const { data: submissionsData } = useQuery({
     queryKey: ['requirement_submissions', id],
     queryFn: () => fetchSubmissions({ requirementId: id!, page: 1, pageSize: 100 }),
@@ -1960,8 +1969,23 @@ export const HqRequirementDetailPage: React.FC = () => {
                 />
               ) : (
                 <div>
+                  <div className="flex flex-wrap items-center gap-3 pb-2">
+                    <label className="inline-flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={reusableOnly}
+                        onChange={(e) => setReusableOnly(e.target.checked)}
+                      />
+                      Reusable only (rejected, released, or from closed / on-hold requirements)
+                    </label>
+                    <span className="text-[12px] text-[var(--text-tertiary)]">
+                      {matchesData.data.filter((x) => (historyMap?.get(x.candidate_id)?.length ?? 0) > 0).length} on this page
+                    </span>
+                  </div>
                   <div className="border-t border-[var(--border)] divide-y divide-[var(--border)]">
-                    {matchesData.data.map((m, idx) => {
+                    {matchesData.data
+                      .filter((x) => !reusableOnly || (historyMap?.get(x.candidate_id)?.length ?? 0) > 0)
+                      .map((m, idx) => {
                       const rank = (matchesPage - 1) * 25 + idx + 1;
                       const cand = m.candidates;
                       const existingSub = submissions.find(
@@ -1975,6 +1999,21 @@ export const HqRequirementDetailPage: React.FC = () => {
                           key={m.id}
                           className="py-3 px-2 hover:bg-[var(--bg-hover)] transition-colors space-y-2"
                         >
+                          {(historyMap?.get(m.candidate_id) || []).length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pl-9">
+                              {(historyMap?.get(m.candidate_id) || []).slice(0, 3).map((h) => (
+                                <span
+                                  key={h.submissionId}
+                                  title={h.reason || undefined}
+                                  className="inline-flex items-center rounded-[4px] border border-[var(--border)] bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)]"
+                                >
+                                  {PAST_OUTCOME_LABEL[h.outcome]}: {h.requirementTitle}
+                                  {h.at ? ` · ${new Date(h.at).toLocaleDateString()}` : ''}
+                                  {h.reason ? ` · ${h.reason.slice(0, 60)}` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3 min-w-0">
                               <span className="font-mono tabular-nums text-[12px] leading-[16px] text-[var(--text-tertiary)] w-6">

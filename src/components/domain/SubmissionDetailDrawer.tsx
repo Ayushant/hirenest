@@ -950,6 +950,46 @@ export const SubmissionDetailDrawer: React.FC<{
         </div>
       ) : (
         <div className="space-y-5">
+          {isHq &&
+            ['closed', 'filled', 'on_hold'].includes(String(submission.requirements?.status)) &&
+            ['applied', 'recruiter_review', 'client_review', 'interviewing', 'offered'].includes(String(submission.stage)) && (
+              <div className="rounded-[8px] border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3.5 space-y-2">
+                <div className="text-[13px] font-medium text-[var(--text-primary)]">
+                  This requirement is {submission.requirements?.status === 'on_hold' ? 'on hold' : 'closed'} by the client.
+                </div>
+                <p className="text-[12px] text-[var(--text-secondary)]">
+                  {submission.requirements?.status === 'on_hold'
+                    ? 'Keep this candidate waiting, or release them so they can be matched to other open requirements.'
+                    : 'Release this candidate to the talent pool so they can be matched to new or similar requirements.'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await transitionSubmissionRpc({
+                          p_submission_id: submission.id,
+                          p_to: 'withdrawn',
+                          p_reason: `Requirement ${submission.requirements?.status === 'on_hold' ? 'on hold' : 'closed'} by client; released to talent pool`,
+                        });
+                        toast({ title: 'Candidate released to talent pool', tone: 'success' });
+                        queryClient.invalidateQueries({ queryKey: ['match_candidate_history'] });
+                        refreshAll();
+                      } catch (err) {
+                        toast({ title: 'Could not release candidate', description: mapSupabaseError(err), tone: 'error' });
+                      }
+                    }}
+                  >
+                    Release to talent pool
+                  </Button>
+                  {submission.requirements?.status === 'on_hold' && (
+                    <span className="self-center text-[12px] text-[var(--text-tertiary)]">
+                      Or leave as is to keep them on hold.
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           {/* Top Attribution & Dual-Score Summary Banner */}
           <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3.5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
