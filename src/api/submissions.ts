@@ -105,6 +105,28 @@ export async function submitCandidateRpc(params: {
   p_candidate_id: string;
   p_notes?: string | null;
 }): Promise<SubmitCandidateResult> {
+  // Vendors can see open requirements before HQ creates their formal share row; make sure it
+  // exists (no-op for internal users, and never overrides a share HQ revoked).
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (token) {
+      const res = await fetch(`/api/vendor/requirements/${encodeURIComponent(params.p_requirement_id)}/ensure-share`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (res.status === 403 || res.status === 404) {
+        const body = await res.json().catch(() => ({}));
+        // 403 for non-vendors just means "not a vendor"; only surface vendor-specific refusals.
+        if (body?.error && /withdrawn|not open|not approved/i.test(String(body.error))) {
+          throw new Error(String(body.error));
+        }
+      }
+    }
+  } catch (e) {
+    if (e instanceof Error && /withdrawn|not open|not approved/i.test(e.message)) throw e;
+  }
   const { data, error } = await supabase.rpc('submit_candidate', params);
   if (error) throw error;
   return data as SubmitCandidateResult;

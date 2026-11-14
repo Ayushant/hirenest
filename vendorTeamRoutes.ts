@@ -193,4 +193,72 @@ export function registerVendorTeamRoutes(app: express.Express, deps: Deps): void
     await audit(ctx.admin, { actorId: ctx.userId, targetUserId: id, action: 'vendor_user_updated', after: patch });
     res.json({ ok: true });
   });
+
+  // Self-service share: a vendor who can SEE an open requirement in their workspace may submit to it.
+  // Creates the missing share row (never re-creates one HQ deliberately revoked).
+  app.post('/api/vendor/requirements/:id/ensure-share', async (req, res) => {
+    const auth = await deps.authenticate(req, { strict: true });
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.message });
+      return;
+    }
+    if ((auth.role !== 'vendor_admin' && auth.role !== 'vendor_recruiter') || !auth.orgId) {
+      res.status(403).json({ error: 'Vendor access required.' });
+      return;
+    }
+    const admin = deps.getAdmin();
+    if (!admin) {
+      res.status(503).json({ error: 'Service unavailable.' });
+      return;
+    }
+    const { data: org } = await admin.from('organizations').select('status, type').eq('id', auth.orgId).maybeSingle();
+    if (!org || org.type !== 'vendor' || org.status !== 'approved') {
+      res.status(403).json({ error: 'Your agency is not approved yet.' });
+      return;
+    }
+    const reqId = req.params.id;
+    const { data: r } = await admin
+      .from('requirements')
+      .select('id, status, submission_sla_hours')
+      .eq('id', reqId)
+      .maybeSingle();
+    if (!r || r.status !== 'open') {
+      res.status(404).json({ error: 'This requirement is not open for submissions.' });
+      return;
+    }
+    const { data: existing } = await admin
+      .from('requirement_vendor_shares')
+      .select('id, revoked_at')
+      .eq('requirement_id', reqId)
+      .eq('vendor_org_id', auth.orgId)
+      .maybeSingle();
+    if (existing) {
+      if (existing.revoked_at) {
+        res.status(403).json({ error: 'This requirement was withdrawn from your agency by HireNest.' });
+        return;
+      }
+      res.json({ ok: true, created: false });
+      return;
+    }
+    const hours = Number(r.submission_sla_hours) > 0 ? Number(r.submission_sla_hours) : 48;
+    const now = Date.now();
+    const { error } = await admin.from('requirement_vendor_shares').insert({
+      requirement_id: reqId,
+      vendor_org_id: auth.orgId,
+      shared_by: auth.userId,
+      shared_at: new Date(now).toISOString(),
+      due_at: new Date(now + hours * 3600_000).toISOString(),
+    });
+    if (error) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    await admin.from('access_audit_log').insert({
+      actor_id: auth.userId,
+      actor_role: auth.role,
+      action: 'vendor_self_share',
+      after: { requirement_id: reqId, vendor_org_id: auth.orgId },
+    });
+    res.json({ ok: true, created: true });
+  });
 }
