@@ -691,9 +691,9 @@ export const Dialog: React.FC<{
 }> = ({ open, onClose, title, description, children, maxWidth = 'max-w-[480px]' }) => {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useRef(`dialog-title-${++dialogIdSeq}`).current;
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
 
-  // Escape closes the dialog; focus moves into it on open and is restored to
-  // the trigger on close, since nothing else manages focus for a fixed-position overlay.
   React.useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -706,7 +706,7 @@ export const Dialog: React.FC<{
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !panelRef.current) return;
@@ -734,7 +734,7 @@ export const Dialog: React.FC<{
       document.body.style.overflow = prevOverflow;
       previouslyFocused?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   const normalizedWidth =
