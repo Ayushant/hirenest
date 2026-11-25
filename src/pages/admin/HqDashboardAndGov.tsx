@@ -1,3 +1,5 @@
+import { OrganizationTeam } from '../../components/domain/OrganizationTeam';
+import { RegistrationReviewDetails } from '../../components/domain/RegistrationReviewDetails';
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,6 +43,7 @@ import {
   type DocumentReviewStatus,
 } from '../../api/onboarding';
 import {
+  reviewRegistration,
   fetchAdminDashboardSummary,
   fetchProfiles,
   adminAssignUser,
@@ -475,6 +478,7 @@ export const AdminApprovalsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'compliance' | 'users'>('compliance');
   const [page, setPage] = useState(1);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [registrationReason, setRegistrationReason] = useState('');
   const [assignRole, setAssignRole] = useState<AppRole>('vendor_admin');
   const [orgMode, setOrgMode] = useState<'existing' | 'new'>('existing');
   const [selectedOrgId, setSelectedOrgId] = useState('');
@@ -493,7 +497,7 @@ export const AdminApprovalsPage: React.FC = () => {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['pending_profiles', page],
-    queryFn: () => fetchProfiles({ page, status: 'pending_approval' }),
+    queryFn: () => fetchProfiles({ page }),
   });
 
   const { data: compDocs = [], isLoading: compLoading, refetch: refetchComp } = useQuery({
@@ -527,6 +531,7 @@ export const AdminApprovalsPage: React.FC = () => {
 
   const handleOpenApprove = (u: Profile) => {
     setSelectedUser(u);
+    setRegistrationReason('');
     const defaultRole: AppRole =
       u.requested_role === 'client' ? 'client_manager' : 'vendor_admin';
     setAssignRole(defaultRole);
@@ -540,29 +545,10 @@ export const AdminApprovalsPage: React.FC = () => {
     if (!selectedUser) return;
     setSubmitting(true);
     try {
-      let targetOrgId: string | null = selectedOrgId || null;
-      if (orgMode === 'new') {
-        if (!newOrgName.trim()) {
-          toast({ title: 'Enter organization name', tone: 'error' });
-          setSubmitting(false);
-          return;
-        }
-        const createdOrg = await createOrganization({
-          name: newOrgName.trim(),
-          type: newOrgType,
-          status: 'approved',
-          sla_tier: 'standard',
-          contact_name: selectedUser.full_name,
-          contact_email: selectedUser.email,
-        });
-        targetOrgId = createdOrg.id;
-      }
-
-      await adminAssignUser({
-        p_user_id: selectedUser.id,
-        p_role: assignRole,
-        p_org_id: targetOrgId,
-        p_status: 'active',
+      await reviewRegistration({
+        p_user_id:selectedUser.id,p_decision:'approved',p_reason:registrationReason,
+        p_role:assignRole,p_org_id:orgMode==='existing'?selectedOrgId||null:null,
+        p_org_name:orgMode==='new'?newOrgName.trim():null,p_org_type:newOrgType,
       });
 
       toast({
@@ -587,12 +573,8 @@ export const AdminApprovalsPage: React.FC = () => {
 
   const handleRejectUser = async (u: Profile) => {
     try {
-      await adminAssignUser({
-        p_user_id: u.id,
-        p_role: 'pending',
-        p_org_id: null,
-        p_status: 'suspended',
-      });
+      await reviewRegistration({p_user_id:u.id,p_decision:'rejected',p_reason:registrationReason});
+      setSelectedUser(null);
       toast({
         title: 'Account suspended',
         description: u.email,
@@ -950,8 +932,8 @@ export const AdminApprovalsPage: React.FC = () => {
             <ErrorState message={mapSupabaseError(error)} onRetry={() => refetch()} />
           ) : !data?.data.length ? (
             <EmptyState
-              title="No pending sign-ups"
-              description="New vendor agency and hiring client registrations will appear here for verification."
+              title="No sign-ups yet"
+              description="Candidate, vendor and client registrations will appear here for review."
             />
           ) : (
             <div>
@@ -961,40 +943,31 @@ export const AdminApprovalsPage: React.FC = () => {
                     <tr>
                       <th>Name</th>
                       <th>Email</th>
-                      <th>Intent</th>
+                      <th>Mobile</th><th>User type</th><th>Designation</th><th>Business role</th>
                       <th>Requested company</th>
-                      <th>Registered</th>
+                      <th>Registered</th><th>Verification</th>
                       <th className="text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.data.map((u) => (
                       <tr key={u.id}>
-                        <td className="font-medium">{u.full_name}</td>
+                        <td className="font-medium"><button className="underline" onClick={() => handleOpenApprove(u)}>{u.full_name}</button></td>
                         <td className="font-mono text-[12px] text-[var(--text-secondary)]">
                           {u.email}
                         </td>
+                        <td>{u.phone || '—'}</td>
                         <td>
                           <Badge tone="amber">{u.requested_role || 'pending'}</Badge>
-                        </td>
+                        </td><td>{u.designation || '—'}</td><td>{u.business_role || u.department || '—'}</td>
                         <td className="text-[var(--text-secondary)]">
                           {u.requested_company || '-'}
                         </td>
                         <td className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)]">
                           {formatLocalDate(u.created_at)}
                         </td>
-                        <td className="text-right space-x-1.5">
-                          <Button size="sm" onClick={() => handleOpenApprove(u)}>
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() => handleRejectUser(u)}
-                          >
-                            Reject
-                          </Button>
-                        </td>
+                        <td>{u.registration_details?.verification_status || '—'}</td>
+                        <td><Button size="sm" onClick={() => handleOpenApprove(u)}>Review</Button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1078,12 +1051,15 @@ export const AdminApprovalsPage: React.FC = () => {
       <Dialog
         open={Boolean(selectedUser)}
         onClose={() => setSelectedUser(null)}
-        title="Approve & assign user"
+        title="Registration review"
         description={
           selectedUser ? `${selectedUser.full_name} · ${selectedUser.email}` : ''
         }
       >
         <div className="space-y-4">
+          {selectedUser && <RegistrationReviewDetails user={selectedUser} />}
+          {selectedUser?.registration_details?.verification_status === 'pending' && <>
+          <Input label="Review reason (required for approval or rejection)" value={registrationReason} onChange={e=>setRegistrationReason(e.target.value)} />
           <Select
             label="Role"
             value={assignRole}
@@ -1156,10 +1132,12 @@ export const AdminApprovalsPage: React.FC = () => {
             <Button variant="outline" onClick={() => setSelectedUser(null)}>
               Cancel
             </Button>
-            <Button onClick={handleApproveConfirm} loading={submitting}>
+            <Button variant="danger" disabled={submitting || registrationReason.trim().length < 3} onClick={() => selectedUser && handleRejectUser(selectedUser)}>Reject registration</Button>
+            <Button onClick={handleApproveConfirm} loading={submitting} disabled={registrationReason.trim().length < 3}>
               Activate account
             </Button>
           </div>
+          </>}
         </div>
       </Dialog>
     </div>
@@ -1226,7 +1204,9 @@ export const AdminOrganizationsPage: React.FC = () => {
     enabled: activeTab === 'internal',
   });
 
+  const [companyFields,setCompanyFields]=useState({website:'',location:'',business_classification:'',staffing_capabilities:[] as string[],engagement_models:[] as string[]});
   const openModal = (org?: Organization) => {
+    setCompanyFields({website:org?.website||'',location:org?.location||'',business_classification:org?.business_classification||'',staffing_capabilities:org?.staffing_capabilities||[],engagement_models:org?.engagement_models||[]});
     if (org) {
       setEditingOrg(org);
       setName(org.name);
@@ -1261,6 +1241,7 @@ export const AdminOrganizationsPage: React.FC = () => {
     setSaving(true);
     try {
       const payload = {
+        ...companyFields,
         name: name.trim(),
         type,
         status,
@@ -1510,7 +1491,7 @@ export const AdminOrganizationsPage: React.FC = () => {
                           <div className="font-medium text-[var(--text-primary)] flex items-center gap-2">
                             {staffProf.full_name || staffProf.email.split('@')[0]}
                             {isCurrentUser && (
-                              <Badge tone="blue">You</Badge>
+                              <Badge tone="rich_blue">You</Badge>
                             )}
                           </div>
                           <div className="font-mono text-[11px] text-[var(--text-tertiary)]">
@@ -1529,7 +1510,7 @@ export const AdminOrganizationsPage: React.FC = () => {
                           {employeeId}
                         </td>
                         <td>
-                          <Badge tone={staffProf.role === 'admin' ? 'purple' : 'neutral'}>
+                          <Badge tone={staffProf.role === 'admin' ? 'indigo' : 'neutral'}>
                             {staffProf.role === 'admin' ? 'HQ Platform Governance' : 'Sourcing & Operations'}
                           </Badge>
                         </td>
@@ -1623,19 +1604,25 @@ export const AdminOrganizationsPage: React.FC = () => {
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {(['website','location','business_classification'] as const).map(key=><Input key={key} label={key.replaceAll('_',' ')} value={companyFields[key]} onChange={e=>setCompanyFields({...companyFields,[key]:e.target.value})}/>)}
+            {(['staffing_capabilities','engagement_models'] as const).map(key=><fieldset key={key}><legend className="text-[12px]">{key.replaceAll('_',' ')}</legend><div className="flex gap-3">{(key==='staffing_capabilities'?['IT','Non-IT']:['FTE','C2C','C2H']).map(v=><label key={v} className="flex gap-1 text-[13px]"><input type="checkbox" checked={companyFields[key].includes(v)} onChange={e=>setCompanyFields({...companyFields,[key]:e.target.checked?[...companyFields[key],v]:companyFields[key].filter(x=>x!==v)})}/>{v}</label>)}</div></fieldset>)}
+            {editingOrg?.primary_contact_user_id&&<p className="text-[12px]">Primary contact details are managed through the linked user profile.</p>}
             <Input
               label="Contact name"
+              disabled={Boolean(editingOrg?.primary_contact_user_id)}
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
             />
             <Input
               label="Contact email"
+              disabled={Boolean(editingOrg?.primary_contact_user_id)}
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
             />
             <Input
               label="Contact phone"
+              disabled={Boolean(editingOrg?.primary_contact_user_id)}
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
             />
@@ -1753,55 +1740,11 @@ export const AdminOrganizationDetailPage: React.FC = () => {
 
       {org.type !== 'internal' && <OrganizationOnboardingPanel orgId={org.id} isAdmin />}
 
-      {org.type === 'vendor' && vendorPerf && (
-        <section className="space-y-3">
-          <h2 className="text-[16px] leading-[24px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-            Vendor performance
-          </h2>
-          <VendorPerformancePanel performance={vendorPerf} />
-        </section>
-      )}
-
-      {/* Users in Organization */}
-      <section className="space-y-2">
-        <h3 className="text-[12px] leading-[16px] font-medium uppercase tracking-[0.04em] text-[var(--text-tertiary)]">
-          Users ({usersData?.count || 0})
-        </h3>
-        {!usersData?.data.length ? (
-          <p className="text-[13px] leading-[20px] text-[var(--text-secondary)] py-3 border-y border-[var(--border)]">
-            No users assigned to this organization.
-          </p>
-        ) : (
-          <div className="border-t border-[var(--border)]">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usersData.data.map((u) => (
-                  <tr key={u.id}>
-                    <td className="font-medium">{u.full_name}</td>
-                    <td className="font-mono text-[12px] text-[var(--text-secondary)]">
-                      {u.email}
-                    </td>
-                    <td>{ROLE_LABELS[u.role]}</td>
-                    <td>
-                      <Badge tone={u.status === 'active' ? 'emerald' : 'red'}>
-                        {u.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {org.type === 'vendor' && vendorPerf && <section className="space-y-3"><h2 className="font-semibold">Vendor performance</h2><VendorPerformancePanel performance={vendorPerf} /></section>}
+      <section className="grid gap-3 sm:grid-cols-2 rounded-lg border border-[var(--border)] p-4">
+        {Object.entries({Website:org.website,Location:org.location,Industry:org.industry,Classification:org.business_classification,'Staffing capabilities':org.staffing_capabilities?.join(', '),'Engagement models':org.engagement_models?.join(', '),'Primary contact':org.contact_name,Mobile:org.contact_phone,Email:org.contact_email,Designation:org.primary_contact?.designation,Department:org.primary_contact?.department,'Business role':org.primary_contact?.business_role,Verification:org.status}).map(([k,v])=><div key={k}><div className="text-[12px] text-[var(--text-secondary)]">{k}</div><div className="text-[13px]">{v||'—'}</div></div>)}
       </section>
+      <OrganizationTeam orgId={org.id} internal={org.type==='internal'} />
 
       {org.type === 'client' && (
         <section className="space-y-2">
@@ -1980,6 +1923,7 @@ export const AdminUsersPage: React.FC = () => {
         p_candidate_id: linkCandidateId.trim(),
         p_user_id: linkModalUser.id,
       });
+      await queryClient.invalidateQueries();
       toast({
         title: 'Candidate profile linked',
         tone: 'success',

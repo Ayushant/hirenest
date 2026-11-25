@@ -1059,6 +1059,7 @@ export const HqRequirementsListPage: React.FC = () => {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSaved={(saved) => {
+          queryClient.setQueryData(['requirement_detail', saved.id], saved);
           invalidateAllRequirementQueries();
           navigate(`${prefix}/requirements/${saved.id}`);
         }}
@@ -1377,6 +1378,12 @@ export const HqRequirementDetailPage: React.FC = () => {
         p_candidate_id: submitMatchTarget.candidate_id,
         p_notes: submitNotes.trim() || null,
       });
+      if (res.status === 'created' && res.auto_rejected) {
+        await queryClient.invalidateQueries();
+        toast({ title: 'Submission automatically rejected', description: res.rejection_reason || 'Joining availability does not meet this requirement.', tone: 'error' });
+        return;
+      }
+
       if (res.status === 'duplicate') {
         setDupDialogReason(res.reason);
         setSubmitMatchTarget(null);
@@ -2600,7 +2607,13 @@ export const HqRequirementDetailPage: React.FC = () => {
       <RequirementFormModal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        onSaved={refreshAll}
+        onSaved={(saved) => {
+          queryClient.setQueryData<Requirement>(['requirement_detail', saved.id], (previous) => ({
+            ...previous,
+            ...saved,
+          }));
+          refreshAll();
+        }}
         role={role}
         userOrgId={profile?.org_id || null}
         initialRequirement={req}

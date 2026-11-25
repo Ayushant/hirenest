@@ -54,7 +54,7 @@ export async function fetchProfiles(params: {
 
   let query = supabase
     .from('profiles')
-    .select('*', { count: 'exact' })
+    .select('*, registration_details:registration_details!registration_details_user_id_fkey(*)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -98,7 +98,7 @@ export async function fetchOrganizations(params: {
 
   let query = supabase
     .from('organizations')
-    .select('*', { count: 'exact' })
+    .select('*, primary_contact:profiles!organizations_primary_contact_user_id_fkey(id,full_name,email,phone,designation,department,business_role)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -110,20 +110,25 @@ export async function fetchOrganizations(params: {
 
   const { data, error, count } = await query;
   if (error) throw error;
-  return { data: (data || []) as Organization[], count: count || 0 };
+  return { data: ((data || []) as Organization[]).map(resolvePrimaryContact), count: count || 0 };
 }
 
 export async function fetchOrganizationById(id: string): Promise<Organization | null> {
   const { data, error } = await supabase
     .from('organizations')
-    .select('*')
+    .select('*, primary_contact:profiles!organizations_primary_contact_user_id_fkey(id,full_name,email,phone,designation,department,business_role)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
-  return data as Organization | null;
+  return data ? resolvePrimaryContact(data as Organization) : null;
 }
 
 export interface UpsertOrganizationPayload {
+  website?: string | null;
+  location?: string | null;
+  business_classification?: string | null;
+  staffing_capabilities?: string[];
+  engagement_models?: string[];
   name: string;
   type: OrgType;
   status: OrgStatus;
@@ -272,4 +277,12 @@ export async function fetchAuditLogs(params: {
   const { data, error, count } = await query;
   if (error) throw error;
   return { data: (data || []) as AuditLog[], count: count || 0 };
+}
+
+function resolvePrimaryContact(org: Organization): Organization {
+  const p=org.primary_contact;
+  return p?{...org,contact_name:p.full_name,contact_email:p.email,contact_phone:p.phone}:org;
+}
+export async function reviewRegistration(params: {p_user_id:string;p_decision:'approved'|'rejected';p_reason:string;p_role?:AppRole;p_org_id?:string|null;p_org_name?:string|null;p_org_type?:OrgType}) {
+ const {error}=await supabase.rpc('admin_review_registration',params); if(error)throw error;
 }

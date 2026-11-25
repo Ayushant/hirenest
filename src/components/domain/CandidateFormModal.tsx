@@ -29,6 +29,8 @@ import { recordPrivacyAcknowledgementApi } from '../../lib/dpdpPrivacy';
 import { getContractContactPolicy } from '../../lib/offerOnboarding';
 import { mapSupabaseError } from '../../lib/errors';
 import { useToast } from '../ui/Toast';
+import { OnboardingFields } from './OnboardingFields';
+import { emptyOnboarding, candidateEmploymentPayload, validateCandidateEmployment, type OnboardingDetails } from '../../lib/onboarding';
 import type { EmploymentType } from '../../types/db';
 
 const candidateSchema = z.object({
@@ -48,6 +50,7 @@ interface BulkCandidateItem {
   id: string;
   file: File;
   resumeHash: string;
+  employment: OnboardingDetails;
   full_name: string;
   current_title: string;
   email: string;
@@ -68,6 +71,7 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 function validateBulkItem(item: BulkCandidateItem): Record<string, string> {
   const errors: Record<string, string> = {};
+  try { validateCandidateEmployment(item.employment); } catch (error) { errors.employment = error instanceof Error ? error.message : String(error); }
   if (!item.full_name.trim()) errors.full_name = 'Name is required';
   if (item.email && !EMAIL_RE.test(item.email.trim()))
     errors.email = item.email.includes(' ')
@@ -100,6 +104,7 @@ export const CandidateFormModal: React.FC<{
   const { toast } = useToast();
   const [mode, setMode] = useState<'single' | 'bulk'>(defaultMode);
   const [engagementType, setEngagementType] = useState<EmploymentType>(defaultEmploymentType);
+  const [employment, setEmployment] = useState<OnboardingDetails>({ ...emptyOnboarding });
   const contactPolicy = getContractContactPolicy(engagementType);
 
   // Vendor mapping (admin only)
@@ -158,6 +163,7 @@ export const CandidateFormModal: React.FC<{
     if (open) {
       setMode(isSelfOnboarding ? 'single' : defaultMode);
       setEngagementType(defaultEmploymentType);
+      setEmployment({ ...emptyOnboarding, employment_type: defaultEmploymentType === 'contract' ? 'C2C' : defaultEmploymentType === 'contract_to_hire' ? 'C2H' : 'FTE' });
       setParsedSuccessBanner(null);
       setFileError(null);
       setSkillsError(null);
@@ -263,6 +269,7 @@ export const CandidateFormModal: React.FC<{
       id: `bulk_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
       file,
       resumeHash: '',
+      employment: { ...emptyOnboarding, employment_type: engagementType === 'contract' ? 'C2C' : engagementType === 'contract_to_hire' ? 'C2H' : 'FTE' },
       full_name: file.name.replace(/\.[a-zA-Z0-9]+$/, ''),
       current_title: 'Parsing...',
       email: '',
@@ -371,7 +378,7 @@ export const CandidateFormModal: React.FC<{
       );
 
       try {
-        const omitContact = contactPolicy.hideAndOmitContactFieldsByDefault;
+        const omitContact = item.employment.employment_type !== 'FTE';
         const dupCheck = await checkCandidateDuplicate({
           p_email: omitContact ? null : item.email || null,
           p_phone: omitContact ? null : item.phone || null,
@@ -400,6 +407,7 @@ export const CandidateFormModal: React.FC<{
         }
 
         const result = await createCandidateRpc({
+          p_employment: candidateEmploymentPayload(item.employment),
           p_full_name: item.full_name.trim() || 'Candidate',
           p_email: omitContact ? null : item.email.trim() || null,
           p_phone: omitContact ? null : item.phone.trim() || null,
@@ -528,7 +536,9 @@ export const CandidateFormModal: React.FC<{
         return;
       }
 
+      validateCandidateEmployment(employment);
       const result = await createCandidateRpc({
+        p_employment: candidateEmploymentPayload(employment),
         p_full_name: values.full_name,
         p_email: effectiveEmail,
         p_phone: effectivePhone,
@@ -742,48 +752,12 @@ export const CandidateFormModal: React.FC<{
               />
             </div>
 
-            {/* Contract-Specific Contact Governance Selector (FTE vs C2C / C2H) */}
-            {!isSelfOnboarding && (
-              <div className="rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[12px] font-semibold text-[var(--text-primary)]">
-                    Target Requirement Engagement Type (Contact Governance)
-                  </span>
-                  <div className="inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-0.5">
-                    {(
-                      [
-                        { id: 'full_time', label: 'FTE (Full-Time)' },
-                        { id: 'contract', label: 'C2C (Contract)' },
-                        { id: 'contract_to_hire', label: 'C2H (Contract-to-Hire)' },
-                      ] as const
-                    ).map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => {
-                          setEngagementType(opt.id);
-                          setContactError(null);
-                          if (opt.id === 'contract' || opt.id === 'contract_to_hire') {
-                            setValue('email', '');
-                            setValue('phone', '');
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer ${
-                          engagementType === opt.id
-                            ? 'bg-[#1D5FD1] text-white'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-[12px] leading-[16px] text-[var(--text-secondary)]">
-                  {contactPolicy.policyExplanation}
-                </p>
-              </div>
-            )}
+            <OnboardingFields value={employment} onChange={(next) => {
+              setEmployment(next);
+              setEngagementType(next.employment_type === 'C2C' ? 'contract' : next.employment_type === 'C2H' ? 'contract_to_hire' : 'full_time');
+              setContactError(null);
+            }} kind="candidate" employmentOnly />
+            <p className="text-[12px] text-[var(--text-secondary)]">{contactPolicy.policyExplanation}</p>
 
             {contactError && (
               <div className="rounded-[6px] border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] text-[var(--status-danger)]">
@@ -1094,7 +1068,8 @@ export const CandidateFormModal: React.FC<{
                         />
                       </div>
 
-                      {contactPolicy.hideAndOmitContactFieldsByDefault ? (
+                      <fieldset disabled={item.status === 'created' || item.status === 'creating' || item.status === 'duplicate'}><OnboardingFields value={item.employment} onChange={(next) => updateBulkItemField(item.id, 'employment', next)} kind="candidate" employmentOnly /></fieldset>
+                      {item.employment.employment_type !== 'FTE' ? (
                         <div className="grid grid-cols-1 gap-2">
                           <Input
                             label="Skills (comma-separated) · Email & Phone omitted per C2C/C2H policy"

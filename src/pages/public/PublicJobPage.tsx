@@ -1,3 +1,5 @@
+import { OnboardingFields } from '../../components/domain/OnboardingFields';
+import { cleanOnboarding, emptyOnboarding, validateOnboarding } from '../../lib/onboarding';
 import React, { useEffect, useMemo, useState } from 'react';
 import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
@@ -456,6 +458,7 @@ const ApplyModal: React.FC<{
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [onboarding,setOnboarding]=useState({...emptyOnboarding});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -509,6 +512,7 @@ const ApplyModal: React.FC<{
     setLoading(true);
     setError(null);
     try {
+      validateOnboarding(onboarding,'candidate');
       const cleanEmail = email.trim();
       const { data, error: signUpErr } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -517,7 +521,9 @@ const ApplyModal: React.FC<{
           emailRedirectTo: `${window.location.origin}/email-confirmed`,
           data: {
             full_name: fullName.trim(),
-            signup_intent: selectedRole === 'vendor' ? 'vendor' : 'candidate',
+            signup_intent: 'candidate',
+            onboarding_version: '1',
+            onboarding: cleanOnboarding(onboarding,'candidate'),
           },
         },
       });
@@ -754,6 +760,7 @@ const ApplyModal: React.FC<{
                 minLength={8}
                 required
               />
+              <OnboardingFields kind="candidate" value={onboarding} onChange={setOnboarding} />
               <Button size="md" type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Creating account…' : 'Create account & apply'}
               </Button>

@@ -1,3 +1,6 @@
+import type { ValidationDecisionStage } from '../../lib/recruiterValidation';
+import { CandidateEmploymentSummary } from '../../components/domain/CandidateEmploymentSummary';
+import { CandidateEmploymentPanel } from '../../components/domain/CandidateEmploymentPanel';
 import React, { useState, useMemo } from 'react';
 import { ScheduleInterviewModal } from '../../components/domain/InterviewModals';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -288,6 +291,7 @@ export const HqCandidatesListPage: React.FC = () => {
                   <th>Original source</th>
                   <th>Vendor association</th>
                   <th>Masked contact</th>
+                  <th>Employment / commercials</th>
                   <th>Skills</th>
                   <th>Added</th>
                 </tr>
@@ -331,6 +335,7 @@ export const HqCandidatesListPage: React.FC = () => {
                         <div>{maskEmail(rawContacts?.email)}</div>
                         <div>{maskPhone(rawContacts?.phone)}</div>
                       </td>
+                      <td><CandidateEmploymentSummary candidate={c} /></td>
                       <td className="max-w-xs">
                         <div className="flex flex-wrap gap-1">
                           {(c.skills || []).slice(0, 4).map((sk) => (
@@ -530,6 +535,12 @@ export const HqCandidateDetailPage: React.FC = () => {
         p_candidate_id: cand.id,
         p_notes: submitNotes.trim() || null,
       });
+      if (res.status === 'created' && res.auto_rejected) {
+        await queryClient.invalidateQueries();
+        toast({ title: 'Submission automatically rejected', description: res.rejection_reason || 'Joining availability does not meet this requirement.', tone: 'error' });
+        return;
+      }
+
       if (res.status === 'duplicate') {
         setDupReason(res.reason);
         setSubmitMatchTarget(null);
@@ -695,6 +706,8 @@ export const HqCandidateDetailPage: React.FC = () => {
           </div>
         }
       />
+
+      <CandidateEmploymentPanel candidateId={cand.id} />
 
       {/* Two columns at 1200px: main (~760px) + right rail (320px) */}
       <div className="flex flex-col lg:flex-row items-start gap-8">

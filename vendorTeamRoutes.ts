@@ -187,6 +187,9 @@ export function registerVendorTeamRoutes(app: express.Express, deps: Deps): void
         full_name: name,
         email,
         phone: b.mobile ? String(b.mobile) : null,
+        designation: typeof b.designation==='string'?b.designation.trim():null,
+        department: typeof b.department==='string'?b.department.trim():null,
+        business_role: typeof b.business_role==='string'?b.business_role.trim():null,
       },
       { onConflict: 'id' }
     );

@@ -1,3 +1,8 @@
+import type { ValidationDecisionStage } from '../../lib/recruiterValidation';
+import { supabase } from '../../lib/supabase';
+import { CandidateEmploymentSummary } from '../../components/domain/CandidateEmploymentSummary';
+import { NOTICE_OPTIONS } from '../../lib/onboarding';
+import { CandidateEmploymentPanel } from '../../components/domain/CandidateEmploymentPanel';
 import React, { useState, useMemo } from 'react';
 import { usePersistedState } from '../../lib/usePersistedState';
 import { formatExperienceRange } from '../../lib/format';
@@ -915,6 +920,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'matches' | 'submissions'>('overview');
+  const [showUnavailable, setShowUnavailable] = useState(false);
   const [acking, setAcking] = useState(false);
   const [submitTarget, setSubmitTarget] = useState<CandidateMatch | null>(null);
   const [submitNotes, setSubmitNotes] = useState('');
@@ -973,7 +979,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
     try {
       await acknowledgeRequirement({
         p_requirement_id: id,
-        vendorOrgId: profile?.org_id,
+        vendorOrgId: profile?.org_id || undefined,
         acknowledgedByUserId: profile?.id,
         acknowledgedByName: profile?.full_name,
         acknowledgedByEmail: profile?.email,
@@ -1006,6 +1012,12 @@ export const VendorRequirementDetailPage: React.FC = () => {
         p_candidate_id: submitTarget.candidate_id,
         p_notes: submitNotes.trim() || null,
       });
+      if (res.status === 'created' && res.auto_rejected) {
+        await queryClient.invalidateQueries();
+        toast({ title: 'Submission automatically rejected', description: res.rejection_reason || 'Joining availability does not meet this requirement.', tone: 'error' });
+        return;
+      }
+
       if (res.status === 'duplicate') {
         setDupReason(res.reason);
         setSubmitTarget(null);
@@ -1046,7 +1058,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
     setManualCandNotes('');
     setManualCandDupReason(null);
     try {
-      const res = await fetchCandidates({ ownerVendorOrgId: profile?.org_id, pageSize: 200 });
+      const res = await fetchCandidates({ ownerVendorOrgId: profile?.org_id || undefined, pageSize: 200 });
       setManualCandList(res.data);
     } catch {
       toast({ title: 'Could not load your candidates', tone: 'error' });
@@ -1064,6 +1076,12 @@ export const VendorRequirementDetailPage: React.FC = () => {
         p_candidate_id: manualSelectedCandId,
         p_notes: manualCandNotes.trim() || null,
       });
+      if (res.status === 'created' && res.auto_rejected) {
+        await queryClient.invalidateQueries();
+        toast({ title: 'Submission automatically rejected', description: res.rejection_reason || 'Joining availability does not meet this requirement.', tone: 'error' });
+        return;
+      }
+
       if (res.status === 'duplicate') {
         setManualCandDupReason(res.reason ?? 'Already submitted to this requirement.');
         return;
@@ -1073,11 +1091,34 @@ export const VendorRequirementDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['vendor_req_submissions', id] });
       queryClient.invalidateQueries({ queryKey: ['vendor_req_matches', id] });
     } catch (err) {
+      queryClient.invalidateQueries({ queryKey: ['vendor_req_submissions'] });
       toast({ title: 'Submission failed', description: mapSupabaseError(err), tone: 'error' });
     } finally {
       setManualCandSubmitting(false);
     }
   };
+
+  const availabilityIds = [...new Set([
+    ...(matchesData?.data || []).map(m => m.candidate_id),
+    ...manualCandList.map(c => c.id),
+  ])].sort();
+  const availabilityQuery = useQuery({
+    queryKey: ['candidate_availability', id, availabilityIds.join(',')],
+    enabled: Boolean(id && availabilityIds.length),
+    queryFn: async () => {
+      const result: Record<string, {status: string; reason: string}> = {};
+      for (let offset = 0; offset < availabilityIds.length; offset += 200) {
+        const {data, error} = await supabase.rpc('candidate_availability_for_requirement', {
+          p_requirement: id, p_candidates: availabilityIds.slice(offset, offset + 200),
+        });
+        if (error) throw error;
+        Object.assign(result, data);
+      }
+      return result;
+    },
+  });
+  const availability = availabilityQuery.data || {};
+  const excludedCount = (matchesData?.data || []).filter(m => availability[m.candidate_id]?.status === 'ineligible').length;
 
   if (isLoading || !req) return <TableSkeleton rows={5} cols={4} />;
 
@@ -1130,16 +1171,19 @@ export const VendorRequirementDetailPage: React.FC = () => {
             onChange={(t) => setActiveTab(t as 'overview' | 'matches' | 'submissions')}
           />
 
+          {activeTab === 'matches' && <div className="space-y-2 text-[13px]">
+            <label className="flex gap-2 items-center"><input type="checkbox" checked={showUnavailable} onChange={e => setShowUnavailable(e.target.checked)} />Show incompatible availability ({excludedCount} filtered)</label>
+            <p>Confirmed non-immediate candidates are filtered for explicit immediate-only requirements. Missing availability needs review.</p>
+            {availabilityQuery.isLoading && <p>Checking joining availability…</p>}
+            {availabilityQuery.error && <p className="text-[var(--status-danger)]">Availability check unavailable. Submission still checks the requirement in the database.</p>}
+          </div>}
           {activeTab === 'matches' && (
             !matchesData?.data.length ? (
               <EmptyState
                 title="No matching candidates in your pool yet"
                 description="Add candidates with matching skills in your Candidate Pool to see ranked matches here."
-                action={
-                  <Button size="sm" variant="outline" onClick={openCandidateMap}>
-                    Submit a candidate manually
-                  </Button>
-                }
+                actionLabel="Submit a candidate manually"
+                onAction={openCandidateMap}
               />
             ) : (
               <>
@@ -1149,12 +1193,13 @@ export const VendorRequirementDetailPage: React.FC = () => {
                   </Button>
                 </div>
               <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
-                {matchesData.data.map((m, idx) => {
+                {matchesData.data.filter(m => showUnavailable || availability[m.candidate_id]?.status !== 'ineligible').map((m, idx) => {
                   const alreadySubmitted = mySubmissions.some(
                     (s) => s.candidate_id === m.candidate_id && s.stage !== 'rejected' && s.stage !== 'withdrawn'
                   );
                   return (
                     <div key={m.id} className="py-3 flex flex-col gap-2">
+                      {availability[m.candidate_id] && availability[m.candidate_id].status !== 'not_applicable' && <p className={availability[m.candidate_id].status === 'ineligible' ? 'text-[12px] text-[var(--status-danger)]' : 'text-[12px] text-[var(--text-secondary)]'}>{availability[m.candidate_id].reason}</p>}
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
                           <span className="font-mono tabular-nums text-[12px] text-[var(--text-tertiary)] w-6">
@@ -1592,7 +1637,7 @@ export const VendorRequirementDetailPage: React.FC = () => {
                     { value: '', label: '— Choose a candidate from your pool —' },
                     ...manualCandList.map((c) => ({
                       value: c.id,
-                      label: `${c.full_name}${c.current_title ? ` · ${c.current_title}` : ''}${c.total_experience_years != null ? ` · ${c.total_experience_years} yrs` : ''}`,
+                      label: `${availability[c.id]?.status === 'ineligible' ? '[Will auto-reject] ' : ''}${c.full_name}${c.current_title ? ` · ${c.current_title}` : ''}${c.total_experience_years != null ? ` · ${c.total_experience_years} yrs` : ''}`,
                     })),
                   ]}
                 />
@@ -1665,16 +1710,21 @@ export const VendorCandidatePoolPage: React.FC = () => {
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [employmentFilter, setEmploymentFilter] = useState('');
+  const [noticeFilter, setNoticeFilter] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [employmentCandidate, setEmploymentCandidate] = useState<Candidate | null>(null);
   const [modalMode, setModalMode] = useState<'single' | 'bulk'>('single');
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['vendor_candidates', profile?.org_id, page, search],
+    queryKey: ['vendor_candidates', profile?.org_id, page, search, employmentFilter, noticeFilter],
     queryFn: () =>
       fetchCandidates({
         page,
         ownerVendorOrgId: profile?.org_id || undefined,
         search,
+        employmentType: employmentFilter,
+        noticePeriod: noticeFilter,
       }),
     enabled: Boolean(profile?.org_id),
   });
@@ -1718,6 +1768,10 @@ export const VendorCandidatePoolPage: React.FC = () => {
         />
       </div>
 
+      <div className="mb-4 flex flex-wrap gap-3">
+        <Select label="Employment type" value={employmentFilter} onChange={e => { setEmploymentFilter(e.target.value); setPage(1); }} options={[{value:'',label:'All employment types'}, ...['FTE','C2C','C2H'].map(value => ({value,label:value}))]} />
+        <Select label="Notice period" value={noticeFilter} onChange={e => { setNoticeFilter(e.target.value); setPage(1); }} options={[{value:'',label:'All notice periods'}, ...NOTICE_OPTIONS]} />
+      </div>
       {isLoading ? (
         <TableSkeleton rows={5} cols={4} />
       ) : error ? (
@@ -1740,6 +1794,7 @@ export const VendorCandidatePoolPage: React.FC = () => {
                 <tr>
                   <th>Candidate</th>
                   <th>Masked contact</th>
+                  <th>Employment / commercials</th>
                   <th>Skills</th>
                   <th>Added</th>
                 </tr>
@@ -1771,6 +1826,7 @@ export const VendorCandidatePoolPage: React.FC = () => {
                         <div>{maskEmail(rawContacts?.email)}</div>
                         <div>{maskPhone(rawContacts?.phone)}</div>
                       </td>
+                      <td><CandidateEmploymentSummary candidate={c} /><Button size="sm" variant="secondary" onClick={event => { event.stopPropagation(); setEmploymentCandidate(c); }}>Edit employment</Button></td>
                       <td>
                         <div className="flex flex-wrap gap-1">
                           {(c.skills || []).slice(0, 5).map((sk) => (
@@ -1796,6 +1852,9 @@ export const VendorCandidatePoolPage: React.FC = () => {
         </div>
       )}
 
+      <Dialog open={Boolean(employmentCandidate)} onClose={() => setEmploymentCandidate(null)} title={`Employment details · ${employmentCandidate?.full_name || ''}`}>
+        {employmentCandidate && <CandidateEmploymentPanel key={employmentCandidate.id} candidateId={employmentCandidate.id} />}
+      </Dialog>
       <CandidateFormModal
         open={addOpen}
         defaultMode={modalMode}
@@ -1981,6 +2040,12 @@ export const VendorCandidateDetailPage: React.FC = () => {
         p_candidate_id: cand.id,
         p_notes: submitNotes.trim() || null,
       });
+      if (res.status === 'created' && res.auto_rejected) {
+        await queryClient.invalidateQueries();
+        toast({ title: 'Submission automatically rejected', description: res.rejection_reason || 'Joining availability does not meet this requirement.', tone: 'error' });
+        return;
+      }
+
       if (res.status === 'duplicate') {
         setDupReason(res.reason);
         setSubmitTarget(null);
@@ -2039,6 +2104,12 @@ export const VendorCandidateDetailPage: React.FC = () => {
         p_candidate_id: id,
         p_notes: manualReqNotes.trim() || null,
       });
+      if (res.status === 'created' && res.auto_rejected) {
+        await queryClient.invalidateQueries();
+        toast({ title: 'Submission automatically rejected', description: res.rejection_reason || 'Joining availability does not meet this requirement.', tone: 'error' });
+        return;
+      }
+
       if (res.status === 'duplicate') {
         setManualReqDupReason(res.reason ?? 'Already submitted to this requirement.');
         return;
@@ -2090,6 +2161,10 @@ export const VendorCandidateDetailPage: React.FC = () => {
           </div>
         }
       />
+
+
+
+      <CandidateEmploymentPanel candidateId={cand.id} />
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         <div className="flex-1 min-w-0 w-full space-y-6">
@@ -2755,6 +2830,7 @@ export const VendorSubmissionsPage: React.FC = () => {
               <thead>
                 <tr>
                   <th>Candidate</th>
+                  <th>Employment / commercials</th>
                   <th>Requirement</th>
                   <th>Recruiter validation</th>
                   <th>
@@ -2789,10 +2865,12 @@ export const VendorSubmissionsPage: React.FC = () => {
                     >
                       <td className="font-medium text-[var(--text-primary)]">
                         <div>{sub.candidates?.full_name || sub.candidate_id}</div>
+                        {sub.rejection_reason && <div className="text-[12px] text-[var(--status-danger)]">{sub.rejection_reason}</div>}
                         <div className="text-[12px] font-mono text-[var(--text-tertiary)]">
                           JD Match {validation.jd_match_percentage}% · {validation.resume_version_used}
                         </div>
                       </td>
+                      <td><CandidateEmploymentSummary candidate={sub.candidates} /></td>
                       <td className="text-[var(--text-secondary)]">
                         <Link
                           to={`/vendor/requirements/${sub.requirement_id}`}
@@ -3162,7 +3240,7 @@ export const VendorMatchIntelligencePage: React.FC = () => {
   // 2. Fetch all candidates owned by this vendor
   const { data: candsData, isLoading: loadingCands } = useQuery({
     queryKey: ['vendor_candidates_for_matches', profile?.org_id],
-    queryFn: () => fetchCandidates({ ownerVendorOrgId: profile?.org_id, pageSize: 200 }),
+    queryFn: () => fetchCandidates({ ownerVendorOrgId: profile?.org_id || undefined, pageSize: 200 }),
     enabled: Boolean(profile?.org_id),
   });
   const candidates = candsData?.data || [];
@@ -3222,6 +3300,12 @@ export const VendorMatchIntelligencePage: React.FC = () => {
         p_candidate_id: submitMatchTarget.match.candidate_id,
         p_notes: submitMatchTarget.notes.trim() || null,
       });
+      if (res.status === 'created' && res.auto_rejected) {
+        await queryClient.invalidateQueries();
+        toast({ title: 'Submission automatically rejected', description: res.rejection_reason || 'Joining availability does not meet this requirement.', tone: 'error' });
+        return;
+      }
+
       if (res.status === 'duplicate') {
         setDupReason(res.reason ?? 'Already submitted to this requirement.');
         setSubmitMatchTarget(null);
@@ -3248,6 +3332,12 @@ export const VendorMatchIntelligencePage: React.FC = () => {
         p_candidate_id: manualModalCandId,
         p_notes: manualModalNotes.trim() || null,
       });
+      if (res.status === 'created' && res.auto_rejected) {
+        await queryClient.invalidateQueries();
+        toast({ title: 'Submission automatically rejected', description: res.rejection_reason || 'Joining availability does not meet this requirement.', tone: 'error' });
+        return;
+      }
+
       if (res.status === 'duplicate') {
         setDupReason(res.reason ?? 'Already submitted to this requirement.');
         setManualCandModalOpen(false);
@@ -3635,7 +3725,7 @@ export const VendorMatchIntelligencePage: React.FC = () => {
           match={scorecardTarget}
           candidate={scorecardTarget.candidates}
           requirement={scorecardTarget.requirements}
-          isVendorView={true}
+          canDownload={false}
         />
       )}
 

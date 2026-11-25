@@ -89,6 +89,13 @@ export type DuplicateFlagStatus = 'open' | 'resolved';
 // 5.2 Tables (All 21 tables in public schema)
 
 export interface Organization {
+  website?: string | null;
+  location?: string | null;
+  business_classification?: string | null;
+  staffing_capabilities?: string[];
+  engagement_models?: string[];
+  primary_contact_user_id?: string | null;
+  primary_contact?: Profile | null;
   id: string;
   name: string;
   type: OrgType;
@@ -105,6 +112,11 @@ export interface Organization {
 }
 
 export interface Profile {
+  designation?: string | null;
+  department?: string | null;
+  business_role?: string | null;
+  reporting_manager_id?: string | null;
+  registration_details?: { details: Record<string, unknown>; verification_status: string; reviewed_at: string | null; review_reason: string | null } | null;
   id: string;
   org_id: string | null;
   role: AppRole;
@@ -118,6 +130,7 @@ export interface Profile {
 }
 
 export interface Requirement {
+  slug?: string | null;
   id: string;
   client_org_id: string;
   title: string;
@@ -169,7 +182,17 @@ export interface RequirementVendorShare {
   requirements?: Requirement | null;
 }
 
+export interface CandidateEmployment {
+  employment_type: string; current_company: string | null;
+  current_ctc: number | null; expected_ctc: number | null;
+  notice_period: string | null; last_working_day: string | null;
+  expected_joining_date: string | null; joining_availability: string | null;
+  current_rate: number | null; expected_rate: number | null;
+  currency: string; rate_period: string | null;
+}
+
 export interface Candidate {
+  candidate_employment?: CandidateEmployment | CandidateEmployment[] | null;
   id: string;
   user_id: string | null;
   full_name: string;
@@ -573,7 +596,7 @@ export type CreateCandidateResult =
     };
 
 export type SubmitCandidateResult =
-  | { status: 'created'; submission_id: string }
+  | { status: 'created'; submission_id: string; auto_rejected?: boolean; rejection_reason?: string | null }
   | { status: 'duplicate'; reason: string };
 
 export type ApplyToRequirementResult =

@@ -831,8 +831,7 @@ export async function createRequirement(
       // Proceed to insert if query fails
     }
 
-    // 4. Insert the new canonical requirement using clean ISO currency code for DB check constraints
-    const safeDbCurrency = (inputMeta.baseCurrency || 'INR').split('|')[0].trim() || 'INR';
+    // Persist the full metadata string so the first reload retains all form choices.
     const insertPayload: Record<string, unknown> = {
       client_org_id: input.client_org_id,
       title: input.title,
@@ -845,7 +844,7 @@ export async function createRequirement(
       employment_type: (input.employment_type || 'full_time').toLowerCase(),
       openings: input.openings,
       vendor_visible_budget: input.vendor_visible_budget,
-      currency: safeDbCurrency,
+      currency: input.currency,
       submission_sla_hours: input.submission_sla_hours,
       vendor_charge_pct: input.employment_type === 'full_time' ? (input.vendor_charge_pct ?? null) : null,
     };
@@ -1227,20 +1226,6 @@ export async function updateRequirement(
     .eq('id', id)
     .select('*')
     .single();
-
-  if (error && input.currency.includes('|')) {
-    const retry = await supabase
-      .from('requirements')
-      .update({
-        ...baseFields,
-        currency: inputMeta.baseCurrency || 'INR',
-      })
-      .eq('id', id)
-      .select('*')
-      .single();
-    data = retry.data;
-    error = retry.error;
-  }
 
   // Fallback to backend update endpoint if client RLS or column privilege rejected direct update
   if (error) {

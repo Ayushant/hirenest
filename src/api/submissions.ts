@@ -35,7 +35,7 @@ export async function fetchSubmissions(params: {
   let query = supabase
     .from('submissions')
     .select(
-      '*, candidates:candidate_id(*, source_vendor:source_vendor_org_id(id, name), owner_vendor:owner_vendor_org_id(id, name)), requirements:requirement_id(*, organizations:client_org_id(id, name)), organizations:vendor_org_id(id, name)',
+      '*, candidates:candidate_id(*, candidate_employment(*), source_vendor:source_vendor_org_id(id, name), owner_vendor:owner_vendor_org_id(id, name)), requirements:requirement_id(*, organizations:client_org_id(id, name)), organizations:vendor_org_id(id, name)',
       { count: 'exact' }
     )
     .order('created_at', { ascending: false })
@@ -66,7 +66,7 @@ export async function fetchSubmissionById(id: string): Promise<Submission | null
   const { data, error } = await supabase
     .from('submissions')
     .select(
-      '*, candidates:candidate_id(*, source_vendor:source_vendor_org_id(id, name), owner_vendor:owner_vendor_org_id(id, name)), requirements:requirement_id(*, organizations:client_org_id(id, name)), organizations:vendor_org_id(id, name)'
+      '*, candidates:candidate_id(*, candidate_employment(*), source_vendor:source_vendor_org_id(id, name), owner_vendor:owner_vendor_org_id(id, name)), requirements:requirement_id(*, organizations:client_org_id(id, name)), organizations:vendor_org_id(id, name)'
     )
     .eq('id', id)
     .maybeSingle();
@@ -130,7 +130,8 @@ export async function submitCandidateRpc(params: {
   const { data, error } = await supabase.rpc('submit_candidate', params);
   if (error) throw error;
   const result = data as SubmitCandidateResult;
-  if (result && result.status === 'created' && result.submission_id) {
+
+  if (result && result.status === 'created' && !result.auto_rejected && result.submission_id) {
     void fetch('/api/submissions/notify-submission', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

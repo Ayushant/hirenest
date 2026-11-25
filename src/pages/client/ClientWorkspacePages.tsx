@@ -1,3 +1,4 @@
+import { OrganizationTeam } from '../../components/domain/OrganizationTeam';
 import React, { useMemo, useState } from 'react';
 import { usePersistedState } from '../../lib/usePersistedState';
 import { formatExperienceRange } from '../../lib/format';
@@ -167,6 +168,7 @@ export const ClientDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-7">
+      {profile?.role === 'client_manager' && profile.org_id && <OrganizationTeam orgId={profile.org_id} />}
       {/* Header Band */}
       <div className="dashboard-header-band rounded-[12px] border border-[var(--border)] px-6 py-5 flex flex-wrap items-center justify-between gap-4">
         <GreetingHeader

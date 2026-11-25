@@ -10,7 +10,6 @@ import {
   computePlanPricingWithTax,
 } from '../src/lib/enterpriseLifecycle';
 import { formatCurrency, formatRequirementBudgetWithSubtitle } from '../src/lib/format';
-import { evaluateAccountSubscriptionLifecycle } from '../server';
 
 async function runTests() {
   console.log('=== HireNestOS Consolidated Verification Suite ===\n');
@@ -178,85 +177,34 @@ async function runTests() {
   console.log('  ✓ Passed Update 2 (LPA/LPM storage, display, validation & legacy records verified)');
 
   // --------------------------------------------------------------------------
-  // TEST 3: Update 3 — Trial Activation, 15/10/5/1d Idempotent Reminders & Expiry
+  // TEST 3: Update 3 — Trial Activation, 10/8/5/2/1d Idempotent Reminders & Expiry
   // --------------------------------------------------------------------------
   console.log('[3/4] Running Update 3: Trial Lifecycle, Automated Reminders & Expiry Enforcement...');
 
-  const testAccountId = `test_acc_${Date.now()}`;
-  const initialEval = evaluateAccountSubscriptionLifecycle(testAccountId, 'Test Corp');
-  assert.equal(initialEval.subscription.subscriptionStatus, 'trialing');
-  assert.equal(initialEval.daysRemaining, 15);
-  assert.equal(initialEval.entitlements.isReadOnlyRestricted, false);
-  // Since initial trial starts at 15 days remaining, the 15d milestone reminder is triggered once
-  assert.equal(initialEval.newlyTriggeredReminders.length, 1);
-  assert.equal(initialEval.newlyTriggeredReminders[0].milestone, '15d');
-
-  // Re-running on the same UTC day must NOT duplicate the 15d reminder (idempotency check)
-  const duplicateEval = evaluateAccountSubscriptionLifecycle(
-    testAccountId,
-    'Test Corp',
-    initialEval.serverNow
-  );
-  assert.equal(
-    duplicateEval.newlyTriggeredReminders.length,
-    0,
-    'Idempotent deduplication must prevent duplicate 15d reminders'
-  );
-
-  // Test 10d, 5d, and 1d (Last day) milestones using authoritative server timestamps
-  const endMs = Date.parse(initialEval.subscription.trialEndsAt);
-  for (const [daysLeft, expectedMilestone] of [
-    [10, '10d'],
-    [5, '5d'],
-    [1, '1d'],
-  ] as const) {
-    const simulatedNow = new Date(endMs - daysLeft * 86_400_000).toISOString();
-    const computedDays = computeServerTrialDaysRemaining(
-      simulatedNow,
-      initialEval.subscription.trialEndsAt
-    );
-    assert.equal(computedDays, daysLeft);
-    assert.equal(getMilestoneForDaysRemaining(computedDays), expectedMilestone);
-
-    const stepEval = evaluateAccountSubscriptionLifecycle(testAccountId, 'Test Corp', simulatedNow);
-    assert.equal(stepEval.newlyTriggeredReminders.length, 1);
-    assert.equal(stepEval.newlyTriggeredReminders[0].milestone, expectedMilestone);
-
-    // Verify idempotency on second run at same timestamp
-    const stepDup = evaluateAccountSubscriptionLifecycle(testAccountId, 'Test Corp', simulatedNow);
-    assert.equal(stepDup.newlyTriggeredReminders.length, 0);
+  // Database lifecycle/idempotency is covered by test:onboarding. This pure test
+  // checks date arithmetic and the current reminder schedule without opening a server.
+  const expiry = '2027-02-20T12:00:00.000Z';
+  for (const days of [10, 8, 5, 2, 1]) {
+    const now = new Date(Date.parse(expiry) - days * 86400000).toISOString();
+    assert.equal(computeServerTrialDaysRemaining(now, expiry), days);
+    assert.equal(getMilestoneForDaysRemaining(days), `${days}d`);
   }
-
-  // Simulate Trial Expiry (serverNow > trialEndsAt)
-  const expiredServerNow = new Date(endMs + 60_000).toISOString();
-  const expiredEval = evaluateAccountSubscriptionLifecycle(
-    testAccountId,
-    'Test Corp',
-    expiredServerNow
-  );
-  assert.equal(expiredEval.subscription.subscriptionStatus, 'expired');
-  assert.equal(expiredEval.daysRemaining, 0);
-  assert.equal(
-    expiredEval.entitlements.isReadOnlyRestricted,
-    true,
-    'Expired account must be transitioned to restricted read-only state'
-  );
-  assert.equal(expiredEval.entitlements.canWriteRequirements, false);
-
-  console.log('  ✓ Passed Update 3A/B/D (Server trial timestamps, 15/10/5/1d idempotent alerts & expiry enforcement)');
+  assert.equal(getMilestoneForDaysRemaining(14), null);
+  assert.equal(computeServerTrialDaysRemaining('2027-02-21T12:00:00.000Z',expiry), 0);
+  console.log('  ✓ Passed trial date arithmetic and 10/8/5/2/1-day reminder schedule');
 
   // --------------------------------------------------------------------------
-  // TEST 4: Update 3C — Pricing + 18% GST & Live HTTP Endpoints Check
+  // TEST 4: Update 3C — Pricing + 18% GST
   // --------------------------------------------------------------------------
-  console.log('[4/4] Running Update 3C: Plan Pricing, 18% GST & Server Payment Verification...');
+  console.log('[4/4] Running Update 3C: Plan Pricing and 18% GST...');
 
   const scaleAnnual = computePlanPricingWithTax('scale', 'annual');
-  assert.equal(scaleAnnual.baseAmountInr, 490000);
+  assert.equal(scaleAnnual.baseAmountInr, 95988);
   assert.equal(scaleAnnual.gstPercent, 18);
-  assert.equal(scaleAnnual.gstAmountInr, 88200);
-  assert.equal(scaleAnnual.totalAmountInr, 578200);
+  assert.equal(scaleAnnual.gstAmountInr, 17278);
+  assert.equal(scaleAnnual.totalAmountInr, 113266);
 
-  console.log('  ✓ Passed Update 3C (Plan pricing, 18% GST & server signature verification)');
+  console.log('  ✓ Passed Update 3C (Plan pricing and 18% GST arithmetic)');
   console.log('\nALL CONSOLIDATED VERIFICATION TESTS PASSED SUCCESSFULLY.');
   process.exit(0);
 }

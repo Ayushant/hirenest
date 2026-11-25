@@ -30,6 +30,8 @@ export async function fetchCandidates(params: {
   minExp?: number;
   maxExp?: number;
   search?: string;
+  employmentType?: string;
+  noticePeriod?: string;
 }): Promise<{ data: Candidate[]; count: number }> {
   const page = params.page || 1;
   const pageSize = params.pageSize || DEFAULT_PAGE_SIZE;
@@ -39,12 +41,14 @@ export async function fetchCandidates(params: {
   let query = supabase
     .from('candidates')
     .select(
-      '*, source_vendor:source_vendor_org_id(id, name), owner_vendor:owner_vendor_org_id(id, name), candidate_contacts(*)',
+      `*, source_vendor:source_vendor_org_id(id, name), owner_vendor:owner_vendor_org_id(id, name), candidate_contacts(*), candidate_employment${params.employmentType || params.noticePeriod ? '!inner' : ''}(*)`,
       { count: 'exact' }
     )
     .order('created_at', { ascending: false })
     .range(from, to);
 
+  if (params.employmentType) query = query.eq('candidate_employment.employment_type', params.employmentType);
+  if (params.noticePeriod) query = query.eq('candidate_employment.notice_period', params.noticePeriod);
   if (params.originalSource) query = query.eq('original_source', params.originalSource);
   if (params.ownerVendorOrgId === '__admin__') {
     query = query.is('owner_vendor_org_id', null);
@@ -124,6 +128,7 @@ export async function checkCandidateDuplicate(params: {
 }
 
 export async function createCandidateRpc(params: {
+  p_employment?: Record<string, unknown>;
   p_full_name: string;
   p_email?: string | null;
   p_phone?: string | null;
@@ -135,7 +140,10 @@ export async function createCandidateRpc(params: {
   p_summary?: string | null;
   p_resume_hash?: string | null;
 }): Promise<CreateCandidateResult> {
-  const { data, error } = await supabase.rpc('create_candidate', params);
+  const { p_employment, ...candidate } = params;
+  const { data, error } = p_employment
+    ? await supabase.rpc('create_candidate_with_employment', { p_candidate: candidate, p_employment })
+    : await supabase.rpc('create_candidate', candidate);
   if (error) throw error;
   return data as CreateCandidateResult;
 }

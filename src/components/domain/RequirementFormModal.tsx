@@ -806,7 +806,7 @@ export const RequirementFormModal: React.FC<{
                         </div>
                         <Button
                           type="button"
-                          size="xs"
+                          size="sm"
                           variant="secondary"
                           onClick={() => setShowUnregisteredModal(true)}
                         >

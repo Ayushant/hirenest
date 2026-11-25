@@ -75,11 +75,15 @@ export function extrasFromMeta(meta: RequirementExtendedMeta): RequirementExtras
     workingDaysPerMonth: meta.workingDaysPerMonth ?? null,
     profileType: meta.profileType ?? null,
     hasBgv: meta.hasBgv ?? null,
+    bgvChecks: meta.bgvChecks,
     paymentTerms: meta.paymentTerms ?? null,
     notes: meta.notes ?? null,
     joiningTimeline: meta.joiningTimeline ?? null,
     contractDuration: meta.contractDuration ?? null,
     travelRequirement: meta.travelRequirement ?? null,
+    unregisteredSource: meta.unregisteredSource ?? null,
+    unregisteredSourceCode: meta.unregisteredSourceCode ?? null,
+    unregisteredSourceContact: meta.unregisteredSourceContact ?? null,
   };
 }
 
@@ -541,7 +545,7 @@ export function encodeRequirementMetaToCurrency(params: {
  */
 export function parseRequirementMeta(
   reqOrCurrency:
-    | (Pick<Requirement, 'currency' | 'vendor_visible_budget' | 'client_org_id'> & { id?: string })
+    | (Partial<Pick<Requirement, 'vendor_visible_budget' | 'client_org_id'>> & { id?: string; currency?: string | null })
     | string
     | null
     | undefined,
@@ -1089,7 +1093,7 @@ export function isRequirementVisibleToClientOrg(
 export type SubscriptionStatus = 'trialing' | 'active' | 'expired' | 'past_due' | 'canceled';
 export type PlanId = 'free_trial' | 'growth' | 'scale' | 'enterprise';
 export type BillingCycle = 'monthly' | 'annual';
-export type ReminderMilestone = '7d' | '3d' | '1d';
+export type ReminderMilestone = '10d' | '8d' | '5d' | '2d' | '1d';
 
 export const DEFAULT_TRIAL_DURATION_DAYS = 14;
 
@@ -1173,32 +1177,12 @@ export const REMINDER_MILESTONE_SPECS: Record<
     urgency: 'info' | 'warning' | 'danger';
   }
 > = {
-  '7d': {
-    milestone: '7d',
-    daysRemaining: 7,
-    badgeLabel: '7 days left',
-    title: '7 days left in your HireNestOS trial',
-    message: 'Early reminder to review plans and upgrade before your trial period concludes.',
-    urgency: 'info',
-  },
-  '3d': {
-    milestone: '3d',
-    daysRemaining: 3,
-    badgeLabel: '3 days left',
-    title: '3 days left - continue with a paid plan',
-    message:
-      'Continue uninterrupted access to deterministic candidate matching, vendor SLA tracking, and structured interview rubrics with a paid plan.',
-    urgency: 'warning',
-  },
-  '1d': {
-    milestone: '1d',
-    daysRemaining: 1,
-    badgeLabel: 'Last day',
-    title: 'Action required: Your HireNestOS trial expires today',
-    message:
-      'Your trial expires today. Complete your plan purchase now so your team retains uninterrupted write access.',
-    urgency: 'danger',
-  },
+  '10d': { milestone:'10d',daysRemaining:10,badgeLabel:'10 days left',title:'10 days left in your HireNestOS trial',message:'Review your subscription before the current trial expiry.',urgency:'info' },
+  '8d': { milestone:'8d',daysRemaining:8,badgeLabel:'8 days left',title:'8 days left in your HireNestOS trial',message:'Review your subscription before the current trial expiry.',urgency:'info' },
+  '5d': { milestone:'5d',daysRemaining:5,badgeLabel:'5 days left',title:'5 days left in your HireNestOS trial',message:'Review your subscription before the current trial expiry.',urgency:'warning' },
+  '2d': { milestone:'2d',daysRemaining:2,badgeLabel:'2 days left',title:'2 days left in your HireNestOS trial',message:'Review your subscription before the current trial expiry.',urgency:'danger' },
+  '1d': { milestone:'1d',daysRemaining:1,badgeLabel:'1 days left',title:'1 days left in your HireNestOS trial',message:'Review your subscription before the current trial expiry.',urgency:'danger' },
+
 };
 
 /**
@@ -1234,8 +1218,10 @@ export function computeServerTrialDaysRemaining(
 }
 
 export function getMilestoneForDaysRemaining(daysRemaining: number): ReminderMilestone | null {
-  if (daysRemaining === 7) return '7d';
-  if (daysRemaining === 3) return '3d';
+  if (daysRemaining === 10) return '10d';
+  if (daysRemaining === 8) return '8d';
+  if (daysRemaining === 5) return '5d';
+  if (daysRemaining === 2) return '2d';
   if (daysRemaining === 1) return '1d';
   return null;
 }

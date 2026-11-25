@@ -1,3 +1,4 @@
+import { CandidateEmploymentPanel } from '../../components/domain/CandidateEmploymentPanel';
 import React, { useState, useEffect, useMemo } from 'react';
 import { RequirementRibbon } from '../../components/domain/RequirementRibbon';
 import { formatExperienceRange } from '../../lib/format';
@@ -238,7 +239,7 @@ export const CandidateJobsForMePage: React.FC = () => {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-[12px]">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-[var(--text-primary)]">Feed scope:</span>
-          <Badge tone={candCategory === 'it' ? 'blue' : 'neutral'}>
+          <Badge tone={candCategory === 'it' ? 'rich_blue' : 'neutral'}>
             {REQUIREMENT_CATEGORY_LABEL[candCategory]} Track
           </Badge>
           <Badge tone={openToContract ? 'amber' : 'emerald'}>
@@ -621,7 +622,7 @@ export const CandidateBrowseJobsPage: React.FC = () => {
   const openToContract = Boolean(candidatePd.open_to_contract);
 
   // Browse filters: defaults to candidate's own track and contract preference
-  const [categoryFilter, setCategoryFilter] = useState<'auto' | 'it' | 'non_it'>('auto');
+  const [categoryFilter, setCategoryFilter] = useState<'auto' | 'it' | 'non_it' | 'all'>('auto');
   const effectiveCategory = categoryFilter === 'auto' ? candCategory : categoryFilter;
 
   const [contractFilter, setContractFilter] = useState<'auto' | 'fte_only' | 'all'>('auto');
@@ -1150,6 +1151,8 @@ export const CandidateProfilePage: React.FC = () => {
           </div>
         }
       />
+
+      <CandidateEmploymentPanel candidateId={myCandidate.id} />
 
       <div className="mb-5 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-[12px]">
         <div>

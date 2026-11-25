@@ -1,5 +1,6 @@
 import { ShieldCheck } from 'lucide-react';
 import { classifyRequirement, REQUIREMENT_CATEGORY_LABEL } from '../../lib/requirementCategory';
+import { parseRequirementMeta } from '../../lib/enterpriseLifecycle';
 
 type Props = {
   requirement: {
@@ -18,6 +19,7 @@ type Props = {
  * derived from explicit currency metadata (|bgv=1|) or inferred from the JD text.
  */
 export function hasBgvRequired(requirement?: {
+  id?: string;
   currency?: string | null;
   description?: string | null;
   title?: string | null;
@@ -26,6 +28,8 @@ export function hasBgvRequired(requirement?: {
   const currencyStr = String(requirement.currency || '');
   if (/\|bgv=(?:1|true)(?:\||$)/i.test(currencyStr)) return true;
   if (/\|bgv=(?:0|false)(?:\||$)/i.test(currencyStr)) return false;
+  const meta = parseRequirementMeta(requirement);
+  if (meta.hasBgv !== undefined && meta.hasBgv !== null) return meta.hasBgv;
 
   const text = `${requirement.title || ''} ${requirement.description || ''}`;
   return /\b(?:bgv|background\s+verification|police\s+clearance|pcc\b|criminal\s+record|employment\s+check)\b/i.test(
@@ -34,9 +38,9 @@ export function hasBgvRequired(requirement?: {
 }
 
 function profilesOf(requirement: Props['requirement']): Array<'bench' | 'market'> {
-  const m = /\|pt=(bench|market|both)(?:\||$)/.exec(String(requirement.currency || ''));
-  if (!m) return [];
-  return m[1] === 'both' ? ['bench', 'market'] : [m[1] as 'bench' | 'market'];
+  const profileType = parseRequirementMeta(requirement).profileType;
+  if (!profileType) return [];
+  return profileType === 'both' ? ['bench', 'market'] : [profileType];
 }
 
 /**

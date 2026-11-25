@@ -1,3 +1,5 @@
+import { useQuery } from '@tanstack/react-query';
+import { TrialExtensionRequests } from '../../components/domain/TrialExtensionRequests';
 import React, { useState, useEffect } from 'react';
 import {
   Check,
@@ -29,12 +31,6 @@ function formatInr(amount: number): string {
   }).format(amount);
 }
 
-const BETA_PARTNER_PRICES: Record<string, { monthly: number; annual: number }> = {
-  growth: { monthly: 2999, annual: 35988 },
-  scale: { monthly: 5999, annual: 71988 },
-  enterprise: { monthly: 19999, annual: 199990 },
-};
-
 export const SubscriptionPage: React.FC = () => {
   const { profile, organization } = useAuth();
   const role = profile?.role || 'vendor_admin';
@@ -44,21 +40,23 @@ export const SubscriptionPage: React.FC = () => {
   const [showBetaPricing, setShowBetaPricing] = useState(false);
   const [trialInfo, setTrialInfo] = useState<{ daysRemaining: number; isExpired: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [paid,setPaid]=useState(false);
+  const [trialError,setTrialError]=useState('');
 
+  const offers=useQuery({queryKey:['own_pricing_offers',orgId],queryFn:async()=>{const {data,error}=await supabase.from('organization_pricing_offers').select('plan_id,billing_cycle,amount_inr').eq('org_id',orgId).gt('expires_at',new Date().toISOString());if(error)throw error;return data||[];}});
   const DEFAULT_TRIAL_DAYS = 14;
 
   useEffect(() => {
     async function loadTrialStatus() {
       try {
-        const { data } = await supabase
-          .from('organizations')
-          .select('created_at, trial_ends_at')
-          .eq('id', orgId)
-          .maybeSingle();
+        const { data,error } = await supabase
+          .rpc('get_org_subscription',{p_org_id:orgId});
 
+        if(error)throw error;
         if (data) {
+          setPaid(data.subscription_status==='active');
           const now = Date.now();
-          const createdAt = new Date(data.created_at).getTime();
+          const createdAt = new Date(data.trial_started_at).getTime();
           const trialEnd = data.trial_ends_at
             ? new Date(data.trial_ends_at).getTime()
             : createdAt + DEFAULT_TRIAL_DAYS * 86_400_000;
@@ -68,7 +66,7 @@ export const SubscriptionPage: React.FC = () => {
           setTrialInfo({ daysRemaining: DEFAULT_TRIAL_DAYS, isExpired: false });
         }
       } catch {
-        setTrialInfo({ daysRemaining: DEFAULT_TRIAL_DAYS, isExpired: false });
+        setTrialError('Could not load subscription status. Refresh to try again.');
       } finally {
         setLoading(false);
       }
@@ -82,13 +80,15 @@ export const SubscriptionPage: React.FC = () => {
 
   const daysRemaining = trialInfo?.daysRemaining ?? DEFAULT_TRIAL_DAYS;
   const isExpired = trialInfo?.isExpired ?? false;
-  const statusLabel = isExpired ? 'EXPIRED' : 'TRIALING';
+  const statusLabel = paid?'ACTIVE':isExpired ? 'EXPIRED' : 'TRIALING';
   const statusTone = isExpired ? 'danger' : daysRemaining <= 5 ? 'danger' : 'warning';
 
   if (loading) return <TableSkeleton rows={4} cols={3} />;
 
   return (
     <div className="space-y-8">
+      {trialError&&<p role="alert">{trialError}</p>}
+      {!paid&&profile?.org_id&&['vendor_admin','client_manager'].includes(profile.role)&&<TrialExtensionRequests orgId={profile.org_id}/>}
       <PageHeader
         title="Plans & pricing"
         description={`Explore plans for your ${roleLabel.toLowerCase()} organisation. Contact admin to activate or upgrade your subscription.`}
@@ -210,8 +210,7 @@ export const SubscriptionPage: React.FC = () => {
               Beta Partner Programme
             </div>
             <p className="text-[13px] leading-[20px] text-[var(--text-secondary)]">
-              Founding-partner pricing for the first batch of vendors and clients. Includes a 30-day beta evaluation period.
-              Beta pricing is locked for 12 months after paid conversion. Feedback and product improvement participation expected.
+              Early-adopter offers require Admin approval. Your approved price, if available, appears on the matching plan. Trial extension decisions remain separate.
             </p>
           </div>
         )}
@@ -220,16 +219,14 @@ export const SubscriptionPage: React.FC = () => {
           {SUBSCRIPTION_PLANS.map((plan) => {
             const pricing = computePlanPricingWithTax(plan.id, billingCycle);
             const isRecommended = plan.id === 'scale';
-            const betaPrices = BETA_PARTNER_PRICES[plan.id];
 
-            const displayPrice = showBetaPricing && betaPrices
-              ? billingCycle === 'annual' ? betaPrices.annual : betaPrices.monthly
-              : pricing.baseAmountInr;
+            const approvedOffer=offers.data?.find(o=>o.plan_id===plan.id&&o.billing_cycle===billingCycle);
+            const displayPrice=approvedOffer?Number(approvedOffer.amount_inr):pricing.baseAmountInr;
             const displayGst = Math.round((displayPrice * 18) / 100);
             const displayTotal = displayPrice + displayGst;
 
             const normalPrice = pricing.baseAmountInr;
-            const hasDiscount = showBetaPricing && betaPrices && displayPrice < normalPrice;
+            const hasDiscount = displayPrice < normalPrice;
 
             return (
               <div

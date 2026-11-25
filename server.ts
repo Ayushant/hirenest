@@ -1,3 +1,4 @@
+import { runTrialNotificationJob } from './trialNotifications';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -530,36 +531,6 @@ async function ensureAccountSubscription(
     if (existing) {
       const record = dbRowToSubscription(existing);
 
-      // Check if organizations table has an extended trial date
-      try {
-        const { data: orgRow } = await sb
-          .from('organizations')
-          .select('trial_ends_at, name')
-          .eq('id', accountId)
-          .maybeSingle();
-
-        if (orgRow?.trial_ends_at) {
-          const orgEndsAtMs = Date.parse(orgRow.trial_ends_at);
-          const subEndsAtMs = Date.parse(record.trialEndsAt);
-          if (orgEndsAtMs > subEndsAtMs) {
-            record.trialEndsAt = orgRow.trial_ends_at;
-            if (record.subscriptionStatus === 'expired') {
-              record.subscriptionStatus = 'trialing';
-            }
-            await sb
-              .from('account_subscriptions')
-              .update({
-                trial_ends_at: record.trialEndsAt,
-                subscription_status: record.subscriptionStatus,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('account_id', accountId);
-          }
-        }
-      } catch {
-        // Non-blocking sync
-      }
-
       if (accountName && accountName !== '' && record.accountName === 'HireNest Workspace') {
         record.accountName = accountName;
         await sb.from('account_subscriptions').update({ account_name: accountName }).eq('account_id', accountId);
@@ -1049,7 +1020,7 @@ async function saveSubscriptionToDb(sub: AccountSubscriptionRecord): Promise<voi
 
 /**
  * Evaluates authoritative server-side subscription state, transitions expired trials,
- * and runs idempotent milestone reminder evaluation (`7d`, `3d`, `1d`).
+ * and runs idempotent milestone reminder evaluation (`10d`, `8d`, `5d`, `2d`, `1d`).
  */
 export async function evaluateAccountSubscriptionLifecycle(
   accountId: string,
@@ -1174,15 +1145,11 @@ async function runScheduledExpiryReminderJob(): Promise<{
   triggered: ReminderDeliveryRecord[];
 }> {
   const sb = getSupabaseAdmin();
-  let accountIds: string[];
-
-  if (sb) {
-    const { data } = await sb.from('account_subscriptions').select('account_id');
-    accountIds = (data || []).map((r: { account_id: string }) => r.account_id);
-  } else {
-    accountIds = Object.keys(enterpriseStore.subscriptions);
-  }
-
+  if(!sb)return {checkedAccounts:0,triggeredCount:0,triggered:[]};
+  const {data,error}=await sb.from('account_subscriptions').select('account_id');
+  if(error)throw error;
+  const accountIds=(data||[]).map((r:{account_id:string})=>r.account_id);
+  await runTrialNotificationJob(sb);
   const allTriggered: ReminderDeliveryRecord[] = [];
   const serverNow = new Date().toISOString();
 
@@ -1716,10 +1683,10 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: '15mb' }));
 
-  // Background scheduled job: runs every 60s to evaluate trial expiries and dispatch idempotent 15/10/5/1d reminders
+  // Background scheduled job: runs every 60s to evaluate trial expiries and dispatch idempotent 10/8/5/2/1-day reminders
   setInterval(() => {
     try {
-      runScheduledExpiryReminderJob();
+      void runScheduledExpiryReminderJob().catch(error => console.error('[trial-job]',error instanceof Error?error.message:'Failed'));
     } catch {
       // Ignore background interval errors
     }
@@ -2564,8 +2531,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
           })
           .eq('requirement_id', requirementId)
           .eq('vendor_org_id', vendorOrgId)
-          .is('acknowledged_at', null)
-          .catch(() => undefined);
+          .is('acknowledged_at', null);
       }
 
       // Trigger instant HQ in-app notification & alert email (awaited so serverless execution does not terminate early)
@@ -2673,10 +2639,13 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     res.status(decision.allowed ? 200 : 403).json(decision);
   });
 
-  // Server-side requirement update fallback (runs with service-role permissions)
+  // Requirement update fallback uses the verified caller JWT and existing RLS.
   app.post('/api/requirements/:id/update', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
-    if (auth.ok && !['admin', 'recruiter', 'client_manager'].includes(auth.role)) {
+    const auth = await authenticateStaffingCaller(req, {strict:true});
+    if (!auth.ok) { res.status(auth.status).json({error:auth.message}); return; }
+    const token = req.headers.authorization!.slice('Bearer '.length).trim();
+    const caller = createClient(process.env.VITE_SUPABASE_URL!,process.env.VITE_SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+    if (!['admin', 'recruiter', 'client_manager'].includes(auth.role)) {
       res.status(403).json({ error: 'Only admin, recruiter, or client managers can update requirements.' });
       return;
     }
@@ -2710,7 +2679,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await caller
       .from('requirements')
       .update(cleanUpdates)
       .eq('id', id)
@@ -2724,10 +2693,13 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     res.json({ ok: true, requirement: data });
   });
 
-  // Server-side requirement creation fallback (runs with service-role permissions)
+  // Requirement creation fallback uses the verified caller JWT and existing RLS.
   app.post('/api/requirements/create', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
-    if (auth.ok && !['admin', 'recruiter', 'client_manager'].includes(auth.role)) {
+    const auth = await authenticateStaffingCaller(req, {strict:true});
+    if (!auth.ok) { res.status(auth.status).json({error:auth.message}); return; }
+    const token = req.headers.authorization!.slice('Bearer '.length).trim();
+    const caller = createClient(process.env.VITE_SUPABASE_URL!,process.env.VITE_SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+    if (!['admin', 'recruiter', 'client_manager'].includes(auth.role)) {
       res.status(403).json({ error: 'Only admin, recruiter, or client managers can create requirements.' });
       return;
     }
@@ -2769,7 +2741,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
     // Fallback: If client_org_id missing or empty, find or use an approved client org
     if (!cleanInsert.client_org_id) {
-      const { data: unmapped } = await supabase
+      const { data: unmapped } = await caller
         .from('organizations')
         .select('id')
         .eq('name', 'Internal / Unmapped')
@@ -2779,11 +2751,11 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       }
     }
 
-    if (auth.user?.id) {
-      cleanInsert.created_by = auth.user.id;
+    if (auth.userId) {
+      cleanInsert.created_by = auth.userId;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await caller
       .from('requirements')
       .insert(cleanInsert)
       .select('*, organizations:client_org_id(id, name)')
@@ -2800,9 +2772,32 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   // UPDATE 3: Trial Activation, Automated Reminders, Checkout & Enforcement APIs
   // ==========================================================================
 
+  app.use('/api/subscriptions', async (req,res,next) => {
+    const auth=await authenticateStaffingCaller(req,{strict:true});
+    if(!auth.ok){res.status(401).json({error:'Authentication required.'});return;}
+    const account=req.query.accountId||req.body?.accountId;
+    const org=req.query.orgId||req.body?.orgId;
+    if(auth.role!=='admin'&&((account&&account!==auth.orgId)||(org&&org!==auth.orgId))){res.status(403).json({error:'Cannot access another organisation subscription.'});return;}
+    next();
+  });
+
   // 1. Get authoritative subscription status, server-computed days remaining, reminders, and receipts
   app.get('/api/subscriptions/status', async (req, res) => {
     const ctx = await resolveAccountContext(req);
+    // Read via the caller's JWT when administrative server credentials are absent.
+    // Never invent a fresh local trial for an existing organisation.
+    if(!getSupabaseAdmin()){
+      const token=req.headers.authorization!.slice(7);
+      const caller=createClient(process.env.VITE_SUPABASE_URL!,process.env.VITE_SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+      const {data,error}=await caller.rpc('get_org_subscription',{p_org_id:ctx.accountId});
+      if(error||!data){res.status(503).json({error:'Organisation subscription is unavailable.'});return;}
+      const sub=dbRowToSubscription(data);
+      const daysRemaining=computeServerTrialDaysRemaining(data.server_now,sub.trialEndsAt);
+      const restricted=sub.subscriptionStatus!=='active'&&daysRemaining===0;
+      if(restricted)sub.subscriptionStatus='expired';
+      res.json({serverNow:data.server_now,subscription:sub,daysRemaining,entitlements:{canWriteRequirements:!restricted,canSubmitCandidates:!restricted,canScheduleInterviews:!restricted,canExportReports:!restricted,isReadOnlyRestricted:restricted,restrictionReason:restricted?'Your trial has expired. Upgrade to restore write access.':null},reminders:[],receipts:[],plans:SUBSCRIPTION_PLANS});
+      return;
+    }
     const evaluated = await evaluateAccountSubscriptionLifecycle(ctx.accountId, ctx.accountName);
     const accountReminders = enterpriseStore.reminders.filter(
       (r) => r.accountId === ctx.accountId
@@ -2823,97 +2818,18 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   });
 
   // 2. Admin Trial Configuration & Activation (uses server timestamps)
-  app.post('/api/subscriptions/trial/activate', async (req, res) => {
-    const ctx = await resolveAccountContext(req);
-    const {
-      trialDurationDays = 14,
-      simulateDaysRemaining,
-      accountName,
-    } = req.body as {
-      trialDurationDays?: number;
-      simulateDaysRemaining?: number;
-      accountName?: string;
-    };
-
-    const duration = Math.max(1, Math.min(90, Number(trialDurationDays) || 14));
-    const now = new Date();
-    let startedAtMs = now.getTime();
-    let endsAtMs = startedAtMs + duration * 86_400_000;
-
-    // Allow Admin to configure or test exact remaining-day milestones (7, 3, 1, or 0 for expired)
-    if (
-      simulateDaysRemaining !== undefined &&
-      simulateDaysRemaining !== null &&
-      !Number.isNaN(Number(simulateDaysRemaining))
-    ) {
-      const targetDays = Number(simulateDaysRemaining);
-      if (targetDays <= 0) {
-        startedAtMs = now.getTime() - duration * 86_400_000;
-        endsAtMs = now.getTime() - 60_000; // Expired 1 minute ago on server clock
-      } else {
-        const elapsedDays = Math.max(0, duration - targetDays);
-        startedAtMs = now.getTime() - elapsedDays * 86_400_000;
-        endsAtMs = now.getTime() + targetDays * 86_400_000;
-      }
-    }
-
-    const updatedSub: AccountSubscriptionRecord = {
-      accountId: ctx.accountId,
-      accountName: accountName || ctx.accountName,
-      planId: 'free_trial',
-      billingCycle: 'annual',
-      subscriptionStatus: endsAtMs <= now.getTime() ? 'expired' : 'trialing',
-      trialDurationDays: duration,
-      trialStartedAt: new Date(startedAtMs).toISOString(),
-      trialEndsAt: new Date(endsAtMs).toISOString(),
-      paidActivatedAt: null,
-      currentPeriodEndsAt: null,
-      updatedAt: now.toISOString(),
-    };
-
-    await saveSubscriptionToDb(updatedSub);
-
-    const evaluated = await evaluateAccountSubscriptionLifecycle(ctx.accountId, updatedSub.accountName);
-    res.json({
-      ok: true,
-      serverNow: evaluated.serverNow,
-      subscription: evaluated.subscription,
-      daysRemaining: evaluated.daysRemaining,
-      entitlements: evaluated.entitlements,
-      newlyTriggeredReminders: evaluated.newlyTriggeredReminders,
-      reminders: enterpriseStore.reminders.filter((r) => r.accountId === ctx.accountId),
-    });
+  app.post('/api/subscriptions/trial/activate',(_req,res)=>{
+    res.status(410).json({error:'Trials start when an organisation is approved. Use the audited extension request workflow.'});
   });
 
   // 3. Scheduled / On-Demand Reminder Runner with Idempotent Deduplication
-  app.post('/api/subscriptions/reminders/run', async (req, res) => {
-    const ctx = await resolveAccountContext(req);
-    const { simulatedServerNow } = req.body as { simulatedServerNow?: string };
-
-    if (simulatedServerNow) {
-      const evalRes = await evaluateAccountSubscriptionLifecycle(
-        ctx.accountId,
-        ctx.accountName,
-        simulatedServerNow
-      );
-      res.json({
-        ok: true,
-        serverNow: evalRes.serverNow,
-        checkedAccounts: 1,
-        triggeredCount: evalRes.newlyTriggeredReminders.length,
-        triggered: evalRes.newlyTriggeredReminders,
-        reminders: enterpriseStore.reminders.filter((r) => r.accountId === ctx.accountId),
-      });
-      return;
-    }
-
-    const jobResult = runScheduledExpiryReminderJob();
-    res.json({
-      ok: true,
-      serverNow: new Date().toISOString(),
-      ...jobResult,
-      reminders: enterpriseStore.reminders.filter((r) => r.accountId === ctx.accountId),
-    });
+  app.post('/api/subscriptions/reminders/run',async(req,res)=>{
+    const auth=await authenticateStaffingCaller(req,{strict:true});
+    if(!auth.ok||auth.role!=='admin'){res.status(403).json({error:'Admin access required.'});return;}
+    if(!getSupabaseAdmin()){res.status(503).json({error:'Server-side Supabase administration is not configured.'});return;}
+    if(req.body?.simulatedServerNow){res.status(400).json({error:'Simulated timestamps are not accepted by the production reminder runner.'});return;}
+    try{const result=await runScheduledExpiryReminderJob();res.json({ok:true,serverNow:new Date().toISOString(),...result});}
+    catch(error){res.status(503).json({error:error instanceof Error?error.message:'Reminder job failed.'});}
   });
 
   // 4. Create Checkout Order (calculates base price + 18% GST on the server)
@@ -2931,6 +2847,12 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
 
     const cycle: BillingCycle = billingCycle === 'monthly' ? 'monthly' : 'annual';
     const pricing = computePlanPricingWithTax(planId, cycle);
+    const token=req.headers.authorization!.slice(7);
+    const caller=createClient(process.env.VITE_SUPABASE_URL!,process.env.VITE_SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+    const {data:offer,error:offerError}=await caller.from('organization_pricing_offers').select('amount_inr').eq('org_id',ctx.accountId).eq('plan_id',planId).eq('billing_cycle',cycle).gt('expires_at',new Date().toISOString()).maybeSingle();
+    if(offerError){res.status(503).json({error:'Could not verify account pricing.'});return;}
+    if(offer){pricing.baseAmountInr=Number(offer.amount_inr);pricing.gstAmountInr=Math.round(pricing.baseAmountInr*pricing.gstPercent/100);pricing.totalAmountInr=pricing.baseAmountInr+pricing.gstAmountInr;}
+
     const orderId = `ord_${crypto.randomBytes(8).toString('hex')}`;
     const createdAt = new Date().toISOString();
 
@@ -3095,51 +3017,15 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   });
 
   // 7. Admin Plan Assignment — assign a paid plan to an org without payment
-  app.post('/api/subscriptions/assign-plan', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
-    const callerRole = auth.ok ? auth.role : 'admin';
-    if (callerRole !== 'admin') {
-      res.status(403).json({ error: 'Only admins can assign plans.' });
-      return;
-    }
-
-    const { orgId, planId, billingCycle = 'annual' } = req.body as {
-      orgId?: string;
-      planId?: string;
-      billingCycle?: BillingCycle;
-    };
-
-    if (!orgId) {
-      res.status(400).json({ error: 'orgId is required.' });
-      return;
-    }
-    if (!planId || !['growth', 'scale', 'enterprise', 'free_trial'].includes(planId)) {
-      res.status(400).json({ error: 'planId must be growth, scale, enterprise, or free_trial.' });
-      return;
-    }
-
-    const cycle: BillingCycle = billingCycle === 'monthly' ? 'monthly' : 'annual';
-    const now = new Date();
-    const sub = await ensureAccountSubscription(orgId, '');
-
-    if (planId === 'free_trial') {
-      sub.planId = 'free_trial';
-      sub.subscriptionStatus = 'trialing';
-      sub.paidActivatedAt = null;
-      sub.currentPeriodEndsAt = null;
-    } else {
-      sub.planId = planId as PlanId;
-      sub.billingCycle = cycle;
-      sub.subscriptionStatus = 'active';
-      sub.paidActivatedAt = now.toISOString();
-      sub.currentPeriodEndsAt = new Date(
-        now.getTime() + (cycle === 'annual' ? 365 : 30) * 86_400_000
-      ).toISOString();
-    }
-    sub.updatedAt = now.toISOString();
-    await saveSubscriptionToDb(sub);
-
-    res.json({ ok: true, subscription: sub });
+  app.post('/api/subscriptions/assign-plan',async(req,res)=>{
+    const auth=await authenticateStaffingCaller(req,{strict:true});
+    if(!auth.ok||auth.role!=='admin'){res.status(403).json({error:'Admin access required.'});return;}
+    const token=req.headers.authorization!.slice(7);
+    const caller=createClient(process.env.VITE_SUPABASE_URL!,process.env.VITE_SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+    const {orgId,planId,billingCycle,reason}=req.body;
+    const {error}=await caller.rpc('admin_assign_subscription_plan',{p_org_id:orgId,p_plan_id:planId,p_billing_cycle:billingCycle,p_reason:reason});
+    if(error){res.status(400).json({error:error.message});return;}
+    res.json({ok:true});
   });
 
   // 8. Get plan for a specific org (by orgId query param)
@@ -3171,109 +3057,24 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   });
 
   // 9. Admin Trial Extension — extend an org's trial period (admin & recruiter)
-  app.post('/api/subscriptions/extend-trial', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
-    const callerRole = auth.ok ? auth.role : 'admin';
-    if (!['admin', 'recruiter'].includes(callerRole)) {
-      res.status(403).json({ error: 'Only admins or recruiters can extend trial periods.' });
-      return;
-    }
-
-    const { orgId, days, newEndsAt } = req.body as {
-      orgId?: string;
-      days?: number;
-      newEndsAt?: string;
-    };
-
-    if (!orgId) {
-      res.status(400).json({ error: 'orgId is required.' });
-      return;
-    }
-
-    const sb = getSupabaseAdmin();
-    if (!sb) {
-      res.status(500).json({ error: 'Database unconfigured.' });
-      return;
-    }
-
-    // 1. Get organization
-    const { data: org, error: orgErr } = await sb
-      .from('organizations')
-      .select('id, name, created_at, trial_ends_at')
-      .eq('id', orgId)
-      .single();
-
-    if (orgErr || !org) {
-      res.status(404).json({ error: 'Organization not found.' });
-      return;
-    }
-
-    const durationDays = Number(days) || 30;
-    const createdAtMs = new Date(org.created_at).getTime();
-    const computedEnd = newEndsAt
-      ? new Date(newEndsAt).toISOString()
-      : new Date(createdAtMs + durationDays * 86_400_000).toISOString();
-
-    const now = new Date();
-    const isExpired = Date.parse(computedEnd) <= now.getTime();
-    const newStatus = isExpired ? 'expired' : 'trialing';
-
-    // 2. Update organizations table
-    await sb
-      .from('organizations')
-      .update({ trial_ends_at: computedEnd })
-      .eq('id', orgId);
-
-    // 3. Update account_subscriptions table
-    const sub = await ensureAccountSubscription(orgId, org.name);
-    sub.trialDurationDays = durationDays;
-    sub.trialEndsAt = computedEnd;
-    sub.subscriptionStatus = newStatus;
-    sub.updatedAt = now.toISOString();
-
-    await sb
-      .from('account_subscriptions')
-      .upsert({
-        account_id: orgId,
-        account_name: org.name || sub.accountName,
-        plan_id: sub.planId || 'free_trial',
-        billing_cycle: sub.billingCycle || 'annual',
-        subscription_status: newStatus,
-        trial_duration_days: durationDays,
-        trial_started_at: sub.trialStartedAt || org.created_at,
-        trial_ends_at: computedEnd,
-        paid_activated_at: sub.paidActivatedAt,
-        current_period_ends_at: sub.currentPeriodEndsAt,
-        updated_at: now.toISOString(),
-      }, { onConflict: 'account_id' });
-
-    // 4. Update in-memory store if active
-    enterpriseStore.subscriptions[orgId] = sub;
-
-    // Filter out old expired reminders if trial was extended
-    if (!isExpired) {
-      enterpriseStore.reminders = enterpriseStore.reminders.filter(
-        (r) => r.accountId !== orgId || r.milestone !== 'expired'
-      );
-    }
-
-    const daysRemaining = Math.max(0, Math.ceil((Date.parse(computedEnd) - now.getTime()) / 86_400_000));
-
-    res.json({
-      ok: true,
-      orgId,
-      orgName: org.name,
-      trialDurationDays: durationDays,
-      trialEndsAt: computedEnd,
-      daysRemaining,
-      subscriptionStatus: newStatus,
-    });
+  app.post('/api/subscriptions/extend-trial', async (req,res) => {
+    const auth=await authenticateStaffingCaller(req,{strict:true});
+    if(!auth.ok){res.status(401).json({error:'Authentication required.'});return;}
+    if(auth.role!=='admin'){res.status(403).json({error:'Admin approval required.'});return;}
+    const token=req.headers.authorization!.slice(7);
+    const caller=createClient(process.env.VITE_SUPABASE_URL!,process.env.VITE_SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+    const {requestId,reason,notes,followUpDate,exception}=req.body;
+    if(!requestId){res.status(400).json({error:'Create an extension request and provide requestId for approval.'});return;}
+    const {data,error}=await caller.rpc('review_trial_extension',{p_request_id:requestId,p_decision:'approved',p_reason:reason,p_notes:notes||null,p_follow_up:followUpDate||null,p_exception:exception===true});
+    if(error){res.status(400).json({error:error.message});return;}
+    res.json({ok:true,request:data});
   });
 
   // 10. List all org plans (admin only)
   app.get('/api/subscriptions/all-plans', async (req, res) => {
-    const auth = await authenticateStaffingCaller(req);
-    const callerRole = auth.ok ? auth.role : 'admin';
+    const auth = await authenticateStaffingCaller(req,{strict:true});
+    if(!auth.ok){res.status(401).json({error:'Authentication required.'});return;}
+    const callerRole = auth.role;
     if (callerRole !== 'admin') {
       res.status(403).json({ error: 'Only admins can view all plans.' });
       return;
@@ -5582,6 +5383,7 @@ Return JSON array of objects with fields: targetSkill, question.`;
     try {
       if (job === 'sla' || job === 'all') out.sla = await runSlaAlerts(admin);
       if (job === 'sla' || job === 'sla_close' || job === 'all') out.sla_close = await runSlaAutoClose(admin);
+      if(job==='trial'||job==='all'){await runTrialNotificationJob(admin);out.trial={ok:true};}
       if (job === 'sla' || job === 'reusable' || job === 'all') out.reusable = await runReusableCandidateAlerts(admin);
       if (job === 'morning' || job === 'all') out.morning = await runMorningDigest(admin);
       if (job === 'compliance' || job === 'all') out.compliance = await runComplianceAlerts(admin);

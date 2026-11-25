@@ -1,3 +1,5 @@
+import { PricingOffers } from '../../components/domain/PricingOffers';
+import { TrialExtensionRequests } from '../../components/domain/TrialExtensionRequests';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,6 +13,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import {
+  Input,
   PageHeader,
   MetricStrip,
   Button,
@@ -51,6 +54,8 @@ interface OrgRow {
   status: string;
   created_at: string;
   trial_ends_at: string | null;
+  plan_id: string;
+  subscription_status: string;
 }
 
 function computeTrialInfo(org: OrgRow) {
@@ -69,35 +74,8 @@ function computeTrialInfo(org: OrgRow) {
 }
 
 async function fetchOrgs(): Promise<OrgRow[]> {
-  const { data, error } = await supabase
-    .from('organizations')
-    .select('id, name, type, status, created_at, trial_ends_at')
-    .in('type', ['vendor', 'client'])
-    .order('created_at', { ascending: false });
-
-  if (error) throw new Error(error.message);
-  return (data || []) as OrgRow[];
-}
-
-async function extendTrial(orgId: string, days: number, newEndDate: string) {
-  const res = await fetch('/api/subscriptions/extend-trial', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orgId, days, newEndsAt: newEndDate }),
-  });
-
-  if (!res.ok) {
-    // Direct database fallback if offline or API unavailable
-    const { error } = await supabase
-      .from('organizations')
-      .update({ trial_ends_at: newEndDate })
-      .eq('id', orgId);
-
-    if (error) throw new Error(error.message);
-    return;
-  }
-
-  return res.json();
+  const {data,error}=await supabase.rpc('admin_subscription_organizations');
+  if(error)throw error;return (data||[]) as OrgRow[];
 }
 
 export const AdminSubscriptionPage: React.FC = () => {
@@ -106,9 +84,11 @@ export const AdminSubscriptionPage: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [showBetaPricing, setShowBetaPricing] = useState(false);
   const [extendOrgId, setExtendOrgId] = useState<string | null>(null);
-  const [extendDays, setExtendDays] = useState<string>('30');
+  const [extendDays, setExtendDays] = useState<string>('14');
+  const [extensionReason,setExtensionReason]=useState('');
   const [assignOrgId, setAssignOrgId] = useState<string | null>(null);
   const [assignPlan, setAssignPlan] = useState<string>('growth');
+  const [assignReason,setAssignReason]=useState('');
   const [assignCycle, setAssignCycle] = useState<string>('annual');
 
   const { data: orgs, isLoading, error, refetch } = useQuery({
@@ -118,18 +98,15 @@ export const AdminSubscriptionPage: React.FC = () => {
 
   const extendMutation = useMutation({
     mutationFn: async ({ orgId, days }: { orgId: string; days: number }) => {
-      const org = orgs?.find((o) => o.id === orgId);
-      if (!org) throw new Error('Organisation not found');
-      const createdAt = new Date(org.created_at).getTime();
-      const newEnd = new Date(createdAt + days * 86_400_000).toISOString();
-      await extendTrial(orgId, days, newEnd);
+      const {error}=await supabase.rpc('request_trial_extension',{p_org_id:orgId,p_days:days,p_reason:extensionReason});if(error)throw error;
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin_org_subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['admin_org_plans'] });
       queryClient.invalidateQueries({ queryKey: ['subscription_dashboard'] });
       setExtendOrgId(null);
-      toast({ title: 'Trial extended', description: `Trial successfully updated to ${variables.days} days.`, tone: 'success' });
+      queryClient.invalidateQueries({queryKey:['trial_requests']});
+      toast({ title: 'Extension request created', description: `Review the request below before adding ${variables.days} days.`, tone: 'success' });
     },
     onError: (err) => {
       toast({ title: 'Failed to extend trial', description: err instanceof Error ? err.message : 'Unknown error', tone: 'error' });
@@ -138,16 +115,7 @@ export const AdminSubscriptionPage: React.FC = () => {
 
   const assignMutation = useMutation({
     mutationFn: async ({ orgId, planId, billingCycle }: { orgId: string; planId: string; billingCycle: string }) => {
-      const res = await fetch('/api/subscriptions/assign-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId, planId, billingCycle }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(body.error || 'Failed to assign plan');
-      }
-      return res.json();
+      const {error}=await supabase.rpc('admin_assign_subscription_plan',{p_org_id:orgId,p_plan_id:planId,p_billing_cycle:billingCycle,p_reason:assignReason});if(error)throw error;
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin_org_subscriptions'] });
@@ -162,25 +130,11 @@ export const AdminSubscriptionPage: React.FC = () => {
     },
   });
 
-  const { data: allPlans } = useQuery({
-    queryKey: ['admin_org_plans'],
-    queryFn: async () => {
-      const res = await fetch('/api/subscriptions/all-plans');
-      if (!res.ok) throw new Error('Failed to load plans');
-      return res.json() as Promise<{ ok: boolean; plans: Array<{
-        orgId: string; orgName: string; planId: string; planName: string;
-        subscriptionStatus: string; billingCycle: string; paidActivatedAt: string | null;
-      }> }>;
-    },
-  });
-
-  const orgPlanMap = new Map(
-    (allPlans?.plans || []).map((p) => [p.orgId, p])
-  );
+  const orgPlanMap = new Map((orgs||[]).map(o=>[o.id,{planId:o.plan_id,planName:o.plan_id==='free_trial'?'Free Trial':o.plan_id,subscriptionStatus:o.subscription_status}]));
 
   const totalOrgs = orgs?.length ?? 0;
-  const trialOrgs = orgs?.filter((o) => !computeTrialInfo(o).isExpired).length ?? 0;
-  const expiredOrgs = orgs?.filter((o) => computeTrialInfo(o).isExpired).length ?? 0;
+  const trialOrgs = orgs?.filter((o) => o.plan_id==='free_trial'&&!computeTrialInfo(o).isExpired).length ?? 0;
+  const expiredOrgs = orgs?.filter((o) => o.plan_id==='free_trial'&&computeTrialInfo(o).isExpired).length ?? 0;
   const extendOrg = orgs?.find((o) => o.id === extendOrgId);
 
   return (
@@ -196,7 +150,7 @@ export const AdminSubscriptionPage: React.FC = () => {
           { label: 'Total organisations', value: isLoading ? '...' : String(totalOrgs) },
           { label: 'Active trials', value: isLoading ? '...' : String(trialOrgs) },
           { label: 'Expired trials', value: isLoading ? '...' : String(expiredOrgs), tone: expiredOrgs > 0 ? 'danger' : 'default' },
-          { label: 'Paid subscriptions', value: '0' },
+          { label: 'Paid subscriptions', value: String(orgs?.filter(o=>o.subscription_status==='active').length||0) },
         ]}
       />
 
@@ -253,7 +207,7 @@ export const AdminSubscriptionPage: React.FC = () => {
                         </Badge>
                       </td>
                       <td>
-                        {trial.isExpired ? (
+                        {org.subscription_status==='active' ? <Badge tone="emerald">Paid active</Badge> : trial.isExpired ? (
                           <Badge tone="red">Expired</Badge>
                         ) : trial.daysRemaining <= 5 ? (
                           <Badge tone="amber">Expiring soon</Badge>
@@ -276,7 +230,7 @@ export const AdminSubscriptionPage: React.FC = () => {
                                   : 'text-[var(--text-primary)]'
                           }`}
                         >
-                          {trial.daysRemaining}d
+                          {org.subscription_status==='active'?'—':`${trial.daysRemaining}d`}
                         </span>
                       </td>
                       <td>
@@ -286,8 +240,8 @@ export const AdminSubscriptionPage: React.FC = () => {
                           const planName = plan?.planName || 'Free Trial';
                           const tone = planId === 'free_trial' ? 'slate'
                             : planId === 'growth' ? 'sky'
-                            : planId === 'scale' ? 'indigo'
-                            : 'violet';
+                            : planId === 'scale' ? 'rich_blue'
+                            : 'teal';
                           return <Badge tone={tone}>{planName}</Badge>;
                         })()}
                       </td>
@@ -298,7 +252,8 @@ export const AdminSubscriptionPage: React.FC = () => {
                             size="sm"
                             onClick={() => {
                               setExtendOrgId(org.id);
-                              setExtendDays(String(Math.max(trial.trialDuration, 30)));
+                              setExtendDays('14');
+                              setExtensionReason('');
                             }}
                           >
                             <CalendarPlus className="h-3.5 w-3.5" />
@@ -337,12 +292,15 @@ export const AdminSubscriptionPage: React.FC = () => {
         )}
       </div>
 
+      <TrialExtensionRequests admin />
+      <PricingOffers orgs={orgs || []} />
+
       {/* Extend Trial Dialog */}
       <Dialog
         open={Boolean(extendOrgId && extendOrg)}
         onClose={() => setExtendOrgId(null)}
         title="Extend trial period"
-        description={extendOrg ? `Set trial duration for ${extendOrg.name}` : ''}
+        description={extendOrg ? `Request additional trial days for ${extendOrg.name}` : ''}
         maxWidth="max-w-[420px]"
       >
         {extendOrg && (
@@ -361,18 +319,13 @@ export const AdminSubscriptionPage: React.FC = () => {
             </div>
 
             <Select
-              label="New trial duration (from signup date)"
+              label="Additional days from current expiry"
               value={extendDays}
               onChange={(e) => setExtendDays(e.target.value)}
-              options={[
-                { value: '14', label: '14 days (default)' },
-                { value: '30', label: '30 days' },
-                { value: '45', label: '45 days' },
-                { value: '60', label: '60 days' },
-                { value: '90', label: '90 days' },
-              ]}
+              options={[14,21,30].map(n=>({value:String(n),label:`${n} additional days`}))}
             />
 
+            <Input label="Reason for extension request" value={extensionReason} onChange={e=>setExtensionReason(e.target.value)} />
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
               <Button variant="outline" onClick={() => setExtendOrgId(null)}>
                 Cancel
@@ -381,10 +334,10 @@ export const AdminSubscriptionPage: React.FC = () => {
                 onClick={() =>
                   extendMutation.mutate({ orgId: extendOrg.id, days: Number(extendDays) })
                 }
-                loading={extendMutation.isPending}
+                loading={extendMutation.isPending} disabled={extensionReason.trim().length<3}
               >
                 <CalendarPlus className="h-3.5 w-3.5" />
-                Extend to {extendDays} days
+                Request +{extendDays} days
               </Button>
             </div>
           </div>
@@ -436,6 +389,7 @@ export const AdminSubscriptionPage: React.FC = () => {
               />
             )}
 
+            <Input label="Reason for manual plan assignment" value={assignReason} onChange={e=>setAssignReason(e.target.value)} />
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
               <Button variant="outline" onClick={() => setAssignOrgId(null)}>
                 Cancel
@@ -448,7 +402,7 @@ export const AdminSubscriptionPage: React.FC = () => {
                     billingCycle: assignCycle,
                   })
                 }
-                loading={assignMutation.isPending}
+                loading={assignMutation.isPending} disabled={assignReason.trim().length<3}
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Assign {assignPlan === 'free_trial' ? 'Free Trial' : assignPlan.charAt(0).toUpperCase() + assignPlan.slice(1)}

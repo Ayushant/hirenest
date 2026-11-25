@@ -175,6 +175,7 @@ export interface SubmissionValidationRecord {
     resumeHashPrefix: string;
   };
   validationInterview: {
+    conductedAt?: string;
     scheduledAt: string;
     durationMinutes: number;
     meetingLink: string;
@@ -409,10 +410,9 @@ export function buildSubmissionValidationRecord(
   // Derive atomic JD skills from requirement definition or infer from title & description
   const atomicReqSkills = extractRequirementAtomicSkills(
     req || {
-      id: submission.requirement_id,
       title: '',
       description: '',
-      skills: req?.skills || [],
+      skills: [],
     }
   );
   const reqSkills = atomicReqSkills.length > 0 ? atomicReqSkills : (req?.skills || []);
@@ -884,7 +884,7 @@ async function syncValidationToSupabase(
         for (const cl of openClarifications) {
           await resolveClarificationRpc({
             p_clarification_id: cl.id,
-            p_resolved: true,
+            p_mark_resolved: true,
           }).catch(() => {});
         }
       }

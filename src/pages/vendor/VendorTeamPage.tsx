@@ -1,3 +1,5 @@
+import { useAuth } from '../../auth/AuthProvider';
+import { OrganizationTeam } from '../../components/domain/OrganizationTeam';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Dialog, EmptyState, ErrorState, Input, PageHeader, Select, TableSkeleton } from '../../components/ui/kit';
@@ -39,11 +41,12 @@ async function call<T>(url: string, opts?: RequestInit): Promise<T> {
 }
 
 export const VendorTeamPage: React.FC = () => {
+  const { profile } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [createdInvite, setCreatedInvite] = useState<{ email: string; inviteLink: string; emailSent: boolean } | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', mobile: '', role: 'vendor_recruiter' as Member['role'] });
+  const [form, setForm] = useState({ name: '', email: '', mobile: '', designation: '', department: '', business_role: '', role: 'vendor_recruiter' as Member['role'] });
 
   const q = useQuery({
     queryKey: ['vendor_team'],
@@ -63,7 +66,7 @@ export const VendorTeamPage: React.FC = () => {
       } else {
         toast({ title: 'Invitation sent', description: `${form.email} will receive a link to set their password.`, tone: 'success' });
       }
-      setForm({ name: '', email: '', mobile: '', role: 'vendor_recruiter' });
+      setForm({ name: '', email: '', mobile: '', designation: '', department: '', business_role: '', role: 'vendor_recruiter' });
     },
     onError: (e: Error) => toast({ title: 'Could not add user', description: e.message, tone: 'error' }),
   });
@@ -106,6 +109,7 @@ export const VendorTeamPage: React.FC = () => {
         actions={<Button onClick={() => setOpen(true)}>Add user</Button>}
       />
 
+      {profile?.org_id && <OrganizationTeam orgId={profile.org_id} />}
       {members.length === 0 ? (
         <EmptyState title="No team members yet" description="Add your first recruiter." />
       ) : (
@@ -186,6 +190,7 @@ export const VendorTeamPage: React.FC = () => {
           <Input label="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input label="Mobile (optional)" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
+          {(['designation','department','business_role'] as const).map(key=><Input key={key} label={key.replaceAll('_',' ')} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})}/>)}
           <Select
             label="Role"
             value={form.role}

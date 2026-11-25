@@ -155,7 +155,7 @@ const BdmDashboardPage: React.FC = () => {
           subtitle="Your clients, open demand, financial calculations and pipeline at a glance."
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={exportClientsCsv}>
+          <Button size="sm" variant="outline" onClick={handleExportCsv}>
             <Download className="h-3.5 w-3.5" />
             Export clients CSV
           </Button>

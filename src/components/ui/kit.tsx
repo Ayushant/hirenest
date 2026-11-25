@@ -170,7 +170,8 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, hint, className = '', id, ...props }, ref) => {
-    const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+    const generatedId = React.useId();
+    const inputId = id || (label ? `${label.toLowerCase().replace(/\s+/g, '-')}-${generatedId}` : undefined);
     return (
       <div className="w-full">
         {label && (
@@ -212,7 +213,8 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, options, className = '', id, ...props }, ref) => {
-    const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+    const generatedId = React.useId();
+    const selectId = id || (label ? `${label.toLowerCase().replace(/\s+/g, '-')}-${generatedId}` : undefined);
     return (
       <div className="w-full">
         {label && (
@@ -257,7 +259,8 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ label, error, hint, className = '', id, ...props }, ref) => {
-    const textareaId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+    const generatedId = React.useId();
+    const textareaId = id || (label ? `${label.toLowerCase().replace(/\s+/g, '-')}-${generatedId}` : undefined);
     return (
       <div className="w-full">
         {label && (
@@ -311,7 +314,7 @@ export const Badge: React.FC<{
   tone?: BadgeTone;
   children: React.ReactNode;
   className?: string;
-}> = ({ tone = 'neutral', children, className = '' }) => {
+} & React.HTMLAttributes<HTMLSpanElement>> = ({ tone = 'neutral', children, className = '', ...props }) => {
   const chipStyles: Record<
     string,
     { bg: string; text: string; dot: string }
@@ -392,6 +395,7 @@ export const Badge: React.FC<{
 
   return (
     <span
+      {...props}
       className={`inline-flex items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-[12px] leading-[16px] font-medium whitespace-nowrap shrink-0 ${activeStyle.bg} ${activeStyle.text} ${className}`}
     >
       <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${activeStyle.dot}`} />

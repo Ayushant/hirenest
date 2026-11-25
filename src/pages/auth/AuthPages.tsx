@@ -1,3 +1,5 @@
+import { OnboardingFields } from '../../components/domain/OnboardingFields';
+import { cleanOnboarding, emptyOnboarding, validateOnboarding } from '../../lib/onboarding';
 import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -425,6 +427,7 @@ export const SignUpPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [signUpError, setSignUpError] = useState<string | null>(null);
+  const [details, setDetails] = useState({ ...emptyOnboarding });
 
   const {
     register,
@@ -448,6 +451,8 @@ export const SignUpPage: React.FC = () => {
     setLoading(true);
     setSignUpError(null);
     try {
+      validateOnboarding(details, values.signup_intent);
+      if (values.signup_intent !== 'candidate' && !values.company_name?.trim()) throw new Error('Company name is required.');
       const cleanEmail = values.email.trim();
       const companyName =
         values.signup_intent === 'vendor' || values.signup_intent === 'client'
@@ -465,6 +470,8 @@ export const SignUpPage: React.FC = () => {
           data: {
             full_name: values.full_name.trim(),
             signup_intent: values.signup_intent,
+            onboarding_version: '1',
+            onboarding: cleanOnboarding(details, values.signup_intent),
             company_name: companyName,
           },
         },
@@ -595,6 +602,10 @@ export const SignUpPage: React.FC = () => {
             error={errors.company_name?.message}
           />
         )}
+
+
+        <OnboardingFields kind={intent} value={details} onChange={setDetails} />
+        {intent === 'vendor' && <p className="text-[12px] text-[var(--text-secondary)]">Register as the authorised agency representative. HQ assigns Vendor Agency Admin access after verification.</p>}
 
         {signUpError && (
           <div className="rounded-[6px] border border-[var(--border)] bg-[var(--status-danger-bg)] p-3 text-[12px] leading-[16px] text-[var(--status-danger)]">

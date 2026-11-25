@@ -1,3 +1,5 @@
+import { OnboardingCompletion } from '../components/domain/OnboardingCompletion';
+import { UserProfileEditor } from '../components/domain/UserProfileEditor';
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -794,6 +796,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               )}
             </button>
 
+            <UserProfileEditor />
             <div className="relative" ref={profileRef}>
               <button
                 type="button"
@@ -919,6 +922,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         {/* Content canvas: responsive fluid canvas up to 1720px */}
         <main className="flex-1 py-6 px-4 sm:px-8 max-w-[1720px] w-full mx-auto space-y-6">
           <ErrorBoundary scope="workspace content">
+            <OnboardingCompletion />
             {children}
           </ErrorBoundary>
         </main>

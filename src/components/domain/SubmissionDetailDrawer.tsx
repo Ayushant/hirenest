@@ -1,3 +1,4 @@
+import { CandidateEmploymentSummary } from './CandidateEmploymentSummary';
 import React, { useEffect, useState } from 'react';
 import { displayClientName } from '../../lib/clientIdentity';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -101,6 +102,7 @@ const SKILL_STATUS_TONES: Record<SkillEvidenceStatus, BadgeTone> = {
 };
 
 const VALIDATION_STAGE_TONES: Record<ValidationDecisionStage, BadgeTone> = {
+  withdrawn: 'neutral',
   matched: 'neutral',
   recruiter_review: 'storm_blue',
   validation_interview_scheduled: 'sky',
@@ -251,7 +253,7 @@ export const SubmissionDetailDrawer: React.FC<{
       setActiveTab(initialTab);
     } else if (
       isVendor &&
-      (valRecord?.followUp?.status === 'requested' ||
+      (valRecord?.followUp?.status === 'pending_candidate' ||
         valRecord?.followUp?.status === 'pending_vendor' ||
         valRecord?.validationStage === 'hold_for_clarification')
     ) {
@@ -473,7 +475,7 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
   const handleShareWhatsApp = () => {
     const text = getInviteText();
     if (!text) return;
-    const phone = submission?.candidates?.phone?.replace(/\D/g, '') || '';
+    const phone = (Array.isArray(submission?.candidates?.candidate_contacts) ? submission?.candidates?.candidate_contacts[0]?.phone : submission?.candidates?.candidate_contacts?.phone)?.replace(/\D/g, '') || '';
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
       : `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -529,6 +531,7 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
 
     // If ratings are not set or quickOffline, smoothly default to 4/5 rather than blocking with error
     const finalRatings = {
+      ...r,
       communicationRating: r.communicationRating || (isVoiceOrOffline ? 4 : 4),
       technicalRating: r.technicalRating || (isVoiceOrOffline ? 4 : 4),
       skillGapValidationRating: r.skillGapValidationRating || (isVoiceOrOffline ? 4 : 4),
@@ -716,7 +719,7 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
           (gapSkillsList.length > 0
             ? `Accurate Client Disclosure: ${gapSkillsList.join(', ')} not explicitly detailed on resume.`
             : 'All mandatory JD skills verified with evidence during recruiter validation.'),
-        status: 'ready_for_client',
+        status: 'ready',
         complianceAndConsentConfirmed: true,
       },
       decisionHistory: [logEntry, ...valRecord.decisionHistory],
@@ -1200,6 +1203,8 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
         </div>
       ) : (
         <div className="space-y-5">
+          <CandidateEmploymentSummary candidate={submission.candidates} />
+          {submission.rejection_reason && <p className="text-[13px] text-[var(--status-danger)]">{submission.rejection_reason}</p>}
           {isHq &&
             ['closed', 'filled', 'on_hold'].includes(String(submission.requirements?.status)) &&
             ['applied', 'recruiter_review', 'client_review', 'interviewing', 'offered'].includes(String(submission.stage)) && (
@@ -2081,7 +2086,7 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
                     <Button
                       size="sm"
                       loading={savingVal}
-                      onClick={handleCompleteValidationInterview}
+                      onClick={() => handleCompleteValidationInterview()}
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                       Complete Validation Interview &amp; Verify Skills
