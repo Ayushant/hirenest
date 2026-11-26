@@ -1560,6 +1560,8 @@ async function resolveAccountContext(req: express.Request): Promise<{
   accountId: string;
   accountName: string;
   role: AppRole;
+  userId: string | null;
+  authOrgId: string | null;
 }> {
   const queryAccountId = typeof req.query.accountId === 'string' ? req.query.accountId.trim() : '';
   const bodyAccountId =
@@ -1574,6 +1576,8 @@ async function resolveAccountContext(req: express.Request): Promise<{
       accountId: resolvedId,
       accountName: bodyAccountName || 'HireNest Enterprise Account',
       role: auth.role as AppRole,
+      userId: auth.userId,
+      authOrgId: auth.orgId,
     };
   }
 
@@ -1581,7 +1585,48 @@ async function resolveAccountContext(req: express.Request): Promise<{
     accountId: queryAccountId || bodyAccountId || 'default_hirenest_account',
     accountName: bodyAccountName || 'HireNest Workspace Account',
     role: 'admin',
+    userId: null,
+    authOrgId: null,
   };
+}
+
+async function evaluateAccountForCaller(ctx: {
+  accountId: string;
+  accountName: string;
+  userId: string | null;
+  authOrgId: string | null;
+}) {
+  const sb = getSupabaseAdmin();
+  const canCheckFounderExemption = Boolean(
+    sb && ctx.userId && (!ctx.authOrgId || ctx.accountId === ctx.authOrgId || ctx.accountId === `user_${ctx.userId}`)
+  );
+  if (canCheckFounderExemption) {
+    const { data } = await sb!
+      .from('account_trial_exemptions')
+      .select('user_id')
+      .eq('user_id', ctx.userId!)
+      .eq('enabled', true)
+      .maybeSingle();
+    if (data) {
+      const subscription = await ensureAccountSubscription(ctx.accountId, ctx.accountName);
+      return {
+        subscription: { ...subscription, subscriptionStatus: 'active' as const },
+        serverNow: new Date().toISOString(),
+        daysRemaining: 0,
+        trialExempt: true,
+        entitlements: {
+          canWriteRequirements: true,
+          canSubmitCandidates: true,
+          canScheduleInterviews: true,
+          canExportReports: true,
+          isReadOnlyRestricted: false,
+          restrictionReason: null,
+        },
+        newlyTriggeredReminders: [],
+      };
+    }
+  }
+  return evaluateAccountSubscriptionLifecycle(ctx.accountId, ctx.accountName);
 }
 
 function extractTextFromResumeBuffer(buf: Buffer, fileName: string): string {
@@ -2789,16 +2834,18 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     if(!getSupabaseAdmin()){
       const token=req.headers.authorization!.slice(7);
       const caller=createClient(process.env.VITE_SUPABASE_URL!,process.env.VITE_SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+      const {data:exempt}=await caller.rpc('my_account_trial_exempt');
       const {data,error}=await caller.rpc('get_org_subscription',{p_org_id:ctx.accountId});
       if(error||!data){res.status(503).json({error:'Organisation subscription is unavailable.'});return;}
       const sub=dbRowToSubscription(data);
       const daysRemaining=computeServerTrialDaysRemaining(data.server_now,sub.trialEndsAt);
-      const restricted=sub.subscriptionStatus!=='active'&&daysRemaining===0;
+      const restricted=!exempt&&sub.subscriptionStatus!=='active'&&daysRemaining===0;
+      if(exempt)sub.subscriptionStatus='active';
       if(restricted)sub.subscriptionStatus='expired';
-      res.json({serverNow:data.server_now,subscription:sub,daysRemaining,entitlements:{canWriteRequirements:!restricted,canSubmitCandidates:!restricted,canScheduleInterviews:!restricted,canExportReports:!restricted,isReadOnlyRestricted:restricted,restrictionReason:restricted?'Your trial has expired. Upgrade to restore write access.':null},reminders:[],receipts:[],plans:SUBSCRIPTION_PLANS});
+      res.json({serverNow:data.server_now,subscription:sub,daysRemaining,trialExempt:Boolean(exempt),entitlements:{canWriteRequirements:!restricted,canSubmitCandidates:!restricted,canScheduleInterviews:!restricted,canExportReports:!restricted,isReadOnlyRestricted:restricted,restrictionReason:restricted?'Your trial has expired. Upgrade to restore write access.':null},reminders:[],receipts:[],plans:SUBSCRIPTION_PLANS});
       return;
     }
-    const evaluated = await evaluateAccountSubscriptionLifecycle(ctx.accountId, ctx.accountName);
+    const evaluated = await evaluateAccountForCaller(ctx);
     const accountReminders = enterpriseStore.reminders.filter(
       (r) => r.accountId === ctx.accountId
     );
@@ -2811,6 +2858,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
       subscription: evaluated.subscription,
       daysRemaining: evaluated.daysRemaining,
       entitlements: evaluated.entitlements,
+      trialExempt: 'trialExempt' in evaluated ? evaluated.trialExempt : false,
       reminders: accountReminders,
       receipts: accountReceipts,
       plans: SUBSCRIPTION_PLANS,
@@ -2994,7 +3042,7 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
   app.post('/api/subscriptions/enforce', async (req, res) => {
     const ctx = await resolveAccountContext(req);
     const { action = 'write_action' } = req.body as { action?: string };
-    const evaluated = await evaluateAccountSubscriptionLifecycle(ctx.accountId, ctx.accountName);
+    const evaluated = await evaluateAccountForCaller(ctx);
 
     if (evaluated.entitlements.isReadOnlyRestricted) {
       res.status(402).json({

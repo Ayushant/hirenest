@@ -22,6 +22,7 @@ import {
 } from '../../lib/enterpriseLifecycle';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
+import { fetchSubscriptionDashboard } from '../../api/subscriptions';
 
 function formatInr(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -39,6 +40,7 @@ export const SubscriptionPage: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [showBetaPricing, setShowBetaPricing] = useState(false);
   const [trialInfo, setTrialInfo] = useState<{ daysRemaining: number; isExpired: boolean } | null>(null);
+  const [trialExempt, setTrialExempt] = useState(false);
   const [loading, setLoading] = useState(true);
   const [paid,setPaid]=useState(false);
   const [trialError,setTrialError]=useState('');
@@ -49,6 +51,12 @@ export const SubscriptionPage: React.FC = () => {
   useEffect(() => {
     async function loadTrialStatus() {
       try {
+        const subscription = await fetchSubscriptionDashboard({ accountId: orgId });
+        if (subscription.trialExempt) {
+          setTrialExempt(true);
+          setTrialInfo({ daysRemaining: 0, isExpired: false });
+          return;
+        }
         const { data,error } = await supabase
           .rpc('get_org_subscription',{p_org_id:orgId});
 
@@ -80,8 +88,8 @@ export const SubscriptionPage: React.FC = () => {
 
   const daysRemaining = trialInfo?.daysRemaining ?? DEFAULT_TRIAL_DAYS;
   const isExpired = trialInfo?.isExpired ?? false;
-  const statusLabel = paid?'ACTIVE':isExpired ? 'EXPIRED' : 'TRIALING';
-  const statusTone = isExpired ? 'danger' : daysRemaining <= 5 ? 'danger' : 'warning';
+  const statusLabel = paid ? 'ACTIVE' : trialExempt ? 'FOUNDER ACCESS' : isExpired ? 'EXPIRED' : 'TRIALING';
+  const statusTone = trialExempt ? 'default' : isExpired ? 'danger' : daysRemaining <= 5 ? 'danger' : 'warning';
 
   if (loading) return <TableSkeleton rows={4} cols={3} />;
 
@@ -95,7 +103,7 @@ export const SubscriptionPage: React.FC = () => {
       />
 
       {/* Expiry Alert */}
-      {isExpired && (
+      {isExpired && !trialExempt && (
         <div className="rounded-[12px] border border-[var(--status-danger)] bg-[var(--status-danger-bg)] p-4 flex items-start gap-3">
           <AlertTriangle className="h-5 w-5 text-[var(--status-danger)] shrink-0 mt-0.5" />
           <div className="space-y-1">
@@ -114,7 +122,7 @@ export const SubscriptionPage: React.FC = () => {
         items={[
           {
             label: 'Current plan',
-            value: 'Free Trial',
+            value: trialExempt ? 'Founder account' : 'Free Trial',
           },
           {
             label: 'Status',
@@ -123,7 +131,7 @@ export const SubscriptionPage: React.FC = () => {
           },
           {
             label: 'Days remaining',
-            value: isExpired ? '0 days' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`,
+            value: trialExempt ? 'Not applicable' : isExpired ? '0 days' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`,
             tone: isExpired ? 'danger' : daysRemaining <= 5 ? 'danger' : daysRemaining <= 7 ? 'warning' : 'default',
           },
           {

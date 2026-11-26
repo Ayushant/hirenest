@@ -72,6 +72,7 @@ export interface SubscriptionDashboardResponse {
   reminders: ReminderDeliveryDto[];
   receipts: PaymentReceiptDto[];
   plans: SubscriptionPlanDefinition[];
+  trialExempt?: boolean;
 }
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
