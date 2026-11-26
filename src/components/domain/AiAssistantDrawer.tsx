@@ -1,15 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react';
 import { Drawer, Button } from '../ui/kit';
-import { AiSuggestionBanner } from './DomainBadges';
 import { sendGeneralStaffingChat } from '../../api/ai';
+
+function cleanAssistantResponse(text: string): string {
+  return text
+    .replace(/^\s*(?:assistant\s*)?(?:suggestion:\s*review before use\s*)+/i, '')
+    .trimStart();
+}
 
 interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
-  label?: string;
-  source?: 'provider' | 'template';
-  reason?: string | null;
 }
 
 const STARTER_PROMPTS = [
@@ -26,7 +28,6 @@ export const AiAssistantDrawer: React.FC<{
     {
       role: 'assistant',
       text: 'Ask about writing clear job descriptions, structuring competency interview questions, or general staffing SLA practices. Do not include candidate personal contact details.',
-      label: 'Suggestion: review before use',
     },
   ]);
   const [input, setInput] = useState('');
@@ -58,10 +59,7 @@ export const AiAssistantDrawer: React.FC<{
         ...prev,
         {
           role: 'assistant',
-          text: response.text,
-          label: response.label || 'Suggestion: review before use',
-          source: response.source,
-          reason: response.reason,
+          text: cleanAssistantResponse(response.text),
         },
       ]);
     } catch (err) {
@@ -85,7 +83,6 @@ export const AiAssistantDrawer: React.FC<{
       {
         role: 'assistant',
         text: 'Ask about writing clear job descriptions, structuring competency interview questions, or general staffing SLA practices. Do not include candidate personal contact details.',
-        label: 'Suggestion: review before use',
       },
     ]);
     setErrorMsg(null);
@@ -121,15 +118,8 @@ export const AiAssistantDrawer: React.FC<{
                 turn.role === 'user' ? 'bg-[var(--bg-subtle)] ml-6' : 'bg-[var(--bg)] mr-4'
               }`}
             >
-              <div className="flex items-center justify-between text-[12px] leading-[16px] font-medium text-[var(--text-tertiary)]">
-                <span>{turn.role === 'user' ? 'You' : 'Assistant'}</span>
-              </div>
-              {turn.role === 'assistant' && (
-                <AiSuggestionBanner
-                  label={turn.label}
-                  source={turn.source}
-                  reason={turn.reason}
-                />
+              {turn.role === 'user' && (
+                <div className="text-[12px] leading-[16px] font-medium text-[var(--text-tertiary)]">You</div>
               )}
               <p className="whitespace-pre-line text-[var(--text-primary)]">
                 {turn.text}
