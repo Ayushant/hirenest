@@ -35,6 +35,7 @@ import { DuplicateDialog } from '../../components/domain/DuplicateDialog';
 import {
   fetchMyCandidateProfile,
   fetchCandidateContacts,
+  fetchCandidateEvidenceHistory,
   updateCandidateProfile,
   updateCandidateContacts,
   uploadCandidateResume,
@@ -1000,6 +1001,12 @@ export const CandidateProfilePage: React.FC = () => {
     enabled: Boolean(myCandidate?.id),
   });
 
+  const { data: evidenceHistory = [] } = useQuery({
+    queryKey: ['my_candidate_evidence_history', myCandidate?.id],
+    queryFn: () => fetchCandidateEvidenceHistory(myCandidate!.id),
+    enabled: Boolean(myCandidate?.id),
+  });
+
   const [fullName, setFullName] = useState('');
   const [currentTitle, setCurrentTitle] = useState('');
   const [location, setLocation] = useState('');
@@ -1092,14 +1099,34 @@ export const CandidateProfilePage: React.FC = () => {
         action: 'acknowledged',
         captureSource: 'resume_upload',
       }).catch(() => undefined);
-      toast({ title: 'Resume updated & DPDP acknowledgement logged', tone: 'success' });
+      toast({ title: 'Resume uploaded for review', description: 'It will be used as your active resume after an authorised recruiter accepts it.', tone: 'success' });
       queryClient.invalidateQueries({ queryKey: ['my_candidate_profile'] });
+      queryClient.invalidateQueries({ queryKey: ['my_candidate_evidence_history', myCandidate.id] });
     } catch (uploadErr) {
       toast({
         title: 'Resume upload failed',
         description: mapSupabaseError(uploadErr),
         tone: 'error',
       });
+    }
+  };
+
+  const handleUploadSupportingDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !myCandidate) return;
+    const err = validateResumeFile(file);
+    if (err) {
+      toast({ title: 'Invalid document', description: err, tone: 'error' });
+      return;
+    }
+    try {
+      const hash = await computeFileSha256(file);
+      await uploadCandidateResume(myCandidate.id, file, hash, { documentKind: 'supporting', reparse: false });
+      await queryClient.invalidateQueries({ queryKey: ['my_candidate_evidence_history', myCandidate.id] });
+      toast({ title: 'Supporting document uploaded for review', tone: 'success' });
+    } catch (uploadErr) {
+      toast({ title: 'Document upload failed', description: mapSupabaseError(uploadErr), tone: 'error' });
     }
   };
 
@@ -1140,7 +1167,7 @@ export const CandidateProfilePage: React.FC = () => {
               </Button>
             )}
             <label className="inline-flex h-7 items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[12px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)]">
-              <span>Replace resume</span>
+              <span>Upload new resume version</span>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
@@ -1148,11 +1175,44 @@ export const CandidateProfilePage: React.FC = () => {
                 className="hidden"
               />
             </label>
+            <label className="inline-flex h-7 items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[12px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)]">
+              <span>Upload supporting document</span>
+              <input type="file" accept=".pdf,.doc,.docx" onChange={handleUploadSupportingDocument} className="hidden" />
+            </label>
           </div>
         }
       />
 
       <CandidateEmploymentPanel candidateId={myCandidate.id} />
+
+      <section className="mb-5 rounded-[8px] border border-[var(--border)] p-4">
+        <div className="mb-3">
+          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Resume &amp; document history</h2>
+          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">Uploads are preserved as separate versions. A new resume becomes active only after review.</p>
+        </div>
+        {evidenceHistory.length === 0 ? (
+          <p className="text-[12px] text-[var(--text-tertiary)]">No uploaded versions yet.</p>
+        ) : (
+          <ul className="divide-y divide-[var(--border)]">
+            {evidenceHistory.map((doc) => (
+              <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[12px]">
+                <div>
+                  <span className="font-medium text-[var(--text-primary)]">v{doc.version_number} · {doc.file_name}{doc.is_latest_candidate_submitted ? ' · latest upload' : ''}</span>
+                  <span className="ml-2 text-[var(--text-secondary)]">{doc.review_status} · {doc.verification_status} · {formatLocalDate(doc.created_at)}</span>
+                </div>
+                <Button size="sm" variant="ghost" onClick={async () => {
+                  try {
+                    const url = await getResumeSignedUrl(doc.storage_path);
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  } catch (err) {
+                    toast({ title: 'Could not open document', description: mapSupabaseError(err), tone: 'error' });
+                  }
+                }}>View</Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className="mb-5 rounded-[8px] border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-[12px]">
         <div>

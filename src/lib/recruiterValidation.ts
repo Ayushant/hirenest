@@ -870,9 +870,8 @@ async function syncValidationToSupabase(
   // 3b. If clarification was responded / recalculated, resolve any open DB clarification requests
   if (
     record.followUp?.status === 'recalculated' ||
-    record.followUp?.status === 'responded' ||
     stage === 'approved_for_submission' ||
-    stage === 'recruiter_review'
+    stage === 'submitted_to_client'
   ) {
     try {
       const { data: openClarifications } = await supabase

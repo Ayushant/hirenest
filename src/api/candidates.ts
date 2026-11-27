@@ -215,8 +215,18 @@ export async function uploadCandidateResume(
   candidateId: string,
   file: File,
   resumeHash: string,
-  options: { reparse?: boolean } = {}
+  options: { reparse?: boolean; submissionId?: string | null; clarificationId?: string | null; documentKind?: 'resume' | 'supporting' } = {}
 ): Promise<string> {
+  const signature = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  const ascii = String.fromCharCode(...signature);
+  const validSignature = file.name.toLowerCase().endsWith('.pdf')
+    ? ascii.startsWith('%PDF-')
+    : file.name.toLowerCase().endsWith('.docx')
+      ? signature[0] === 0x50 && signature[1] === 0x4b && signature[2] === 0x03 && signature[3] === 0x04
+      : file.name.toLowerCase().endsWith('.doc')
+        ? signature[0] === 0xd0 && signature[1] === 0xcf && signature[2] === 0x11 && signature[3] === 0xe0
+        : false;
+  if (!validSignature) throw new Error('The file contents do not match a supported PDF, DOC, or DOCX file.');
   const storagePath = buildSafeResumeStoragePath(candidateId, file.name);
   const { error: uploadError } = await supabase.storage
     .from('resumes')
@@ -226,42 +236,107 @@ export async function uploadCandidateResume(
     });
   if (uploadError) throw uploadError;
 
-  // A new/updated resume must refresh the candidate's skills so match scores and
-  // missing-skill lists always reflect the latest document.
-  let refreshed: Partial<Candidate> = {};
-  if (options.reparse !== false) {
+  // Preserve parsed claims as pending evidence; never overwrite the accepted
+  // candidate profile or allow a candidate claim to increase a match score.
+  let parsedClaims: Record<string, unknown> = {};
+  if (options.documentKind !== 'supporting' && options.reparse !== false) {
     try {
       const parsed = await parseResumeFile(file);
-      if (parsed.skills.length > 0) refreshed.skills = parsed.skills;
-      if (parsed.summary) refreshed.summary = parsed.summary;
-      if (parsed.current_title) refreshed.current_title = parsed.current_title;
-      if (parsed.total_experience_years > 0) {
-        refreshed.total_experience_years = parsed.total_experience_years;
-      }
-      refreshed.parsed_data = {
+      parsedClaims = {
         ...parsed,
         email: undefined,
         phone: undefined,
         linkedin_url: undefined,
         parsed_at: new Date().toISOString(),
-      } as unknown as Candidate['parsed_data'];
+      };
     } catch {
-      refreshed = {};
+      parsedClaims = {};
     }
   }
 
-  await updateCandidateProfile(candidateId, {
-    resume_path: storagePath,
-    resume_hash: resumeHash,
-    ...refreshed,
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) throw authError || new Error('Sign in to upload evidence.');
+  const { data: actor, error: actorError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', authData.user.id)
+    .single();
+  if (actorError) throw actorError;
+  const isCandidate = actor.role === 'candidate';
+  const candidateAuthorized = isCandidate ||
+    (typeof window !== 'undefined' && window.confirm(
+      'Confirm that this resume was provided by the candidate or that the candidate authorised you to upload it.'
+    ));
+  if (!candidateAuthorized) {
+    await supabase.storage.from('resumes').remove([storagePath]);
+    throw new Error('Candidate authorisation is required before uploading this resume.');
+  }
+
+  const sourceChannel = isCandidate ? 'candidate_portal'
+    : actor.role?.startsWith('vendor') ? 'vendor_portal'
+      : actor.role === 'admin' || actor.role === 'hq_admin' ? 'admin_portal'
+        : 'recruiter_portal';
+  const { error: registerError } = await supabase.rpc('register_candidate_evidence_document', {
+    p_candidate_id: candidateId,
+    p_submission_id: options.submissionId ?? null,
+    p_clarification_id: options.clarificationId ?? null,
+    p_document_kind: options.documentKind || 'resume',
+    p_storage_path: storagePath,
+    p_file_name: file.name,
+    p_mime_type: file.type || 'application/octet-stream',
+    p_file_size_bytes: file.size,
+    p_sha256: resumeHash,
+    p_source_channel: sourceChannel,
+    p_candidate_authorized: candidateAuthorized,
+    p_parsed_claims: parsedClaims,
   });
+  if (registerError) {
+    await supabase.storage.from('resumes').remove([storagePath]);
+    throw registerError;
+  }
 
   // Tell open screens to recompute matches against the new resume.
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('hirenest:resume-updated', { detail: { candidateId } }));
+    window.dispatchEvent(new CustomEvent('hirenest:resume-evidence-uploaded', { detail: { candidateId } }));
   }
 
   return storagePath;
+}
+
+export async function fetchCandidateEvidenceHistory(candidateId: string) {
+  const { data, error } = await supabase
+    .from('candidate_evidence_documents')
+    .select('id,candidate_id,document_kind,version_number,file_name,storage_path,source_channel,review_status,verification_status,uploaded_by,uploader_role,sha256,review_reason,is_latest_candidate_submitted,created_at')
+    .eq('candidate_id', candidateId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchCandidateMatchHistory(candidateId: string, requirementId: string) {
+  const { data, error } = await supabase
+    .from('candidate_match_history')
+    .select('id,computed_score,skill_score,experience_score,matched_skills,unproven_skills,engine_version,calculated_at,recorded_at')
+    .eq('candidate_id', candidateId)
+    .eq('requirement_id', requirementId)
+    .order('recorded_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function reviewCandidateEvidenceDocument(params: {
+  documentId: string;
+  reviewStatus: 'accepted' | 'rejected';
+  verificationStatus: 'candidate_reported' | 'evidence_uploaded' | 'under_review' | 'verified' | 'partially_verified' | 'not_verified' | 'rejected';
+  reason: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc('review_candidate_evidence_document', {
+    p_document_id: params.documentId,
+    p_review_status: params.reviewStatus,
+    p_verification_status: params.verificationStatus,
+    p_reason: params.reason,
+  });
+  if (error) throw error;
 }
 
 export async function getResumeSignedUrl(resumePath: string): Promise<string> {

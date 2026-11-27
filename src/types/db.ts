@@ -351,6 +351,13 @@ export interface SubmissionClarification {
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
+  requirement_id?: string | null;
+  requester_org_id?: string | null;
+  requester_role?: string | null;
+  cycle_number?: number;
+  skill_classification?: Record<string, string>;
+  response_deadline?: string | null;
+  viewed_at?: string | null;
 }
 
 export interface SubmissionStageHistory {

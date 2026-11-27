@@ -48,6 +48,8 @@ import {
 import {
   fetchSubmissionById,
   fetchSubmissionStageHistory,
+  fetchSubmissionClarifications,
+  submitClarificationResponseRpc,
   getAllowedTransitions,
   transitionRequiresReason,
   transitionSubmissionRpc,
@@ -90,6 +92,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { AiInterviewPanel } from './AiInterviewPanel';
 import { ScreeningScorecard } from './ScreeningScorecard';
 import { aiInterviewApi } from '../../api/aiInterviews';
+import { fetchCandidateEvidenceHistory, fetchCandidateMatchHistory, getResumeSignedUrl, reviewCandidateEvidenceDocument } from '../../api/candidates';
 import { useToast } from '../ui/Toast';
 import type { AppRole, Interview, SubmissionStage } from '../../types/db';
 
@@ -136,6 +139,7 @@ export const SubmissionDetailDrawer: React.FC<{
   const isClient = role === 'client_manager' || role === 'client_member';
   const isVendor = role === 'vendor_admin' || role === 'vendor_recruiter';
   const isCandidate = role === 'candidate';
+  const canRequestClarification = isHq || isVendor;
 
   const [activeTab, setActiveTab] = useState<
     | 'match_summary'
@@ -174,8 +178,7 @@ export const SubmissionDetailDrawer: React.FC<{
 
   // Follow-up response state (for Vendor / Direct Candidate / Recruiter)
   const [followUpResponseNotes, setFollowUpResponseNotes] = useState('');
-  const [followUpNewVersion, setFollowUpNewVersion] = useState('v2.0');
-
+  const [activeClarificationId, setActiveClarificationId] = useState('');
   const { data: submission, isLoading } = useQuery({
     queryKey: ['submission_detail', submissionId],
     queryFn: () => fetchSubmissionById(submissionId!),
@@ -187,6 +190,17 @@ export const SubmissionDetailDrawer: React.FC<{
     queryFn: () => fetchSubmissionStageHistory(submissionId!),
     enabled: Boolean(submissionId),
   });
+
+  const { data: clarificationCycles = [] } = useQuery({
+    queryKey: ['submission_clarification_cycles', submissionId],
+    queryFn: () => fetchSubmissionClarifications(submissionId!),
+    enabled: Boolean(submissionId),
+  });
+
+  useEffect(() => {
+    const stillOpen = clarificationCycles.some((cycle) => cycle.id === activeClarificationId && cycle.status === 'open');
+    if (!stillOpen) setActiveClarificationId(clarificationCycles.find((cycle) => cycle.status === 'open')?.id || '');
+  }, [activeClarificationId, clarificationCycles]);
 
   // Clients only ever receive scorecards HQ has shared; the server enforces this.
   const { data: sharedScorecards = [] } = useQuery({
@@ -206,6 +220,18 @@ export const SubmissionDetailDrawer: React.FC<{
     queryKey: ['submission_quality_feedback', submissionId],
     queryFn: () => fetchQualityFeedbackList({ submissionId: submissionId! }),
     enabled: Boolean(submissionId),
+  });
+
+  const { data: evidenceDocuments = [] } = useQuery({
+    queryKey: ['candidate_evidence_history', submission?.candidate_id],
+    queryFn: () => fetchCandidateEvidenceHistory(submission!.candidate_id),
+    enabled: Boolean(submission?.candidate_id),
+  });
+
+  const { data: matchHistory = [] } = useQuery({
+    queryKey: ['candidate_match_history', submission?.candidate_id, submission?.requirement_id],
+    queryFn: () => fetchCandidateMatchHistory(submission!.candidate_id, submission!.requirement_id),
+    enabled: Boolean(submission?.candidate_id && submission?.requirement_id) && !isClient,
   });
 
   useEffect(() => {
@@ -307,11 +333,8 @@ export const SubmissionDetailDrawer: React.FC<{
     }
   };
 
-  // Recalculate JD match incorporating verified/confirmed skills
-  const recomputeMatchSummary = (
-    baseRecord: SubmissionValidationRecord,
-    bumpVersion?: string
-  ): SubmissionValidationRecord => {
+  // Candidate statements are evidence for review, not verified match evidence.
+  const recomputeMatchSummary = (baseRecord: SubmissionValidationRecord): SubmissionValidationRecord => {
     if (!submission) return baseRecord;
     let effective = baseRecord;
     if (!effective.matchSummary.skills || effective.matchSummary.skills.length === 0) {
@@ -321,8 +344,7 @@ export const SubmissionDetailDrawer: React.FC<{
     const verifiedCount = skills.filter(
       (s) =>
         s.status === 'matched' ||
-        s.status === 'recruiter_verified' ||
-        s.status === 'candidate_confirmed'
+        s.status === 'recruiter_verified'
     ).length;
     const nextSkillScore =
       skills.length > 0
@@ -338,29 +360,16 @@ export const SubmissionDetailDrawer: React.FC<{
       )
     );
     const missingNow = skills
-      .filter((s) => s.status === 'not_found' || s.status === 'unclear')
+      .filter((s) => s.status === 'not_found' || s.status === 'unclear' || s.status === 'candidate_confirmed')
       .map((s) => s.skill);
     const nextWarnings =
       missingNow.length > 0
         ? [
             `${missingNow.length} JD skill(s) (${missingNow.slice(0, 4).join(', ')}) remain unverified - use validation interview or source follow-up.`,
           ]
-        : ['All JD skills verified or confirmed with evidence.'];
+        : ['All JD skills have matching or recruiter-verified evidence.'];
 
-    const nextVersion = bumpVersion || effective.matchSummary.resumeVersion;
-    const nextVersions = bumpVersion
-      ? [
-          {
-            version: bumpVersion,
-            uploadedAt: new Date().toISOString(),
-            uploadedBy: profile?.full_name || role,
-            resumeHash: `sha256-${Math.random().toString(36).slice(2, 10)}`,
-            matchScoreAtVersion: nextJdMatch,
-            notes: `Updated evidence / resume version (${bumpVersion}) analyzed.`,
-          },
-          ...effective.resumeVersions,
-        ]
-      : effective.resumeVersions;
+    const nextVersions = effective.resumeVersions;
 
     return {
       ...effective,
@@ -370,7 +379,7 @@ export const SubmissionDetailDrawer: React.FC<{
         skillScore: nextSkillScore,
         parsingWarnings: nextWarnings,
         lastAnalysisAt: new Date().toISOString(),
-        resumeVersion: nextVersion,
+        resumeVersion: effective.matchSummary.resumeVersion,
       },
       resumeVersions: nextVersions,
     };
@@ -676,7 +685,7 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
     const isOverride = valRecord.validationInterview.status !== 'completed';
 
     const verifiedSkillsList = valRecord.matchSummary.skills
-      .filter((s) => s.status === 'matched' || s.status === 'recruiter_verified' || s.status === 'candidate_confirmed')
+      .filter((s) => s.status === 'matched' || s.status === 'recruiter_verified')
       .map((s) => s.skill);
     const gapSkillsList = valRecord.matchSummary.skills
       .filter((s) => s.status === 'not_found' || s.status === 'unclear')
@@ -774,7 +783,7 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
     };
 
     const verifiedSkillsList = valRecord.matchSummary.skills
-      .filter((s) => s.status === 'matched' || s.status === 'recruiter_verified' || s.status === 'candidate_confirmed')
+      .filter((s) => s.status === 'matched' || s.status === 'recruiter_verified')
       .map((s) => s.skill);
     const gapSkillsList = valRecord.matchSummary.skills
       .filter((s) => s.status === 'not_found' || s.status === 'unclear')
@@ -897,6 +906,7 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
         ? `Gap report & follow-up sent to ${valRecord.followUp.vendorOrgName || 'Vendor'}`
         : 'Clarification request routed to Direct Candidate portal'
     );
+    await queryClient.invalidateQueries({ queryKey: ['submission_clarification_cycles', submissionId] });
   };
 
   const handleRecordFollowUpResponseAndRecalculate = async () => {
@@ -909,37 +919,27 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
       return;
     }
 
-    // Mark target skills in followUp as candidate_confirmed
-    const targetSet = new Set(
-      valRecord.followUp.targetSkills.map((s) => s.toLowerCase().trim())
-    );
-    const updatedSkills = valRecord.matchSummary.skills.map((sk) => {
-      if (targetSet.has(sk.skill.toLowerCase().trim()) && sk.status !== 'recruiter_verified') {
-        return {
-          ...sk,
-          status: 'candidate_confirmed' as SkillEvidenceStatus,
-          evidenceSnippet: `Follow-up Clarification (${followUpNewVersion}): ${followUpResponseNotes.trim()}`,
-          verifiedBy: profile?.full_name || role,
-          verifiedAt: new Date().toISOString(),
-        };
-      }
-      return sk;
-    });
+    const selectedCycle = clarificationCycles.find((cycle) => cycle.id === activeClarificationId && cycle.status === 'open');
+    if (!selectedCycle) {
+      toast({ title: 'No open clarification cycle', description: 'Send a clarification request before submitting a response.', tone: 'error' });
+      return;
+    }
+    try {
+      await submitClarificationResponseRpc(selectedCycle.id, followUpResponseNotes.trim());
+    } catch (err) {
+      toast({ title: 'Could not save clarification response', description: mapSupabaseError(err), tone: 'error' });
+      return;
+    }
 
     const nextWithSkills: SubmissionValidationRecord = {
       ...valRecord,
       validationStage: 'recruiter_review',
-      matchSummary: {
-        ...valRecord.matchSummary,
-        skills: updatedSkills,
-      },
       followUp: {
         ...valRecord.followUp,
-        status: 'recalculated',
+        status: 'responded',
         responseNotes: followUpResponseNotes.trim(),
         respondedAt: new Date().toISOString(),
         respondedBy: profile?.full_name || role,
-        updatedResumeVersion: followUpNewVersion,
       },
       decisionHistory: [
         {
@@ -948,7 +948,7 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
           toStage: 'recruiter_review',
           actorName: profile?.full_name || role,
           actorRole: role,
-          reason: `Follow-up response received & match recalculated against resume ${followUpNewVersion}.`,
+          reason: 'Candidate-reported clarification recorded and marked for evidence review. Match score was not changed.',
           isOverride: false,
           timestamp: new Date().toISOString(),
         },
@@ -956,12 +956,12 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
       ],
     };
 
-    const recalculated = recomputeMatchSummary(nextWithSkills, followUpNewVersion);
     await persistValidation(
-      recalculated,
-      'followup_response_recalculate',
-      `Follow-up recorded & match recalculated (${recalculated.matchSummary.jdMatchPercentage}% on ${followUpNewVersion})`
+      nextWithSkills,
+      'followup_response_recorded',
+      'Candidate-reported clarification recorded for evidence review; no score change.'
     );
+    await queryClient.invalidateQueries({ queryKey: ['submission_clarification_cycles', submissionId] });
   };
 
   const handleFinalSubmitToClient = async () => {
@@ -2159,10 +2159,12 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
               </div>
 
               {/* Recruiter Request Generator (For HQ Admin / Recruiter) */}
-              {isHq && (
+              {canRequestClarification && (
                 <div className="rounded-[8px] border border-[var(--border)] p-4 space-y-3.5">
                   <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
-                    {valRecord.followUp.routeType === 'vendor'
+                    {isVendor
+                      ? 'Request Candidate Clarification & Resume Update'
+                      : valRecord.followUp.routeType === 'vendor'
                       ? 'Generate Vendor-Facing Gap Report & Request Updated Evidence'
                       : 'Send Direct Candidate Clarification & Resume Update Request'}
                   </h3>
@@ -2243,12 +2245,35 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
                       onClick={handleSendFollowUpRequest}
                     >
                       <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                      {valRecord.followUp.routeType === 'vendor'
+                      {isVendor
+                        ? 'Request Candidate Clarification'
+                        : valRecord.followUp.routeType === 'vendor'
                         ? `Send Gap Report to ${valRecord.followUp.vendorOrgName || 'Vendor'}`
                         : 'Send Clarification Request to Candidate Portal'}
                     </Button>
                   </div>
                 </div>
+              )}
+
+              {!isClient && clarificationCycles.length > 0 && (
+                <section className="space-y-2">
+                  <h3 className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--text-secondary)]">
+                    Clarification request history ({clarificationCycles.length} cycles)
+                  </h3>
+                  <div className="divide-y divide-[var(--border)] rounded-[8px] border border-[var(--border)]">
+                    {clarificationCycles.map((cycle) => (
+                      <div key={cycle.id} className="px-3 py-2.5 text-[12px]">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-[var(--text-primary)]">Cycle {cycle.cycle_number || '—'} · {cycle.status}</span>
+                          <span className="text-[var(--text-tertiary)]">{formatLocalDateTime(cycle.created_at)}</span>
+                        </div>
+                        {cycle.missing_skills?.length > 0 && <div className="mt-1 text-[var(--text-secondary)]">Skills: {cycle.missing_skills.join(', ')}</div>}
+                        <p className="mt-1 whitespace-pre-wrap text-[var(--text-secondary)]">{cycle.questions}</p>
+                        {cycle.response && <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">Response:</span> {cycle.response}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </section>
               )}
 
               {/* Response & Match Recalculation Panel (Accessible to Vendor for own candidate, Direct Candidate for own profile, or Recruiter) */}
@@ -2275,6 +2300,18 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
                   </div>
                 )}
 
+                {clarificationCycles.some((cycle) => cycle.status === 'open') && (
+                  <Select
+                    label="Responding to clarification cycle"
+                    value={activeClarificationId}
+                    onChange={(e) => setActiveClarificationId(e.target.value)}
+                    options={clarificationCycles.filter((cycle) => cycle.status === 'open').map((cycle) => ({
+                      value: cycle.id,
+                      label: `Cycle ${cycle.cycle_number || '—'} · ${cycle.missing_skills.join(', ') || 'General clarification'}`,
+                    }))}
+                  />
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2">
                     <Textarea
@@ -2287,14 +2324,10 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
                   </div>
                   <div className="space-y-3">
                     <Select
-                      label="Updated resume version"
-                      value={followUpNewVersion}
-                      onChange={(e) => setFollowUpNewVersion(e.target.value)}
-                      options={[
-                        { value: 'v1.1', label: 'v1.1 (Skill evidence addendum)' },
-                        { value: 'v2.0', label: 'v2.0 (Updated resume uploaded)' },
-                        { value: 'v2.1', label: 'v2.1 (Verified portfolio revision)' },
-                      ]}
+                      label="Evidence status"
+                      value="candidate_reported"
+                      disabled
+                      options={[{ value: 'candidate_reported', label: 'Candidate reported — review required' }]}
                     />
                     <Button
                       size="sm"
@@ -2303,11 +2336,84 @@ Please join 5 minutes before scheduled time. If any reschedule is required, plea
                       onClick={handleRecordFollowUpResponseAndRecalculate}
                     >
                       <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                      Submit Evidence &amp; Recalculate Match
+                      Record Response for Evidence Review
                     </Button>
                   </div>
                 </div>
               </div>
+
+              {evidenceDocuments.length > 0 && (
+                <section className="space-y-2">
+                  <h3 className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--text-secondary)]">
+                    Uploaded resume &amp; evidence versions
+                  </h3>
+                  <div className="divide-y divide-[var(--border)] rounded-[8px] border border-[var(--border)]">
+                    {evidenceDocuments.map((doc) => (
+                      <div key={doc.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-[12px]">
+                        <div>
+                          <div className="font-medium text-[var(--text-primary)]">v{doc.version_number} · {doc.file_name}</div>
+                          <div className="text-[var(--text-tertiary)]">{doc.source_channel.replaceAll('_', ' ')} · uploaded by {doc.uploader_role} · {formatLocalDateTime(doc.created_at)}</div>
+                          <div className="text-[var(--text-secondary)]">Review: {doc.review_status} · Verification: {doc.verification_status}</div>
+                          {doc.review_reason && <div className="text-[var(--text-secondary)]">Review note: {doc.review_reason}</div>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={async () => {
+                            try {
+                              window.open(await getResumeSignedUrl(doc.storage_path), '_blank', 'noopener,noreferrer');
+                            } catch (err) {
+                              toast({ title: 'Could not open evidence', description: mapSupabaseError(err), tone: 'error' });
+                            }
+                          }}>View</Button>
+                          {isHq && doc.review_status === 'pending' && (
+                            <>
+                              <Button size="sm" onClick={async () => {
+                                const reason = window.prompt('Review note (required):');
+                                if (!reason?.trim()) return;
+                                try {
+                                  await reviewCandidateEvidenceDocument({ documentId: doc.id, reviewStatus: 'accepted', verificationStatus: 'evidence_uploaded', reason: reason.trim() });
+                                  await queryClient.invalidateQueries({ queryKey: ['candidate_evidence_history', submission?.candidate_id] });
+                                  await queryClient.invalidateQueries({ queryKey: ['submission_detail', submissionId] });
+                                  toast({ title: 'Evidence accepted', description: 'Resume version is now the accepted candidate resume; no skills were auto-verified.', tone: 'success' });
+                                } catch (err) {
+                                  toast({ title: 'Could not accept evidence', description: mapSupabaseError(err), tone: 'error' });
+                                }
+                              }}>Accept</Button>
+                              <Button size="sm" variant="outline" onClick={async () => {
+                                const reason = window.prompt('Rejection reason (required):');
+                                if (!reason?.trim()) return;
+                                try {
+                                  await reviewCandidateEvidenceDocument({ documentId: doc.id, reviewStatus: 'rejected', verificationStatus: 'rejected', reason: reason.trim() });
+                                  await queryClient.invalidateQueries({ queryKey: ['candidate_evidence_history', submission?.candidate_id] });
+                                  toast({ title: 'Evidence rejected', tone: 'success' });
+                                } catch (err) {
+                                  toast({ title: 'Could not reject evidence', description: mapSupabaseError(err), tone: 'error' });
+                                }
+                              }}>Reject</Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {!isClient && matchHistory.length > 0 && (
+                <section className="space-y-2">
+                  <h3 className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--text-secondary)]">Deterministic match history</h3>
+                  <div className="divide-y divide-[var(--border)] rounded-[8px] border border-[var(--border)]">
+                    {matchHistory.map((assessment) => (
+                      <div key={assessment.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-[12px]">
+                        <div>
+                          <div className="font-medium text-[var(--text-primary)]">Score {assessment.computed_score ?? '—'}% · {assessment.engine_version}</div>
+                          <div className="text-[var(--text-secondary)]">Matched: {assessment.matched_skills.join(', ') || 'none'} · Unproven: {assessment.unproven_skills.join(', ') || 'none'}</div>
+                        </div>
+                        <span className="text-[var(--text-tertiary)]">{formatLocalDateTime(assessment.calculated_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {/* Resume Version & Score History */}
               <div className="space-y-2">

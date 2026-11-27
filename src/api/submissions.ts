@@ -319,6 +319,14 @@ export async function resolveClarificationRpc(params: {
   if (error) throw error;
 }
 
+export async function submitClarificationResponseRpc(clarificationId: string, response: string): Promise<void> {
+  const { error } = await supabase.rpc('submit_clarification_response', {
+    p_clarification_id: clarificationId,
+    p_response: response,
+  });
+  if (error) throw error;
+}
+
 /** Returns the total number of submissions made by this vendor org. */
 export async function getVendorSubmissionCount(vendorOrgId: string): Promise<number> {
   const { data, error } = await supabase.rpc('get_vendor_submission_count', {
