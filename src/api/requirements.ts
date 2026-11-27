@@ -142,7 +142,7 @@ async function syncRequirementMappingWithBackend(params: {
   requirementId: string;
   isClientMapped: boolean;
   mappedClientOrgId: string | null;
-  budgetUnit: 'LPA' | 'LPM' | 'HOURLY' | null;
+  budgetUnit: 'LPA' | 'LPM' | 'KPM' | 'HOURLY' | null;
   budgetMode: 'range' | 'fixed';
   budgetMin: number | null;
   budgetMax: number | null;

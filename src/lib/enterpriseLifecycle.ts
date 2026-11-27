@@ -4,7 +4,7 @@ import type { AppRole, MarginType, Requirement, RequirementFinancials, Requireme
 // UPDATE 1 & UPDATE 2: Requirement Client Mapping & LPA/LPM Budget Schema
 // ============================================================================
 
-export type BudgetUnit = 'LPA' | 'LPM' | 'HOURLY';
+export type BudgetUnit = 'LPA' | 'LPM' | 'KPM' | 'HOURLY';
 export type BudgetMode = 'range' | 'fixed';
 
 export interface RequirementSoftDeleteMeta {
@@ -440,6 +440,12 @@ export const BUDGET_UNIT_METADATA: Record<
     fullLabel: 'Lakhs per month',
     shortSuffix: 'LPM',
   },
+  KPM: {
+    code: 'KPM',
+    selectorLabel: 'KPM - thousands per month',
+    fullLabel: 'Thousands of rupees per month',
+    shortSuffix: 'KPM',
+  },
   HOURLY: {
     code: 'HOURLY',
     selectorLabel: 'Hourly rate',
@@ -453,7 +459,7 @@ export const BUDGET_UNIT_METADATA: Record<
  * explicit client mapping state, and optional soft-deletion governance metadata
  * into the requirement currency field while keeping legacy plain currency strings ('INR', 'USD') 100% supported.
  *
- * Format: "<BASE_CURRENCY>|unit=<LPA|LPM>|mode=<range|fixed>|min=<num>|max=<num>|map=<1|0>:<clientOrgId>[|del=1:<deletedAt>:<deletedBy>:<canonicalId>]"
+ * Format: "<BASE_CURRENCY>|unit=<LPA|LPM|KPM>|mode=<range|fixed>|min=<num>|max=<num>|map=<1|0>:<clientOrgId>[|del=1:<deletedAt>:<deletedBy>:<canonicalId>]"
  */
 export function encodeRequirementMetaToCurrency(params: {
   baseCurrency?: string;
@@ -615,7 +621,7 @@ export function parseRequirementMeta(
 
   const unitRaw = kv.unit?.toUpperCase();
   const budgetUnit: BudgetUnit | null =
-    unitRaw === 'LPA' || unitRaw === 'LPM' || unitRaw === 'HOURLY' ? unitRaw : null;
+    unitRaw === 'LPA' || unitRaw === 'LPM' || unitRaw === 'KPM' || unitRaw === 'HOURLY' ? unitRaw : null;
 
   const budgetMode: BudgetMode = kv.mode === 'fixed' ? 'fixed' : 'range';
 
@@ -809,8 +815,8 @@ export function validateBudgetValues(params: {
   budgetMax?: number | null;
 }): { valid: boolean; error?: string } {
   const { budgetMode, budgetUnit, budgetMin, budgetMax } = params;
-  if (budgetUnit !== 'LPA' && budgetUnit !== 'LPM' && budgetUnit !== 'HOURLY') {
-    return { valid: false, error: 'Select a valid budget unit (LPA, LPM or Hourly rate).' };
+  if (budgetUnit !== 'LPA' && budgetUnit !== 'LPM' && budgetUnit !== 'KPM' && budgetUnit !== 'HOURLY') {
+    return { valid: false, error: 'Select a valid budget unit (LPA, LPM, KPM or Hourly rate).' };
   }
 
   const hasMin = budgetMin !== null && budgetMin !== undefined && !Number.isNaN(budgetMin);
@@ -913,6 +919,20 @@ export function formatBudgetDisplay(params: {
       subtitle = `${workingDaysPerMonth} working days/month · ≈ ${single ? monthly(hi) : `${monthly(lo)}–${monthly(hi)}`} per month (8 hrs/day)`;
     }
     return { formatted, subtitle, unit: budgetUnit };
+  }
+
+  if (budgetUnit === 'KPM') {
+    const toMonthly = (n: number) => `${symbol}${Math.round(n * 1000).toLocaleString('en-IN')}/month`;
+    if (!hasMin && !hasMax) return { formatted: '-', subtitle: unitInfo.fullLabel, unit: budgetUnit };
+    if (budgetMode === 'fixed' || (hasMin && hasMax && budgetMin === budgetMax) || (hasMin && !hasMax) || (!hasMin && hasMax)) {
+      const value = hasMax ? budgetMax! : budgetMin!;
+      return { formatted: toMonthly(value), subtitle: 'KPM · enter amounts in thousands', unit: budgetUnit };
+    }
+    return {
+      formatted: `${toMonthly(budgetMin!)}–${toMonthly(budgetMax!)}`,
+      subtitle: 'KPM · enter amounts in thousands',
+      unit: budgetUnit,
+    };
   }
 
   if (!hasMin && !hasMax) {

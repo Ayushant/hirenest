@@ -26,7 +26,6 @@ export async function sendEmailResult(
   html: string,
   from?: 'gopal' | 'admin' | 'praveen' | string
 ): Promise<{ ok: boolean; error?: string; channel?: string }> {
-  if (to.length === 0) return { ok: false, error: 'No recipient' };
   const res = await sendNotificationEmailViaSmtp({
     to,
     subject,

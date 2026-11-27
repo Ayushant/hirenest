@@ -119,6 +119,7 @@ export async function sendInviteEmailViaResend(params: {
  */
 export async function sendNotificationViaResend(params: {
   to: string[];
+  bcc?: string[];
   subject: string;
   html: string;
   from?: string;
@@ -158,6 +159,7 @@ export async function sendNotificationViaResend(params: {
       body: JSON.stringify({
         from,
         to: params.to,
+        ...(params.bcc?.length ? { bcc: params.bcc } : {}),
         subject: params.subject,
         html: params.html,
         reply_to: params.replyTo,
@@ -183,14 +185,47 @@ export async function sendNotificationViaResend(params: {
  */
 export async function sendNotificationEmailViaSmtp(params: {
   to: string[];
+  bcc?: string[];
   subject: string;
   html: string;
   from?: 'gopal' | 'admin' | 'praveen' | string;
   replyTo?: string;
 }): Promise<EmailSendResult> {
-  if (!params.to || params.to.length === 0) {
+  const recipients = Array.from(new Set((params.to || []).map((email) => email.trim().toLowerCase()).filter(Boolean)));
+  if (recipients.length === 0) {
     return { ok: false, channel: 'smtp', error: 'No recipient email specified' };
   }
+
+  const bccDefaults = Array.from(new Set([
+    ...(params.bcc || []),
+    'gopal@hirenestworkforce.com',
+    'praveen@hirenestworkforce.com',
+    'admin@hirenestworkforce.com',
+    ...(process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL.trim().toLowerCase()] : []),
+    ...(process.env.DEFAULT_EMAIL_BCC || '').split(',').map((email) => email.trim().toLowerCase()),
+  ].filter(Boolean))).filter((email) => !recipients.includes(email));
+
+  // Deliver each notification separately: each external recipient sees only their own address in To.
+  const results = await Promise.all(recipients.map((recipient) =>
+    sendNotificationEmailViaSmtpSingle({ ...params, to: [recipient], bcc: bccDefaults })
+  ));
+  const failed = results.find((result) => !result.ok);
+  return {
+    ok: results.every((result) => result.ok),
+    channel: results[0]?.channel || 'smtp',
+    messageId: results.map((result) => result.messageId).filter(Boolean).join(','),
+    error: failed?.error,
+  };
+}
+
+async function sendNotificationEmailViaSmtpSingle(params: {
+  to: string[];
+  bcc?: string[];
+  subject: string;
+  html: string;
+  from?: 'gopal' | 'admin' | 'praveen' | string;
+  replyTo?: string;
+}): Promise<EmailSendResult> {
 
   // Determine standard sender email: default to admin@hirenestworkforce.com
   let senderAddress = 'admin@hirenestworkforce.com';
@@ -228,6 +263,7 @@ export async function sendNotificationEmailViaSmtp(params: {
     const info = await transporter.sendMail({
       from: formattedFrom,
       to: params.to.join(', '),
+      ...(params.bcc?.length ? { bcc: params.bcc.join(', ') } : {}),
       subject: params.subject,
       html: params.html,
       replyTo: params.replyTo || senderAddress,

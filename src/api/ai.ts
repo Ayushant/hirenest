@@ -211,7 +211,7 @@ function buildClientStaffingAiFallback(
   return tagTemplate(
     {
       label: OFFLINE_AI_LABEL,
-      text: `HireNestOS Staffing Operations Guide:\n1. Job Descriptions: Define clear atomic skills, experience bounds, work mode, and LPA/LPM budget range.\n2. 4-Dimension Matching: Scores combine Skills (40%), Experience (25%), Domain (20%), and Seniority (15%). Missing resume evidence is marked Unproven (verify in screening) rather than missing.\n3. Interviews & SLA: Acknowledge shared requirements within SLA, use structured competency rubrics, and rate JD skill alignment separately from communication.`,
+      text: `HireNestOS Staffing Operations Guide:\n1. Job Descriptions: Define clear atomic skills, experience bounds, work mode, and budget using LPA, LPM, KPM (thousands per month), or hourly units.\n2. 4-Dimension Matching: Scores combine Skills (40%), Experience (25%), Domain (20%), and Seniority (15%). Missing resume evidence is marked Unproven (verify in screening) rather than missing.\n3. Interviews & SLA: Acknowledge shared requirements within SLA, use structured competency rubrics, and rate JD skill alignment separately from communication.`,
     },
     reason
   );

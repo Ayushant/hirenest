@@ -1,7 +1,7 @@
 export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'past_due' | 'cancelled';
 export type PlanId = 'starter' | 'growth' | 'enterprise';
 export type BillingCycle = 'monthly' | 'annual';
-export type BudgetUnit = 'LPA' | 'LPM';
+export type BudgetUnit = 'LPA' | 'LPM' | 'KPM';
 export type BudgetType = 'fixed' | 'range';
 
 export interface PlanFeature {

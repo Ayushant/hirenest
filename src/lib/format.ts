@@ -72,6 +72,9 @@ export function formatCurrency(amount: number | null | undefined, currency = 'IN
 
       if (!matchesVendorBudget) {
         const clean = Number.isInteger(amount) ? String(amount) : Number(amount.toFixed(2)).toString();
+        if (meta.budgetUnit === 'KPM') {
+          return `${symbol}${Math.round(amount * 1000).toLocaleString('en-IN')}/month`;
+        }
         return `${symbol}${clean} ${unitInfo.shortSuffix}`;
       }
 
@@ -113,6 +116,9 @@ export function formatFinancialAmount(
   const symbol = meta.baseCurrency.toUpperCase() === 'USD' ? '$' : '₹';
   if (meta.budgetUnit) {
     const unitInfo = BUDGET_UNIT_METADATA[meta.budgetUnit];
+    if (meta.budgetUnit === 'KPM') {
+      return `${symbol}${Math.round(amount * 1000).toLocaleString('en-IN')}/month`;
+    }
     const clean = Number.isInteger(amount) ? String(amount) : Number(amount.toFixed(2)).toString();
     return `${symbol}${clean} ${unitInfo.shortSuffix}`;
   }
@@ -124,7 +130,7 @@ export function formatRequirementBudgetWithSubtitle(
 ): {
   formatted: string;
   subtitle: string | null;
-  unit: 'LPA' | 'LPM' | 'HOURLY' | null;
+  unit: 'LPA' | 'LPM' | 'KPM' | 'HOURLY' | null;
   isClientMapped: boolean;
   mappedClientOrgId: string | null;
 } {

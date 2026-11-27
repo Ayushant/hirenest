@@ -194,7 +194,7 @@ export const RequirementFormModal: React.FC<{
   const [publishForVendors, setPublishForVendors] = useState<boolean>(true);
   const [clientMapError, setClientMapError] = useState<string | null>(null);
 
-  // Budget Range vs Fixed + LPA / LPM Unit state
+  // Budget range/fixed mode and annual/monthly budget units
   const [budgetMode, setBudgetMode] = useState<BudgetMode>(
     isEditing ? initialMeta.budgetMode || 'range' : 'range'
   );
@@ -531,7 +531,7 @@ export const RequirementFormModal: React.FC<{
     }
     setClientMapError(null);
 
-    // Validate LPA / LPM Budget
+    // Validate budget mode and unit
     const budgetCheck = validateBudgetValues({
       budgetMode,
       budgetUnit,
@@ -680,7 +680,7 @@ export const RequirementFormModal: React.FC<{
           ? `An identical active requirement (${savedReq.title}) already exists for this client and location. Linked to canonical ID ${savedReq.id.slice(0, 8).toUpperCase()}.`
           : `${savedReq.title} · ${liveBudgetPreview.formatted}${
               parsedInternalBudgetNum !== null
-                ? ` (Internal: ₹${parsedInternalBudgetNum} ${budgetUnit})`
+                ? ` (Internal: ${formatBudgetDisplay({ budgetMode: 'fixed', budgetUnit, budgetMin: parsedInternalBudgetNum, budgetMax: parsedInternalBudgetNum, baseCurrency: 'INR' }).formatted})`
                 : ''
             }`,
         tone: savedReq.wasDuplicatePrevented ? 'info' : 'success',
@@ -704,7 +704,7 @@ export const RequirementFormModal: React.FC<{
       open={open}
       onClose={onClose}
       title={isEditing ? 'Edit requirement' : 'New requirement'}
-      description="Job specification, explicit client mapping, LPA/LPM budget unit, and SLA governance."
+      description="Job specification, explicit client mapping, budget unit, and SLA governance."
       maxWidth="max-w-[660px]"
     >
       <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -1458,7 +1458,7 @@ export const RequirementFormModal: React.FC<{
           </div>
         )}
 
-        {/* Budget Unit Selection (LPA - annual / LPM - monthly) & Financial Governance */}
+        {/* Budget Unit Selection (annual, monthly, or hourly) & Financial Governance */}
         <div className="pt-3 border-t border-[var(--border)] space-y-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
@@ -1497,13 +1497,13 @@ export const RequirementFormModal: React.FC<{
             </div>
           </div>
 
-          {/* Budget Unit Selector: LPA - annual vs LPM - monthly */}
+          {/* Budget Unit Selector */}
           <div className="space-y-1.5">
             <label className="block text-[12px] leading-[16px] font-medium text-[var(--text-secondary)]">
               Budget unit
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {(['LPA', 'LPM', 'HOURLY'] as const).map((unitCode) => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {(['LPA', 'LPM', 'KPM', 'HOURLY'] as const).map((unitCode) => {
                 const info = BUDGET_UNIT_METADATA[unitCode];
                 const active = budgetUnit === unitCode;
                 return (
@@ -1560,7 +1560,7 @@ export const RequirementFormModal: React.FC<{
                   type="number"
                   step="0.1"
                   min="0"
-                  placeholder={budgetUnit === 'LPA' ? 'e.g. 12' : budgetUnit === 'HOURLY' ? 'e.g. 1200' : 'e.g. 1.2'}
+                  placeholder={budgetUnit === 'LPA' ? 'e.g. 12' : budgetUnit === 'HOURLY' ? 'e.g. 1200' : budgetUnit === 'KPM' ? 'e.g. 80' : 'e.g. 1.2'}
                   value={budgetMinInput}
                   onChange={(e) => {
                     setBudgetMinInput(e.target.value);
@@ -1572,7 +1572,7 @@ export const RequirementFormModal: React.FC<{
                   type="number"
                   step="0.1"
                   min="0"
-                  placeholder={budgetUnit === 'LPA' ? 'e.g. 15' : budgetUnit === 'HOURLY' ? 'e.g. 1500' : 'e.g. 1.8'}
+                  placeholder={budgetUnit === 'LPA' ? 'e.g. 15' : budgetUnit === 'HOURLY' ? 'e.g. 1500' : budgetUnit === 'KPM' ? 'e.g. 100' : 'e.g. 1.8'}
                   value={budgetMaxInput}
                   onChange={(e) => {
                     setBudgetMaxInput(e.target.value);
@@ -1587,7 +1587,7 @@ export const RequirementFormModal: React.FC<{
                   type="number"
                   step="0.1"
                   min="0"
-                  placeholder={budgetUnit === 'LPA' ? 'e.g. 14' : budgetUnit === 'HOURLY' ? 'e.g. 1300' : 'e.g. 1.5'}
+                  placeholder={budgetUnit === 'LPA' ? 'e.g. 14' : budgetUnit === 'HOURLY' ? 'e.g. 1300' : budgetUnit === 'KPM' ? 'e.g. 80' : 'e.g. 1.5'}
                   value={budgetMinInput}
                   onChange={(e) => {
                     setBudgetMinInput(e.target.value);
@@ -1622,7 +1622,7 @@ export const RequirementFormModal: React.FC<{
               type="number"
               step="0.1"
               min="0"
-              placeholder={budgetUnit === 'LPA' ? 'Private (e.g. 16)' : 'Private (e.g. 1.8)'}
+              placeholder={budgetUnit === 'LPA' ? 'Private (e.g. 16)' : budgetUnit === 'KPM' ? 'Private (e.g. 80)' : 'Private (e.g. 1.8)'}
               value={actualClientBudgetInput}
               onChange={(e) => {
                 financialsTouchedRef.current = true;

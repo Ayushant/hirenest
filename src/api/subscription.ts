@@ -429,7 +429,7 @@ export async function setRequirementClientMapping(params: {
 }
 
 // ----------------------------------------------------------------------
-// Requirement Budget Unit Store (Update 2: LPA / LPM)
+// Requirement Budget Unit Store (annual, lakh-monthly, thousand-monthly)
 // ----------------------------------------------------------------------
 
 export function getStoredRequirementBudgets(): Record<string, RequirementBudgetDetails> {
@@ -473,14 +473,17 @@ export async function saveRequirementBudgetDetails(params: {
   budget_type: 'fixed' | 'range';
   budget_min: number | null;
   budget_max: number | null;
-  budget_unit: 'LPA' | 'LPM';
+  budget_unit: 'LPA' | 'LPM' | 'KPM';
 }): Promise<RequirementBudgetDetails> {
   const minStr = params.budget_min !== null ? params.budget_min : '';
   const maxStr = params.budget_max !== null ? params.budget_max : '';
+  const formatAmount = (amount: number | '') => params.budget_unit === 'KPM'
+    ? `₹${Math.round(Number(amount) * 1000).toLocaleString('en-IN')}/month`
+    : `₹${amount} ${params.budget_unit}`;
   const isRange = params.budget_type === 'range' && params.budget_min !== null && params.budget_max !== null;
   const display_text = isRange
-    ? `₹${minStr}–${maxStr} ${params.budget_unit}`
-    : `₹${maxStr || minStr || '0'} ${params.budget_unit}`;
+    ? `${formatAmount(params.budget_min!)}–${formatAmount(params.budget_max!)}`
+    : formatAmount(params.budget_max || params.budget_min || 0);
 
   const details: RequirementBudgetDetails = {
     budget_type: params.budget_type,
