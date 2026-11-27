@@ -238,7 +238,7 @@ export const CandidateJobsForMePage: React.FC = () => {
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#B9D1FB]">Your opportunity hub</p>
-              <h1 className="font-[var(--font-display)] text-[26px] font-semibold tracking-tight sm:text-[32px]">Find your next move, {firstName}</h1>
+              <h1 className="font-[var(--font-display)] text-[26px] font-semibold tracking-tight text-[#FFFEFB] sm:text-[32px]">Find your next move, {firstName}</h1>
               <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-[var(--sidebar-muted)]">
                 Explore jobs matched to your experience, see why they fit, and keep every application in view.
               </p>
