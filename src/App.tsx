@@ -32,6 +32,8 @@ import {
 } from './pages/admin/HqDashboardAndGov';
 import { EarlyAccessDashboardPage } from './pages/admin/EarlyAccessDashboardPage';
 import { AdminSubscriptionPage } from './pages/admin/AdminSubscriptionPage';
+import { VendorReactivationPage } from './pages/admin/VendorReactivationPage';
+import { VendorReactivationFeedbackPage } from './pages/public/VendorReactivationFeedbackPage';
 import { RecruiterHome } from './pages/admin/BdmDashboardPage';
 import { UserTeamManagementPage } from './pages/admin/UserTeamManagementPage';
 import { VendorTeamPage } from './pages/vendor/VendorTeamPage';
@@ -196,6 +198,7 @@ function AppRoutes() {
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="/ai-interview/:token" element={<AiInterviewPage />} />
+      <Route path="/reactivate-vendor/:token" element={<VendorReactivationFeedbackPage />} />
       <Route path="/welcome" element={<WelcomePage />} />
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
@@ -251,6 +254,7 @@ function AppRoutes() {
         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
         <Route path="early-access" element={<EarlyAccessDashboardPage />} />
         <Route path="subscription" element={<AdminSubscriptionPage />} />
+        <Route path="vendor-reactivation" element={<VendorReactivationPage />} />
         <Route path="ceo" element={<CeoDashboardPage />} />
         <Route path="cfo" element={<CfoDashboardPage />} />
       </Route>

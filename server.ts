@@ -3118,6 +3118,113 @@ Extracted text snippet: ${extractedText.slice(0, 12000)}`,
     res.json({ok:true,request:data});
   });
 
+  // Vendor feedback and reactivation. Campaign delivery is always an explicit admin action.
+  app.get('/api/admin/vendor-reactivation', async (req,res) => {
+    const auth=await authenticateStaffingCaller(req,{strict:true});
+    if(!auth.ok||auth.role!=='admin'){res.status(403).json({error:'Admin access required.'});return;}
+    const db=getSupabaseAdmin(); if(!db){res.status(503).json({error:'Subscription database is unavailable.'});return;}
+    const [{data:orgs,error:orgError},{data:invites,error:inviteError}]=await Promise.all([
+      db.from('organizations').select('id,name,status,contact_name,contact_email,contact_phone,primary_contact_user_id,created_at').eq('type','vendor').eq('status','approved'),
+      db.from('vendor_reactivation_invites').select('id,org_id,invited_email,status,created_at,sent_by,responded_at,onboarding_call_scheduled_at,onboarding_call_completed_at,reactivation_days,reactivated_at,expires_at').order('created_at',{ascending:false}),
+    ]);
+    if(orgError||inviteError){res.status(400).json({error:orgError?.message||inviteError?.message});return;}
+    const vendorOrgs=orgs||[]; const ids=vendorOrgs.map((o:any)=>o.id); const byId=new Map(vendorOrgs.map((o:any)=>[o.id,o]));
+    const [{data:subs,error:subError},{data:profiles}]=await Promise.all([
+      db.from('account_subscriptions').select('account_id,plan_id,subscription_status,trial_ends_at').in('account_id',ids.length?ids:['00000000-0000-0000-0000-000000000000']),
+      db.from('profiles').select('id,org_id,full_name,email,role,status').in('org_id',ids.length?ids:['00000000-0000-0000-0000-000000000000']).eq('status','active'),
+    ]);
+    if(subError){res.status(400).json({error:subError.message});return;}
+    const subByOrg=new Map((subs||[]).map((s:any)=>[s.account_id,s]));
+    const profileByOrg=new Map<string,any[]>(); for(const p of profiles||[]){profileByOrg.set(p.org_id,[...(profileByOrg.get(p.org_id)||[]),p]);}
+    const feedbackIds=(invites||[]).map((i:any)=>i.id);
+    const {data:feedback}=feedbackIds.length?await db.from('vendor_reactivation_feedback').select('invite_id,trial_exploration,biggest_challenge,feature_suggestion_one,feature_suggestion_two,wants_onboarding_call,contact_number,preferred_call_time,additional_feedback,submitted_at').in('invite_id',feedbackIds):{data:[] as any[]};
+    const feedbackByInvite=new Map((feedback||[]).map((f:any)=>[f.invite_id,f]));
+    const now=Date.now();
+    const rows=vendorOrgs.map((o:any)=>{
+      const sub:any=subByOrg.get(o.id)||{}; const people=profileByOrg.get(o.id)||[];
+      const primary=people.find((p:any)=>p.id===o.primary_contact_user_id)||people.find((p:any)=>p.role==='vendor_admin')||people.find((p:any)=>p.role==='vendor_recruiter')||people[0];
+      const expires=sub.trial_ends_at?new Date(sub.trial_ends_at).getTime():null;
+      const invitesForOrg=(invites||[]).filter((i:any)=>i.org_id===o.id).map((i:any)=>({...i,feedback:feedbackByInvite.get(i.id)||null}));
+      const latestInvite=invitesForOrg[0]?{...invitesForOrg[0],invites:invitesForOrg}:null;
+      return {id:o.id,name:o.name,status:o.status,email:primary?.email||o.contact_email||null,contactName:primary?.full_name||o.contact_name||'Vendor partner',contactPhone:primary?.phone||o.contact_phone||null,planId:sub.plan_id||null,subscriptionStatus:sub.subscription_status||null,trialEndsAt:sub.trial_ends_at||null,expired:expires!==null&&expires<=now,expiringSoon:expires!==null&&expires>now&&expires<=now+14*86400000,latestInvite,invites:invitesForOrg};
+    }).filter((o:any)=>o.planId==='free_trial'&&(o.expired||o.expiringSoon||o.latestInvite));
+    const allInvites=invites||[];
+    res.json({vendors:rows,stats:{expiredVendors:rows.filter((v:any)=>v.expired).length,feedbackReceived:allInvites.filter((i:any)=>i.feedback).length,reactivatedVendors:new Set(allInvites.filter((i:any)=>i.status==='reactivated').map((i:any)=>i.org_id)).size,onboardingCallsPending:new Set(allInvites.filter((i:any)=>i.feedback?.wants_onboarding_call&&!i.onboarding_call_completed_at).map((i:any)=>i.org_id)).size}});
+  });
+
+  app.post('/api/admin/vendor-reactivation/send', async (req,res) => {
+    const auth=await authenticateStaffingCaller(req,{strict:true});
+    if(!auth.ok||auth.role!=='admin'){res.status(403).json({error:'Admin access required.'});return;}
+    const orgId=String(req.body?.orgId||''); const db=getSupabaseAdmin();
+    if(!orgId||!db){res.status(400).json({error:'Choose a vendor with an active contact email.'});return;}
+    const {data:org,error}=await db.from('organizations').select('id,name,status,contact_name,contact_email,primary_contact_user_id').eq('id',orgId).eq('type','vendor').eq('status','approved').single();
+    if(error||!org){res.status(404).json({error:'Approved vendor organization not found.'});return;}
+    let person:any=null;
+    if(org.primary_contact_user_id){const result=await db.from('profiles').select('full_name,email').eq('id',org.primary_contact_user_id).eq('status','active').maybeSingle();person=result.data;}
+    if(!person?.email){const result=await db.from('profiles').select('full_name,email').eq('org_id',orgId).eq('status','active').in('role',['vendor_admin','vendor_recruiter']).order('created_at',{ascending:true}).limit(1).maybeSingle();person=result.data;}
+    const email=String(person?.email||org.contact_email||'').trim(); if(!email){res.status(400).json({error:'This vendor has no deliverable contact email.'});return;}
+    const token=crypto.randomBytes(32).toString('hex'); const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+    const {data:invite,error:insertError}=await db.from('vendor_reactivation_invites').insert({org_id:orgId,invited_email:email,token_hash:tokenHash,sent_by:auth.userId}).select('id').single();
+    if(insertError||!invite){res.status(400).json({error:insertError?.message||'Could not create feedback invitation.'});return;}
+    const base=(process.env.APP_BASE_URL||process.env.APP_URL||'https://os.hirenestworkforce.com').replace(/\/$/,'');
+    const url=`${base}/reactivate-vendor/${token}`; const safeName=String(person?.full_name||org.contact_name||org.name).replace(/[<>"&]/g,'');
+    const {data:sub}=await db.from('account_subscriptions').select('trial_ends_at,plan_id,subscription_status').eq('account_id',orgId).maybeSingle();
+    if(!sub||sub.plan_id!=='free_trial'||sub.subscription_status==='active'){res.status(409).json({error:'Only inactive free-trial vendor accounts can receive this campaign.'});return;}
+    const trialCopy=sub?.trial_ends_at&&new Date(sub.trial_ends_at).getTime()>Date.now()?'Your complimentary HireNestOS trial is ending soon.':'Your complimentary HireNestOS trial has ended.';
+    const html=`<div style="font-family:Arial,sans-serif;max-width:620px;color:#17233b;line-height:1.6"><h2>Help us improve HireNestOS</h2><p>Hi ${safeName},</p><p>Greetings from HireNest Workforce. ${trialCopy} We would value a few minutes of feedback about the requirements, candidate submissions, and your experience using the platform.</p><p>Please use the short form to tell us what worked, what was difficult, and which two improvements would help your recruitment business most.</p><p><a href="${url}" style="display:inline-block;background:#2459d3;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Share feedback</a></p><p>After your feedback and a short onboarding session, we can offer a complimentary 14-day reactivation. Selected strategic partners may be considered for an additional 30 days based on active usage and engagement.</p><p>If you would like a personal walkthrough, request a call in the form and share a convenient number and time.</p><p>Best regards,<br>Team HireNest<br>HireNest Workforce Pvt. Ltd.<br><a href="https://os.hirenestworkforce.com">os.hirenestworkforce.com</a> · <a href="https://www.hirenestworkforce.com">hirenestworkforce.com</a></p></div>`;
+    try {
+      const sent=await sendNotificationEmailViaSmtp({to:[email],subject:'Help us improve HireNestOS — share your feedback',html,from:'admin@hirenestworkforce.com'});
+      if((sent as any)?.ok===false)throw new Error((sent as any).error||'Email delivery failed.');
+      res.json({ok:true,inviteId:invite.id,email});
+    } catch(err) {
+      await db.from('vendor_reactivation_invites').update({status:'send_failed',delivery_error:err instanceof Error?err.message:'Email delivery failed'}).eq('id',invite.id);
+      res.status(502).json({error:err instanceof Error?err.message:'Email delivery failed.'});
+    }
+  });
+
+  app.get('/api/public/vendor-reactivation/:token',async(req,res)=>{
+    const db=getSupabaseAdmin(); const token=String(req.params.token||'');
+    if(!db||token.length<32){res.status(404).json({error:'This feedback link is invalid or expired.'});return;}
+    const hash=crypto.createHash('sha256').update(token).digest('hex');
+    const {data:invite,error}=await db.from('vendor_reactivation_invites').select('id,org_id,status,expires_at').eq('token_hash',hash).maybeSingle();
+    if(error||!invite||new Date(invite.expires_at).getTime()<Date.now()){res.status(404).json({error:'This feedback link is invalid or expired.'});return;}
+    const [{data:org},{data:feedback}]=await Promise.all([db.from('organizations').select('name').eq('id',invite.org_id).maybeSingle(),db.from('vendor_reactivation_feedback').select('id').eq('invite_id',invite.id).maybeSingle()]);
+    res.json({vendorName:org?.name||'Vendor partner',submitted:!!feedback});
+  });
+
+  app.post('/api/public/vendor-reactivation/:token',async(req,res)=>{
+    const db=getSupabaseAdmin(); const token=String(req.params.token||'');
+    if(!db||token.length<32){res.status(404).json({error:'This feedback link is invalid or expired.'});return;}
+    const hash=crypto.createHash('sha256').update(token).digest('hex');
+    const {data:invite,error}=await db.from('vendor_reactivation_invites').select('id,org_id,expires_at,status').eq('token_hash',hash).maybeSingle();
+    if(error||!invite||new Date(invite.expires_at).getTime()<Date.now()){res.status(404).json({error:'This feedback link is invalid or expired.'});return;}
+    const body=req.body||{}; const validExplore=['yes','partially','could_not_use','no_suitable_requirements']; const validChallenge=['requirements','matching_submission','usability_onboarding','notifications_followups','time','other'];
+    if(!validExplore.includes(body.trialExploration)||!validChallenge.includes(body.biggestChallenge)||![body.featureSuggestionOne,body.featureSuggestionTwo].every((v:any)=>typeof v==='string'&&v.trim().length>=2&&v.trim().length<=1000)){res.status(400).json({error:'Answer each question and enter two feature suggestions.'});return;}
+    const wantsCall=body.wantsOnboardingCall===true; const phone=String(body.contactNumber||'').trim();
+    if(wantsCall&&(phone.replace(/\D/g,'').length<7||phone.length>40)){res.status(400).json({error:'Add a valid contact number to request a call.'});return;}
+    const {error:saveError}=await db.from('vendor_reactivation_feedback').insert({invite_id:invite.id,org_id:invite.org_id,trial_exploration:body.trialExploration,biggest_challenge:body.biggestChallenge,feature_suggestion_one:body.featureSuggestionOne.trim(),feature_suggestion_two:body.featureSuggestionTwo.trim(),wants_onboarding_call:wantsCall,contact_number:wantsCall?phone:null,preferred_call_time:wantsCall?String(body.preferredCallTime||'').slice(0,200):null,additional_feedback:String(body.additionalFeedback||'').slice(0,2000)||null});
+    if(saveError){res.status(saveError.code==='23505'?409:400).json({error:saveError.code==='23505'?'Feedback has already been submitted.':saveError.message});return;}
+    await db.from('vendor_reactivation_invites').update({status:wantsCall?'call_requested':'feedback_received',responded_at:new Date().toISOString()}).eq('id',invite.id);
+    res.json({ok:true});
+  });
+
+  app.patch('/api/admin/vendor-reactivation/:inviteId/call',async(req,res)=>{
+    const auth=await authenticateStaffingCaller(req,{strict:true}); if(!auth.ok||auth.role!=='admin'){res.status(403).json({error:'Admin access required.'});return;}
+    const {scheduledAt,completed}=req.body||{}; const db=getSupabaseAdmin(); if(!db){res.status(503).json({error:'Database unavailable.'});return;}
+    const update:any={}; if(scheduledAt)update.onboarding_call_scheduled_at=scheduledAt; if(completed===true)update.onboarding_call_completed_at=new Date().toISOString();
+    if(!Object.keys(update).length){res.status(400).json({error:'Provide a call date or mark the call complete.'});return;}
+    update.status=completed?'call_completed':(scheduledAt?'call_scheduled':'feedback_received');
+    const {error}=await db.from('vendor_reactivation_invites').update(update).eq('id',req.params.inviteId); if(error){res.status(400).json({error:error.message});return;} res.json({ok:true});
+  });
+
+  app.post('/api/admin/vendor-reactivation/:inviteId/reactivate',async(req,res)=>{
+    const auth=await authenticateStaffingCaller(req,{strict:true}); if(!auth.ok||auth.role!=='admin'){res.status(403).json({error:'Admin access required.'});return;}
+    const days=Number(req.body?.days); const reason=String(req.body?.reason||''); if(![14,30].includes(days)||reason.trim().length<3){res.status(400).json({error:'Choose 14 or 30 days and record a reason.'});return;}
+    const token=req.headers.authorization!.slice(7); const caller=createClient(process.env.VITE_SUPABASE_URL!,process.env.VITE_SUPABASE_ANON_KEY!,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+    const {data,error}=await caller.rpc('reactivate_vendor_trial_from_feedback',{p_invite_id:req.params.inviteId,p_days:days,p_reason:reason.trim()});
+    if(error){res.status(400).json({error:error.message});return;} res.json({ok:true,result:data});
+  });
+
   // 10. List all org plans (admin only)
   app.get('/api/subscriptions/all-plans', async (req, res) => {
     const auth = await authenticateStaffingCaller(req,{strict:true});
