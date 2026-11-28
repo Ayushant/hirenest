@@ -218,6 +218,7 @@ export const CandidateJobsForMePage: React.FC = () => {
   // Profile completeness: real signal from fields actually captured on the candidate record.
   const completenessFields: Array<[string, boolean]> = [
     ['Experience', Boolean(myCandidate?.total_experience_years)],
+    ['Relevant experience', myCandidate?.parsed_data?.relevant_experience_years != null],
     ['Current title', Boolean(myCandidate?.current_title)],
     ['Location', Boolean(myCandidate?.location)],
     ['Skills', candidateSkills.length > 0],
@@ -1090,6 +1091,8 @@ export const CandidateProfilePage: React.FC = () => {
   const [currentTitle, setCurrentTitle] = useState('');
   const [location, setLocation] = useState('');
   const [expYears, setExpYears] = useState('0');
+  const [relevantExpYears, setRelevantExpYears] = useState('');
+  const [experienceError, setExperienceError] = useState<string | null>(null);
   const [skills, setSkills] = useState<string[]>([]);
   const [summary, setSummary] = useState('');
   const [email, setEmail] = useState('');
@@ -1108,6 +1111,7 @@ export const CandidateProfilePage: React.FC = () => {
       setSkills(myCandidate.skills || []);
       setSummary(myCandidate.summary || '');
       const pd = (myCandidate.parsed_data || {}) as Record<string, unknown>;
+      setRelevantExpYears(pd.relevant_experience_years == null ? '' : String(pd.relevant_experience_years));
       setOpenToContract(Boolean(pd.open_to_contract));
       setDomainCategory((pd.domain_category as 'it' | 'non_it') || classifyCandidate(myCandidate));
     }
@@ -1121,6 +1125,17 @@ export const CandidateProfilePage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!myCandidate) return;
+    const currentExperience = Number(expYears);
+    const relevantExperience = relevantExpYears.trim() === '' ? null : Number(relevantExpYears);
+    if (expYears.trim() === '' || !Number.isFinite(currentExperience) || currentExperience < 0 || currentExperience > 60) {
+      setExperienceError('Enter current experience between 0 and 60 years.');
+      return;
+    }
+    if (relevantExperience !== null && (!Number.isFinite(relevantExperience) || relevantExperience < 0 || relevantExperience > currentExperience)) {
+      setExperienceError('Relevant experience must be between 0 and your current experience.');
+      return;
+    }
+    setExperienceError(null);
     setSaving(true);
     try {
       const existingPd = (myCandidate.parsed_data || {}) as Record<string, unknown>;
@@ -1128,11 +1143,12 @@ export const CandidateProfilePage: React.FC = () => {
         full_name: fullName.trim(),
         current_title: currentTitle.trim() || null,
         location: location.trim() || null,
-        total_experience_years: Number(expYears),
+        total_experience_years: currentExperience,
         skills,
         summary: summary.trim() || null,
         parsed_data: {
           ...existingPd,
+          relevant_experience_years: relevantExperience,
           open_to_contract: openToContract,
           domain_category: domainCategory,
         },
@@ -1209,10 +1225,13 @@ export const CandidateProfilePage: React.FC = () => {
     }
   };
 
+  const latestResume = evidenceHistory.find((doc) => doc.document_kind === 'resume' && doc.review_status !== 'rejected');
+  const resumePathToView = latestResume?.storage_path || myCandidate?.resume_path;
+
   const handleOpenResume = async () => {
-    if (!myCandidate?.resume_path) return;
+    if (!resumePathToView) return;
     try {
-      const signed = await getResumeSignedUrl(myCandidate.resume_path);
+      const signed = await getResumeSignedUrl(resumePathToView);
       window.open(signed, '_blank', 'noopener,noreferrer');
     } catch (err) {
       toast({
@@ -1237,9 +1256,10 @@ export const CandidateProfilePage: React.FC = () => {
     ['Current title', Boolean(myCandidate.current_title)],
     ['Location', Boolean(myCandidate.location)],
     ['Experience', Boolean(myCandidate.total_experience_years)],
+    ['Relevant experience', myCandidate.parsed_data?.relevant_experience_years != null],
     ['Skills', Boolean(myCandidate.skills?.length)],
     ['Summary', Boolean(myCandidate.summary)],
-    ['Resume', Boolean(myCandidate.resume_path)],
+    ['Resume', Boolean(resumePathToView)],
   ];
   const profileProgress = Math.round(profileChecks.filter(([, done]) => done).length / profileChecks.length * 100);
   const nextProfileStep = profileChecks.find(([, done]) => !done)?.[0];
@@ -1249,28 +1269,6 @@ export const CandidateProfilePage: React.FC = () => {
       <PageHeader
         title="My profile"
         description="Keep your skills, experience, and resume up to date to improve job match accuracy."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {myCandidate.resume_path && (
-              <Button size="sm" variant="outline" onClick={handleOpenResume}>
-                View resume
-              </Button>
-            )}
-            <label className="inline-flex min-h-9 items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[12px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus-border)]">
-              <span>Upload new resume version</span>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={handleReplaceResume}
-                className="sr-only"
-              />
-            </label>
-            <label className="inline-flex min-h-9 items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[12px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus-border)]">
-              <span>Upload supporting document</span>
-              <input type="file" accept=".pdf,.doc,.docx" onChange={handleUploadSupportingDocument} className="sr-only" />
-            </label>
-          </div>
-        }
       />
 
       <section className="mb-5 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6" aria-label="Profile overview">
@@ -1280,6 +1278,11 @@ export const CandidateProfilePage: React.FC = () => {
             <div className="min-w-0">
               <h2 className="truncate text-[16px] font-semibold text-[var(--text-primary)]">{myCandidate.full_name || 'Your profile'}</h2>
               <p className="text-[12px] text-[var(--text-secondary)]">{myCandidate.current_title || 'Add your current title'}{myCandidate.location ? ` · ${myCandidate.location}` : ''}</p>
+              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                Current experience: {myCandidate.total_experience_years == null ? 'Not set' : `${myCandidate.total_experience_years} years`}
+                {' · '}Relevant experience: {myCandidate.parsed_data?.relevant_experience_years == null ? 'Not set' : `${myCandidate.parsed_data.relevant_experience_years} years`}
+              </p>
+              <a href="#candidate-experience" className="mt-1 inline-block text-[11px] font-medium text-[var(--primary-bg)] hover:underline">Edit experience</a>
             </div>
           </div>
           <Link to="/candidate" className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--primary-bg)] hover:underline">See matched jobs <ArrowRight className="h-3.5 w-3.5" /></Link>
@@ -1294,6 +1297,31 @@ export const CandidateProfilePage: React.FC = () => {
         <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
           {nextProfileStep ? `Next step: add ${nextProfileStep.toLowerCase()} to help recruiters understand your experience.` : 'Your profile has the essentials. Keep it current as your experience grows.'}
         </p>
+      </section>
+
+      <section className="mb-5 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6" aria-label="Resume">
+        <div className="flex items-start gap-3">
+          <span className="rounded-[9px] bg-[#EEF4FF] p-2 text-[#1D5FD1]"><FileText className="h-4 w-4" /></span>
+          <div>
+            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Your resume</h2>
+            <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
+              {latestResume?.review_status === 'pending' ? 'Your latest upload is awaiting review. You can still view it here.' : resumePathToView ? 'View your current resume or upload a newer version.' : 'No resume uploaded yet. Add one to complete your profile.'}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleOpenResume} disabled={!resumePathToView}>
+            View resume
+          </Button>
+          <label className="inline-flex min-h-9 items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[12px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus-border)]">
+            {resumePathToView ? 'Upload new version' : 'Upload resume'}
+            <input type="file" accept=".pdf,.doc,.docx" onChange={handleReplaceResume} className="sr-only" />
+          </label>
+          <label className="inline-flex min-h-9 items-center rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[12px] font-medium text-[var(--text-primary)] cursor-pointer hover:bg-[var(--bg-hover)] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus-border)]">
+            Upload supporting document
+            <input type="file" accept=".pdf,.doc,.docx" onChange={handleUploadSupportingDocument} className="sr-only" />
+          </label>
+        </div>
       </section>
 
       <CandidateEmploymentPanel candidateId={myCandidate.id} />
@@ -1358,19 +1386,34 @@ export const CandidateProfilePage: React.FC = () => {
             onChange={(e) => setCurrentTitle(e.target.value)}
           />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div id="candidate-experience" className="grid scroll-mt-6 grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Location"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
           />
           <Input
-            label="Total experience (years)"
+            label="Current experience (years)"
             type="number"
             step="0.5"
+            min="0"
+            max="60"
             value={expYears}
-            onChange={(e) => setExpYears(e.target.value)}
+            onChange={(e) => { setExpYears(e.target.value); setExperienceError(null); }}
           />
+        </div>
+        <div>
+          <Input
+            label="Relevant experience (years)"
+            type="number"
+            step="0.5"
+            min="0"
+            max="60"
+            value={relevantExpYears}
+            onChange={(e) => { setRelevantExpYears(e.target.value); setExperienceError(null); }}
+            error={experienceError || undefined}
+          />
+          <p className="mt-1 text-[11px] text-[var(--text-secondary)]">Years in roles similar to the jobs you want. This cannot exceed your current experience.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Input
