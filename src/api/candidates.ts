@@ -347,6 +347,13 @@ export async function getResumeSignedUrl(resumePath: string): Promise<string> {
   return data.signedUrl;
 }
 
+export async function downloadResumeFile(resumePath: string): Promise<Blob> {
+  const { data, error } = await supabase.storage.from('resumes').download(resumePath);
+  if (error) throw error;
+  if (!data || data.size === 0) throw new Error('The resume file is empty or unavailable.');
+  return data;
+}
+
 // Two-way deterministic matching queries (candidate_matches) enriched with JD + Resume skill fine-tuning
 export async function fetchMatchesForRequirement(params: {
   requirementId: string;

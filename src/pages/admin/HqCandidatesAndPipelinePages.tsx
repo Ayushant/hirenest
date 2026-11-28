@@ -50,7 +50,7 @@ import {
   fetchCandidates,
   fetchCandidateById,
   fetchCandidateContacts,
-  getResumeSignedUrl,
+  downloadResumeFile,
   fetchMatchesForCandidate,
   overrideMatchScore,
   updateCandidateProfile,
@@ -421,7 +421,10 @@ export const HqCandidateDetailPage: React.FC = () => {
   const [linkedin, setLinkedin] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const [resumeViewerUrl, setResumeViewerUrl] = useState<string | null>(null);
+  const [resumePreview, setResumePreview] = useState<{ url: string; fileName: string; isPdf: boolean } | null>(null);
+  React.useEffect(() => () => {
+    if (resumePreview) URL.revokeObjectURL(resumePreview.url);
+  }, [resumePreview]);
 
   const [linkUserOpen, setLinkUserOpen] = useState(false);
   const [linkUserIdInput, setLinkUserIdInput] = useState('');
@@ -489,8 +492,14 @@ export const HqCandidateDetailPage: React.FC = () => {
   const handleOpenResume = async () => {
     if (!cand?.resume_path) return;
     try {
-      const signedUrl = await getResumeSignedUrl(cand.resume_path);
-      setResumeViewerUrl(signedUrl);
+      const file = await downloadResumeFile(cand.resume_path);
+      const isPdf = await file.slice(0, 5).text() === '%PDF-';
+      const previewFile = isPdf ? new Blob([file], { type: 'application/pdf' }) : file;
+      setResumePreview({
+        url: URL.createObjectURL(previewFile),
+        fileName: cand.resume_path.split('/').pop() || 'resume',
+        isPdf,
+      });
     } catch (err) {
       toast({
         title: 'Could not open resume',
@@ -1338,36 +1347,45 @@ export const HqCandidateDetailPage: React.FC = () => {
       </Dialog>
 
       {/* Resume Viewer Modal */}
-      {resumeViewerUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      {resumePreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Resume viewer">
           <div className="bg-white rounded-[12px] shadow-xl w-[90vw] max-w-[900px] h-[85vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">
-                Resume - {cand?.full_name}
-              </h3>
+              <div className="min-w-0">
+                <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Resume preview</h3>
+                <p className="truncate text-[11px] text-[var(--text-secondary)]">{resumePreview.fileName}{cand?.full_name && cand.full_name !== 'N/A' ? ` · ${cand.full_name}` : ''}</p>
+              </div>
               <div className="flex items-center gap-2">
                 <a
-                  href={resumeViewerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={resumePreview.url}
+                  download={resumePreview.fileName}
                   className="h-7 px-2.5 rounded-[6px] border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] inline-flex items-center gap-1"
                 >
-                  Open in new tab
+                  Download resume
                 </a>
                 <button
-                  onClick={() => setResumeViewerUrl(null)}
+                  type="button"
+                  aria-label="Close resume viewer"
+                  onClick={() => setResumePreview(null)}
                   className="h-7 w-7 rounded-[6px] hover:bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)]"
                 >
                   &times;
                 </button>
               </div>
             </div>
-            <div className="flex-1 min-h-0">
-              <iframe
-                src={resumeViewerUrl}
-                title="Resume viewer"
-                className="w-full h-full rounded-b-[10px]"
-              />
+            <div className="flex flex-1 min-h-0 flex-col bg-[var(--bg-subtle)]">
+              {resumePreview.isPdf ? (
+                <>
+                  <iframe src={resumePreview.url} title="Resume PDF preview" className="min-h-0 w-full flex-1" />
+                  <p className="border-t border-[var(--border)] px-4 py-2 text-center text-[11px] text-[var(--text-secondary)]">Preview blank? Use Download resume above to open the PDF directly.</p>
+                </>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                  <p className="text-[14px] font-semibold text-[var(--text-primary)]">This resume cannot be previewed in the browser</p>
+                  <p className="max-w-md text-[12px] text-[var(--text-secondary)]">Download {resumePreview.fileName} to view it in an app that supports this file type.</p>
+                  <a href={resumePreview.url} download={resumePreview.fileName} className="rounded-[6px] bg-[var(--primary-bg)] px-4 py-2 text-[12px] font-semibold text-[var(--primary-text)] hover:bg-[var(--primary-hover)]">Download resume</a>
+                </div>
+              )}
             </div>
           </div>
         </div>
