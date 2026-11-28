@@ -156,10 +156,12 @@ export async function removeParticipant(
 
 export async function pollMessages(
   roomId: string,
-  sinceTimestamp: string
+  sinceTimestamp: string,
+  signal?: AbortSignal
 ): Promise<DealRoomMessage[]> {
   const data = await apiFetch<{ ok: boolean; messages: DealRoomMessage[] }>(
-    `${BASE}/${roomId}/messages?since=${encodeURIComponent(sinceTimestamp)}`
+    `${BASE}/${roomId}/messages?since=${encodeURIComponent(sinceTimestamp)}`,
+    { signal }
   );
   return data.messages;
 }

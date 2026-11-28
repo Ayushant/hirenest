@@ -22,6 +22,7 @@ import {
   MailQuestion,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
+import { startVisiblePolling } from '../../lib/visiblePolling';
 import {
   PageHeader,
   Badge,
@@ -357,25 +358,20 @@ const ConversationTab: React.FC<{
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [liveMessages]);
 
-  // Poll for new messages every 5 seconds
+  // Keep the active chat current without polling from background tabs.
   useEffect(() => {
     if (room.status === 'closed') return;
 
-    const id = setInterval(async () => {
-      try {
-        const newMsgs = await pollMessages(roomId, latestTsRef.current);
-        if (newMsgs.length > 0) {
-          const maxTs = newMsgs[newMsgs.length - 1].createdAt;
-          if (maxTs > latestTsRef.current) latestTsRef.current = maxTs;
-          setLiveMessages((prev) => {
-            const ids = new Set(prev.map((m) => m.id));
-            return [...prev, ...newMsgs.filter((m) => !ids.has(m.id))];
-          });
-        }
-      } catch { /* silent */ }
-    }, 5000);
-
-    return () => clearInterval(id);
+    return startVisiblePolling(document, 5000, async (signal) => {
+      const newMsgs = await pollMessages(roomId, latestTsRef.current, signal);
+      if (signal.aborted || newMsgs.length === 0) return;
+      const maxTs = newMsgs[newMsgs.length - 1].createdAt;
+      if (maxTs > latestTsRef.current) latestTsRef.current = maxTs;
+      setLiveMessages((prev) => {
+        const ids = new Set(prev.map((m) => m.id));
+        return [...prev, ...newMsgs.filter((m) => !ids.has(m.id))];
+      });
+    });
   }, [roomId, room.status]);
 
   const handleSend = async () => {
