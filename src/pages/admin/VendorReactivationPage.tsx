@@ -6,7 +6,7 @@ import { useToast } from '../../components/ui/Toast';
 import { supabase } from '../../lib/supabase';
 
 type Feedback = { trial_exploration:string;biggest_challenge:string;feature_suggestion_one:string;feature_suggestion_two:string;wants_onboarding_call:boolean;contact_number:string|null;preferred_call_time:string|null;additional_feedback:string|null;submitted_at:string };
-type Invite = { id:string;status:string;created_at:string;responded_at:string|null;onboarding_call_scheduled_at:string|null;onboarding_call_completed_at:string|null;reactivation_days:number|null;feedback:Feedback|null;invites?:Invite[] };
+type Invite = { id:string;status:string;created_at:string;responded_at:string|null;onboarding_call_scheduled_at:string|null;onboarding_call_completed_at:string|null;reactivation_days:number|null;reactivated_at:string|null;feedback:Feedback|null;invites?:Invite[] };
 type Vendor = { id:string;name:string;email:string|null;contactName:string;contactPhone:string|null;trialEndsAt:string|null;expired:boolean;expiringSoon:boolean;latestInvite:Invite|null;invites:Invite[] };
 type DashboardData = { vendors:Vendor[];stats:{expiredVendors:number;feedbackReceived:number;reactivatedVendors:number;onboardingCallsPending:number} };
 
@@ -51,7 +51,7 @@ export const VendorReactivationPage:React.FC=()=>{
               {latest.reactivated_at&&latest.reactivation_days===14&&<><span className="text-sm text-emerald-700">14-day access granted · ends {shortDate(v.trialEndsAt)}</span><input aria-label="Additional 30-day approval reason" value={reason[latest.id]||''} onChange={e=>setReason({...reason,[latest.id]:e.target.value})} placeholder="Strategic extension reason" className="min-w-40 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"/><Button size="sm" onClick={()=>reactivate.mutate({id:latest.id,days:30})} disabled={!reason[latest.id]?.trim()||reactivate.isPending}>Approve additional 30 days</Button></>}
               {latest.reactivated_at&&latest.reactivation_days===30&&<span className="text-sm font-medium text-emerald-700">14-day reactivation plus additional 30 days approved</span>}</div>}
           </div>}
-          {latest?.invites?.length>1&&<details className="mt-3 text-sm"><summary className="cursor-pointer text-slate-600">View {latest.invites.length} campaign records</summary><div className="mt-2 space-y-1">{latest.invites.map(i=><p key={i.id} className="text-xs text-slate-500">{shortDate(i.created_at)} · {nice(i.status)}{i.reactivation_days?` · ${i.reactivation_days} days`:''}</p>)}</div></details>}
+          {v.invites.length>1&&<details className="mt-3 text-sm"><summary className="cursor-pointer text-slate-600">View {v.invites.length} campaign records</summary><div className="mt-2 space-y-1">{v.invites.map(i=><p key={i.id} className="text-xs text-slate-500">{shortDate(i.created_at)} · {nice(i.status)}{i.reactivation_days?` · ${i.reactivation_days} days`:''}</p>)}</div></details>}
         </article>;
       })}</div>}
       <p className="mt-5 flex items-start gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500"><Users size={15} className="mt-0.5 shrink-0"/>The 30-day extension is offered only after an initial 14-day reactivation and requires Platform Admin or Super Admin approval. Every action is recorded in subscription history.</p>
